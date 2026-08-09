@@ -1,7 +1,7 @@
 {
   "name": "orchestration-kit",
   "displayName": "Multi-Session Orchestration Kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shared claimable agent board + independent verification + worktree reconcile workflow for running multiple Claude Code sessions (each dispatching parallel worktree subagents) on one repo without collisions. Ships the board template, the workflow skills, the verifier agent, a CLAUDE.md starter, and distilled cross-project lessons.",
   "author": { "name": "Artekka" },
   "license": "MIT",

@@ -18,6 +18,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/verify-feature` | independent context-isolated verification at hand-offs |
 | `skills/reconcile` | land one worktree at a time onto main, re-prove the gate there |
 | `skills/orient` | five-bullet session orientation for kit-adopted projects |
+| `skills/retro` | session close-out: board close-out, lesson distillation (upstream to LESSONS.md), status refresh, clean-handoff check |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
 | `templates/` | `AGENT_BOARD.md`, `ORCHESTRATION.md` (project overlay), `CLAUDE-section.md` |
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
