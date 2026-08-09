@@ -1,0 +1,14 @@
+{
+  "name": "artekka-kits",
+  "owner": { "name": "Artekka" },
+  "description": "Artekka's reusable Claude Code kits. This repo is both the marketplace and (currently) its single plugin.",
+  "plugins": [
+    {
+      "name": "orchestration-kit",
+      "source": "./",
+      "description": "Multi-session claimable agent board + verification workflow.",
+      "category": "workflow",
+      "tags": ["orchestration", "multi-session", "worktree"]
+    }
+  ]
+}
