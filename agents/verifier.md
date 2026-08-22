@@ -9,6 +9,10 @@ description: >
   requirements — not against what the author thought was intended. READ-ONLY: you report
   a verdict + blast-radius, you do NOT fix code.
 tools: Read, Grep, Glob, Bash
+model: opus
+# permissionMode: bypassPermissions — OPT-IN ONLY. Lets the verifier run gates without
+# per-command prompts in unattended orchestration. A trust grant, never a default:
+# uncomment knowingly, per project.
 ---
 
 # Independent Verifier — context-isolated, read-only
