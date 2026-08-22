@@ -14,7 +14,7 @@ Repeatedly effective across the 2026-07-25/26 session (5 features shipped: bigge
 
 **How to apply:**
 - Ask only the branching decisions (2-3 max); take sensible defaults on the rest and STATE them (travel days, grid dims, storage model) rather than asking.
-- Then run the full ship cadence: build all layers → `pnpm gate` → patch note + `LATEST_PATCH_VERSION` bump → `/deploy` (verify the live bundle carries a marker from this change) → dispatch Felix (build-log milestone + AI_CONTEXT refresh) → commit her docs → push.
+- Then run the full ship cadence: build all layers → the project gate → release note + version bump → deploy (verify the live artifact carries a marker from this change) → dispatch the doc agent (log entry + status-doc refresh) → commit its docs → push.
 - For a LARGE multi-phase feature, offer to ship Phase 1 (the actual pain-fix) now and build the rest as a follow-up — but don't be over-cautious about context: at ~50% of a 1M window there's ample room to keep going (Art asked directly, 2026-07-26).
 
-Related: [[feedback_art_iterates_ui_via_local_mockups]] · [[feedback_pull_board_before_scoping_and_dont_overengineer]] · [[feedback_deploy_per_task_cadence]].
+Related: `feedback_art_iterates_ui_via_local_mockups` · `feedback_pull_board_before_scoping_and_dont_overengineer` · `feedback_deploy_per_task_cadence`.

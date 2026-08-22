@@ -25,7 +25,7 @@ Initial release, extracted from the Einherjar/Camelot Tactics multi-session work
 The orchestrated-autonomy port (from the Einherjar pilot, 2026-08-20/21) + the
 `bootstrap-project` super-init. New: orchestrate, bootstrap-project (+ scripts/bootstrap.sh,
 idempotent + --dry-run), post-feature, generic team-agent templates (optional,
-install-only-if-missing, user-level precedence), agnostic memory starter (30 ratified,
+install-only-if-missing, user-level precedence), agnostic memory starter (31: 30 ratified + 1 canonical merge,
 trust grants excluded), extras/backfill, settings-snippets template (SessionStart hook +
 auto-compact off, one approval step), LESSONS 16–27. Refreshed: orient, reconcile, retro,
 verify-feature, board, CLAUDE-section (v0.3.0 marker), verifier (model-pinned;

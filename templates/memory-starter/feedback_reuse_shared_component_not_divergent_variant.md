@@ -14,4 +14,4 @@ metadata:
 
 **The right fix:** feed the shared component the SAME real data the other caller does (real inventory + real handlers + real subWeaponId). If the component secretly reads from a store (coupling), make that an optional prop so a second caller can pass its own state — don't fork the component. Result: one component, one behavior, one place to change.
 
-**How to apply:** before adding a `variant`/`mode`/`readOnly` prop to make two callers differ, ask "can I instead make them pass the same data?" Divergence in DATA at the call site is fine; divergence in the COMPONENT (new branches/props to look different) is the smell. See the M359 expedition-equipment fix. Related: [[feedback_surface_all_state_changes]].
+**How to apply:** before adding a `variant`/`mode`/`readOnly` prop to make two callers differ, ask "can I instead make them pass the same data?" Divergence in DATA at the call site is fine; divergence in the COMPONENT (new branches/props to look different) is the smell. See the M359 expedition-equipment fix. Related: `feedback_surface_all_state_changes`.

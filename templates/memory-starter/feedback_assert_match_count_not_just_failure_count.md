@@ -23,4 +23,4 @@ which read as a clean bill of health. It had matched **zero lines** — the rege
 
 Generalises past SQL — same trap in any grep-the-output verification step.
 
-Related: [[feedback_verify_before_narrate]], [[feedback_verify_test_gate_yourself]], [[reference_prod_sql_write_via_staged_file]]
+Related: `feedback_verify_before_narrate`, `feedback_verify_test_gate_yourself`, `reference_prod_sql_write_via_staged_file`

@@ -22,6 +22,6 @@ expect(heightTokens(plainCaption).some((t) => t.startsWith("h-"))).toBe(true); /
 
 **Why the non-vacuity line matters:** without it, "both sides equally unconstrained" satisfies the equality. The verifier proved this by mutating `h-4` → `sm:h-4`, which keeps every `toContain("h-4")` substring green *and* would pass a bare set-equality.
 
-**How to apply:** when the contract is "these two elements agree", assert the **agreement** (set equality on the relevant token family), not the presence of one token on one of them — and add the check that the compared thing is non-empty. Same reasoning as [[feedback_assert_match_count_not_just_failure_count]]: presence checks pass for reasons unrelated to the property you care about.
+**How to apply:** when the contract is "these two elements agree", assert the **agreement** (set equality on the relevant token family), not the presence of one token on one of them — and add the check that the compared thing is non-empty. Same reasoning as `feedback_assert_match_count_not_just_failure_count`: presence checks pass for reasons unrelated to the property you care about.
 
-Related: [[feedback_a_check_that_cannot_fail_is_not_a_check]], [[reference_independent_verify_skill]].
+Related: `feedback_a_check_that_cannot_fail_is_not_a_check`, `reference_independent_verify_skill`.

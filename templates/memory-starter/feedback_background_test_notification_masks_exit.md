@@ -11,4 +11,4 @@ When you run the pre-deploy gate in the background as `pnpm test --no-file-paral
 
 **Why:** This bit me directly (2026-06-16, Battle Items P1). The notification said "exit code 0", but `grep "REAL EXIT" gate.log` showed **1** — a genuine `seed-tier-ladder` test failure. Trusting the notification would have merged + deployed a red gate.
 
-**How to apply:** The appended `echo "REAL EXIT: $?" >> log` pattern is CORRECT — keep it. But after a background gate completes, ALWAYS `grep` the log for that REAL-EXIT line AND the `Tests N passed | M failed` summary, and gate the merge/deploy on THAT, never on the notification's exit code. Sharpens [[feedback_verify_test_gate_yourself]] for the background-bash case.
+**How to apply:** The appended `echo "REAL EXIT: $?" >> log` pattern is CORRECT — keep it. But after a background gate completes, ALWAYS `grep` the log for that REAL-EXIT line AND the `Tests N passed | M failed` summary, and gate the merge/deploy on THAT, never on the notification's exit code. Sharpens `feedback_verify_test_gate_yourself` for the background-bash case.

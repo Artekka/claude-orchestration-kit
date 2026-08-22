@@ -1,4 +1,4 @@
-# Agnostic memory starter — seeded by bootstrap-project
+# Agnostic memory starter (31 files) — seeded by bootstrap-project
 
 Curated from the origin project's memory store (ratified 2026-08-21): working-style
 preferences and process lessons that hold on ANY project. Project FACTS were

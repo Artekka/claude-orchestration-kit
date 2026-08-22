@@ -96,7 +96,7 @@ New since v0.2.0 (extracted from the 2026-08-20/21 Orchestrated-Autonomy pilot: 
   agent definitions with the same names WIN day-to-day; project copies exist for machines
   and collaborators without them, and install only with `--with-team-agents`, only when
   missing.
-- **`templates/memory-starter/`** — 30 curated agnostic memories (working-style + process;
+- **`templates/memory-starter/`** — 31 curated agnostic memories (30 ported + 1 canonical merge) (working-style + process;
   ratified 2026-08-21). Project FACTS and STANDING PERMISSIONS were deliberately excluded —
   a trust grant never ports to a fresh project by default.
 - **`extras/`** — take-or-leave skills outside the orchestration core (currently

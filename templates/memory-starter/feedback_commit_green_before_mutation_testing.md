@@ -23,7 +23,7 @@ GREEN state.
 **How to apply:** the mutation sequence is COMMIT GREEN → mutate → run →
 `git checkout` → re-run to confirm restored-green. If for some reason GREEN
 cannot be committed yet, restore by re-applying the inverse edit (or sed the
-mutant back), never by checkout. Related: [[a-check-that-cannot-fail-is-not-a-check]]
+mutant back), never by checkout. Related: `a-check-that-cannot-fail-is-not-a-check`
 (mutation probes are that check), and the O71 pattern of restore-verifying
 between mutants — this rule is its precondition.
 

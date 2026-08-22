@@ -30,4 +30,4 @@ The implementation didn't actually do the rebuild — the constructor just defau
 
 **Rule:** a false comment gets caught, because reality contradicts it everywhere. A half-true one is confirmed by every check you happen to run and silent about the half you didn't. So verify the **specific claim you are about to rely on**, not the sentence's general vicinity — and check for a comment authorising an absence before treating that absence as a defect. Both directions are the same mistake: substituting prose for a trace.
 
-Related: [[feedback_tests_that_ratify_the_defect]] — the same substitution, but in a test rather than a comment.
+Related: `feedback_tests_that_ratify_the_defect` — the same substitution, but in a test rather than a comment.

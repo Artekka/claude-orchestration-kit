@@ -105,7 +105,9 @@ kit's whole reason to exist.
     abort can silently DROP a commit from the sequence; compare landed commits against the
     branch's commit list before declaring the landing complete.
     *Provenance:* a green branch's GREEN commit vanished from a landing mid-sequence
-    (Einherjar, 2026-08-21); caught by diffing against the branch tip.
+    (Einherjar, 2026-08-21); caught by counting the landed commits against the branch's
+    intended list — the byte-diff against the branch tip was the repair's verification,
+    not the detection.
 
 21. **Mutation/falsification commands: one explicit target tree, stderr visible.** Never
     leave earlier path guesses in a compound command; never `2>/dev/null` anything that

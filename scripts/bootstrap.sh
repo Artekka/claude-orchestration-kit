@@ -79,11 +79,14 @@ fi
 # ── 5. Memory starter ───────────────────────────────────────────────────────
 # Seeds the agnostic starter into the project's home memory store only if that
 # store does not exist yet (an existing store is live state).
-MEMDIR="$HOME/.claude/projects/$(realpath "$TARGET" | sed 's|/|-|g')/memory"
+# -m: resolve without requiring the path to exist — a dry run into a target
+# whose PARENT doesn't exist yet is the flagship bare-directory case, and a
+# bare `realpath` dies there (truncating the printed plan under set -e).
+MEMDIR="$HOME/.claude/projects/$(realpath -m "$TARGET" | sed 's|/|-|g')/memory"
 if [ -d "$MEMDIR" ]; then
   say "SKIP  memory starter ($MEMDIR exists — live store)"
 else
-  say "CREATE memory starter → $MEMDIR (30 curated memories + index)"
+  say "CREATE memory starter → $MEMDIR (31 curated memories + a generated index)"
   run mkdir -p "$MEMDIR"
   if [ "$DRY" -eq 0 ]; then
     cp "$KIT_ROOT"/templates/memory-starter/feedback_*.md "$MEMDIR/"

@@ -56,6 +56,6 @@ fails exactly 1 of 17 / 1 of 71, isolated to the right site).
 Same trap generalizes past strings: a presence-only assertion on a DoT buff survives a
 double-tick (the buff is still present, HP still dropped), so pin **count and magnitude**.
 
-Related: [[feedback-assert-match-count-not-just-failure-count]],
-[[feedback-multiagent-false-green-trace-semantics]], [[feedback-never-guess-stats-use-tables]],
-[[reference-codex-guards-anchor-to-registry]].
+Related: `feedback-assert-match-count-not-just-failure-count`,
+`feedback-multiagent-false-green-trace-semantics`, `feedback-never-guess-stats-use-tables`,
+`reference-codex-guards-anchor-to-registry`.

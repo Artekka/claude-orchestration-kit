@@ -24,4 +24,4 @@ In the Dragoon "spear damage not registering, only collision" bug, the orchestra
 
 **How to apply:** when a chain ends in "therefore it must be X", write out the alternatives you eliminated **and ask what class you never listed** — especially automatic/implicit paths (auto-advance, reconcilers, cron, retries) that need no user action. Prefer a reproduction over a deduction: if a peer can produce a deterministic repro, that outranks any chain. And when a peer corrects you, verify it — the second correction here came from checking the first.
 
-Links [[feedback_verify_before_narrate]] [[feedback_verify_subagent_failure_claims]] [[feedback_trust_user_observation_over_code_skim]] [[reference_dragoon_charge_damage_and_float_batch]] [[reference_fail_open_null_when_store_not_loaded]] [[feedback_a_test_can_pin_the_defect]].
+Links `feedback_verify_before_narrate` `feedback_verify_subagent_failure_claims` `feedback_trust_user_observation_over_code_skim` `reference_dragoon_charge_damage_and_float_batch` `reference_fail_open_null_when_store_not_loaded` `feedback_a_test_can_pin_the_defect`.

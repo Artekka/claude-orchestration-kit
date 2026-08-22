@@ -15,4 +15,4 @@ metadata:
 2. Make it interactive (layout toggles, collapse-all, theme) so he can compare options.
 3. **Overwrite the SAME scratchpad file** across iterations so his Explorer bookmark keeps working; give him the path in text (don't rely on the render card he can't see).
 4. Once he approves, implement to match, then build → **deploy** so he reviews it LIVE (he can't preview the real React app any other way; he course-corrects from the live version).
-Related: [[feedback_marathon_session_style]] · [[feedback_visual_bug_triage]] · [[reference_town_layout_sticky_banner]]
+Related: `feedback_marathon_session_style` · `feedback_visual_bug_triage` · `reference_town_layout_sticky_banner`
