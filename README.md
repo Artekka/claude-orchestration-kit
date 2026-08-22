@@ -74,3 +74,38 @@ independent `verify-feature` at the hand-off (contract only; PASS required) → 
 **one worktree at a time** onto main, re-proving the overlay's gate with the literal
 pass line → update the board, release the fence → deploy only via the exclusive DEPLOY
 row claim. Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
+
+## v0.3.0 — the orchestrated-autonomy port
+
+New since v0.2.0 (extracted from the 2026-08-20/21 Orchestrated-Autonomy pilot: 20+ rows,
+8 production releases, 15+ independent verifier runs across a 4-session fleet):
+
+- **`orchestrate`** — the active-orchestrator operating loop: seat-taking via board banner,
+  single-allocator rules (row IDs, LOG slot, DEPLOY slot, versions), briefed-row intake,
+  dependency-DAG assignment, phase-boundary tracking, verify-gated hand-offs, wave-train
+  deploys, doc-agent logging, and the retro-before-clear sibling lifecycle handshake.
+- **`bootstrap-project`** — super-init: bare directory → fully kit-adopted project in one
+  pass, driven by `scripts/bootstrap.sh` (idempotent, `--dry-run`). Offers the settings
+  snippets (SessionStart hook + auto-compact off) as ONE approval-gated step.
+- **`post-feature`** — the coupled log+status-doc close-out checklist.
+- **Refreshed** `orient` / `reconcile` / `retro` / `verify-feature` / `board` with the
+  pilot's protocol: per-session row prefixes, LOG slot, resource-window announcements,
+  count-the-picks, on-main-SHA discipline, banner-aware branches.
+- **`templates/agents/`** — an optional generic team set (orchestrator, architect,
+  backend-dev, frontend-dev, qa-lead, devops, tech-writer). **Precedence note:** user-level
+  agent definitions with the same names WIN day-to-day; project copies exist for machines
+  and collaborators without them, and install only with `--with-team-agents`, only when
+  missing.
+- **`templates/memory-starter/`** — 31 curated agnostic memories (30 ported + 1 canonical merge) (working-style + process;
+  ratified 2026-08-21). Project FACTS and STANDING PERMISSIONS were deliberately excluded —
+  a trust grant never ports to a fresh project by default.
+- **`extras/`** — take-or-leave skills outside the orchestration core (currently
+  `backfill`: guarded, lineage-preserving prod data surgery). Not installed by bootstrap.
+- **LESSONS 16–27** — the pilot's harvest.
+
+## Assumed plugins (user-level — documented, never copied)
+
+The workflow assumes nothing beyond stock Claude Code. These user-level plugins are
+routinely present on the origin setup and complement the kit, but the kit never installs
+or requires them: `superpowers` (TDD/debugging discipline), `code-review`, a token/context
+hygiene plugin. If a skill here references one, treat it as optional.

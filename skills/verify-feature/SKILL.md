@@ -1,38 +1,36 @@
 ---
 name: verify-feature
-description: Independent, context-isolated verification of a finished feature — a fresh verifier agent (never given the implementer's reasoning) checks the code MATCHES the original spec (no drift) AND genuinely works (correct gate, real pass/fail line), then reports a structured verdict + blast-radius. Use after an implementation agent completes, at any parallel hand-off, or when the user asks "verify this", "did the agent actually build X", "check the agent's work". Auto-fires for the high-risk change classes in ORCHESTRATION.md. It never edits code.
+description: Independent, context-isolated verification of a finished feature — a fresh verifier agent (never given the implementer's reasoning) checks the code MATCHES the original spec (no drift) AND genuinely works (correct gate, real pass/fail line), then reports a structured verdict + blast-radius. Use after an implementation agent completes, at any parallel hand-off, or when the human asks "verify this", "did the agent actually build X". Auto-fires for the high-risk change classes in ORCHESTRATION.md; opt-in for trivial single-file tweaks. It never edits code.
 ---
 
 # verify-feature
 
-Adds a **validator node at each hand-off edge**, anchored to canonical ground truth (the spec / design doc / named constants), not to the sibling agent. Closes TDD's blind spot: test+code that confabulate the same wrong value pass TDD but fail an independent spec check.
+A validator node with a gate at each hand-off edge, anchored to canonical ground truth (spec / design doc / named constants) — never to the sibling's test. Closes TDD's blind spot: test+code confabulating the same wrong value pass TDD but fail an independent spec check (LESSON 7).
 
-## When to run
+## When
 
 | Change | Mode |
 |---|---|
-| Parallel / worktree hand-off (agent B will consume agent A's output) | **AUTO** — before B starts |
-| A high-risk class listed in `ORCHESTRATION.md` → Change classes | **AUTO** — before reconcile |
+| Parallel / worktree hand-off (B will consume A's output) | **AUTO** — before B starts |
+| ORCHESTRATION.md's high-risk classes (schema/migration, money/economy, security, golden-fixture) | **AUTO** — before reconcile |
 | Other multi-file / shared-surface changes | AUTO in parallel work; else opt-in |
-| Trivial single-file change, no shared surface | **OPT-IN** |
+| Trivial single-file change, no shared surface | **OPT-IN** — and skipping is a recorded DECISION on the row, not an omission |
 
 ## Mechanism
 
-Dispatch a **fresh** subagent — `agentType: orchestration-kit:verifier`. Pass the **contract only**:
+Dispatch a **fresh** `verifier`-type agent with the **contract only**: `spec` (canonical text — board row / ADR / design doc, NOT the implementer's summary) + `target` (branch/worktree/diff) + `change_class` (→ gate command + model from ORCHESTRATION.md's table). The verifier is read-only; discipline + four checks + output schema live in `agents/verifier.md`.
 
-- `spec` — canonical source text: the board row / issue / design doc (ground truth), NOT the implementer's summary.
-- `target` — branch / worktree path / diff to verify.
-- `gate` — the gate command for this change class, read from `ORCHESTRATION.md` (command + the literal pass-proof line to assert).
-- `locked` — the overlay's Locked list (the verifier flags any touch).
-
-Never pass the implementer's transcript or reasoning. The verifier is read-only and returns a verdict: `PASS | DEVIATES | BROKEN` + deviations + fixes + blast radius.
+If the `verifier` agent type isn't registered (defs load at session start), fall back to a general agent at the same model with an explicit `READ-ONLY — report, do not fix` line + the full discipline pasted in — prose-only enforcement, so prefer the real type once reloaded.
 
 ## Model policy
 
-Default = a strong model (never a small/fast tier for the verdict). Escalate to the strongest available for the overlay's high-risk classes. If the strongest model refuses (safety classifier on an unattended gate), re-dispatch the SAME verification one tier down and log the fallback — an unattended gate must never stall.
+Default: the strongest generally-available tier you'd trust for review. Escalate one tier for the high-risk classes. **Never a small/fast model for the verdict.** If an escalated dispatch refuses (safety classifiers), re-dispatch the SAME verification on the default tier so an unattended gate never stalls — log the fallback.
 
-## Verdict → action
+## Acting on the verdict
 
-- `PASS` → proceed to reconcile.
-- `DEVIATES` / `BROKEN` → block downstream consumption; return deviations to the implementation agent (resume it — don't fix in the verifier, don't fix in main). Re-verify after the fix round-trip.
-- Any touch of a Locked item → surface to the human regardless of verdict.
+- **PASS** → proceed (reconcile / next stage). A PASS may still carry a hardening `fixes[]` list — landing it pre-reconcile is normal (the roundtrip precedent).
+- **DEVIATES** (drift on a green suite — the confabulation case) → downstream consumption blocked; return `deviations[]` to the SAME implementer for a fix-roundtrip, then a scoped delta re-verify.
+- **BROKEN** → same, plus contain the blast radius: pause/re-verify every `blast_radius[]` consumer (files AND sibling worktrees) before they build further.
+
+## Does NOT
+Fix code (reports `fixes[]`) · replace the gate or reconcile · run the project's known-flaky full suite.

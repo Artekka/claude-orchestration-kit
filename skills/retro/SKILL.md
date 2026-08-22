@@ -1,22 +1,20 @@
 ---
 name: retro
-description: Close out a session on a kit-adopted project — the write-back half of /orient. Board rows updated and fences released, new lessons distilled (to project memory AND proposed upstream to the kit's LESSONS.md), status docs refreshed, work committed, and a clean-handoff check so the next session can orient cold. Use when the user says "retro", "wrap up", "close out the session", "let's call it".
+description: Close out a session on a kit-adopted project — the write-back half of /orient. Board rows updated and fences released, durable lessons written as memories/skills (invocation IS the approval), new lessons proposed upstream to the kit's LESSONS.md, status docs refreshed, work committed, deploy ensured (or handed to the active orchestrator), and a clean-handoff check so the next session can orient cold. Use when the human says "retro", "wrap up", "close out the session" — or when an active orchestrator orders "run /retro now".
 ---
 
 # retro
 
-Orient loads state at session start; retro writes it back at session end. A session that ends without this leaves the board lying and its lessons trapped in one context window.
+Capture what would evaporate on `/clear`, AND leave the session committed, logged, and (when you own deploys) live. After this, a fresh `/orient` must reflect reality. Invocation is the standing approval — write, don't ask per-item.
 
 ## Steps
 
-1. **Board close-out** — every row you touched: status current, verifier verdict + REAL gate line recorded, fences released, `git pull` → commit → push the board edit. An open claim you're abandoning goes back to OPEN with a note.
-2. **Work committed** — nothing of value left uncommitted; branches/worktrees you own either landed (via reconcile) or their state is noted on their row. Deploy state goes through the DEPLOY row, never a retro side effect.
-3. **Lesson distillation — the kit's whole point:**
-   - Walk the session for incidents: a wrong assumption that cost time, a collision, a flaky signal, a rule that saved you. Write each to the project's memory system (if it has one).
-   - **Cross-project lessons go upstream:** anything not project-specific is a candidate for the kit's `docs/LESSONS.md` (rule + one-line incident provenance). Add it to the kit repo and bump the minor version — that is how every other project inherits it — or, if you can't write the kit repo, record the candidate on the board for someone who can.
-4. **Status docs refreshed** — whatever the project's orientation doc is (see overlay / CLAUDE.md): current-state line, counts, deferred list. A stale status doc is how the next session rebuilds finished work.
-5. **Clean-handoff check** — final gate: could a fresh session run `/orient` right now and get the true picture from docs + board alone? If anything load-bearing lives only in this conversation, write it down (board note, status doc, or memory) before ending.
+1. **Walk the conversation backwards.** Corrections → feedback memory (rule + why). Quiet confirmations a non-obvious approach worked → feedback memory. Sequences run ≥2× → skill candidate. Non-obvious repo facts / root-cause paths → reference memory. Human decisions not visible in code → memory. Bar: a memory is something a future agent gets *wrong or slow* without it; empty buckets are valid. UPDATE existing files over duplicating.
+2. **Propose kit-worthy lessons upstream.** A lesson that holds on ANY project belongs in the kit's `docs/LESSONS.md` (terse numbered rule + one-line provenance) — that propagation is the kit's reason to exist. Project-only lessons stay in project memory.
+3. **Board write-back.** Update every row you touched: status, verifier verdict, REAL gate lines, released fences. Close only rows whose FULL scope verifiably shipped (check reality — code + log + git — not the row's description). Sync any external task board both directions if the project uses one.
+4. **Commit the session's work.** Explicit paths (never `git add -A`; a sibling's WIP may share the tree). Release notes for user-visible work per the project's convention. Dispatch the doc agent for the log + status-doc refresh in one pass — then verify its diff is append-only and factual before committing it yourself (LESSON 23).
+5. **Deploy — banner check FIRST.** If the board carries an `ORCHESTRATOR ACTIVE` banner and you are not the orchestrator: **skip deploying entirely**; hand reconciled-but-undeployed SHAs to the orchestrator (message + board note). Otherwise ensure HEAD is live per ORCHESTRATION.md's deploy vehicle and verify a marker from this session in the live artifact.
+6. **Handshake close.** Final tight summary: memories/skills written, lessons proposed upstream, rows closed/flagged, commits, deploy status, leftover manual actions. If an orchestrator ordered this retro, **reply "retro complete" — only that reply makes your terminal safe to clear** (LESSON 24).
 
-## What stays project-level
-
-Deploys, patch notes, changelog/dev-log conventions, external task-board syncs — a project's own richer retro skill should do those and can chain this one for the generic half.
+## When NOT to use
+Mid-task, or right after `/orient` — nothing to look back on.

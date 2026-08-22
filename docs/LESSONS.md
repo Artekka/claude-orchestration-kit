@@ -79,3 +79,68 @@ kit's whole reason to exist.
 15. **The board is institutional memory at the hand-off grain.** Closed rows keep their
     verifier verdict, real gate lines, and released fences — the next session's context
     starts there.
+
+## Orchestrated autonomy (harvest 2026-08-19 → 2026-08-21)
+
+16. **Per-session row-ID prefixes — never a shared counter.** "Read the highest and add one"
+    is a read-then-write with no lock; sessions append in different places so git never
+    conflicts, both ids go live, and a grep returns two unrelated rows that look deliberate.
+    Prefix = session tag (`O7-1`, `FQ-2`); collisions become impossible by construction.
+    *Provenance:* six manual reconciliations in two days (Einherjar M416).
+
+17. **Milestone/log numbers are allocated through a claimed LOG slot** (same shape as the
+    DEPLOY slot). Any shared monotonic counter needs a single allocator while concurrent
+    sessions run.
+
+18. **A verify arc of DEVIATES → fix-roundtrip → delta-PASS is the system WORKING.** The
+    verifier's findings are the record's most valuable content; a fully green suite can
+    still carry spec drift. Roundtrip fixes land at the layer the finding names, falsified
+    one-red-each.
+
+19. **Announce resource windows on the board** — gate runs, integration/testcontainer runs,
+    deploys, AND dev-stack boots on a shared daemon. A sibling's sweeper, deploy, or
+    resource-hungry run is a killer for anything it can't see.
+
+20. **After ANY interrupted cherry-pick / rebase sequence: count the picks.** A conflict
+    abort can silently DROP a commit from the sequence; compare landed commits against the
+    branch's commit list before declaring the landing complete.
+    *Provenance:* a green branch's GREEN commit vanished from a landing mid-sequence
+    (Einherjar, 2026-08-21); caught by counting the landed commits against the branch's
+    intended list — the byte-diff against the branch tip was the repair's verification,
+    not the detection.
+
+21. **Mutation/falsification commands: one explicit target tree, stderr visible.** Never
+    leave earlier path guesses in a compound command; never `2>/dev/null` anything that
+    edits files; after restore, diff-verify EVERY tree the command string could have
+    reached, not just the one the test reads. And a mutant you haven't diff-verified as
+    APPLIED proves nothing.
+
+22. **A change that ADDS test output needs one pass through the real gate stage** — gates
+    that classify stage output by pattern make output part of the interface; a realistic
+    fixture string in test logs can impersonate an infra-error signal and false-RED every
+    session's gate. Capture loggers in tests (and assert they fired); never reword a
+    fixture away from the real message to dodge a classifier.
+
+23. **Doc-agent diffs are APPEND-ONLY and fact-checked line-by-line before commit.** A
+    delegated log write once replaced a 32k-line institutional log with an 82-line stub,
+    with fabricated details; `git diff` deletions must be zero for an append, and every
+    factual claim is checked against what actually happened.
+
+24. **Retro-before-clear is a HANDSHAKE.** `/clear` destroys unpersisted context; the retro
+    converts it into memories and tied-off state. Order: retro order → the session's
+    explicit "retro complete" → only then "safe to clear", one terminal at a time.
+
+25. **No mid-orchestration `/compact`.** Context quality is load-bearing at hand-offs;
+    compaction mid-arc loses exactly the correction/decision detail the next phase needs.
+    Context pressure → the retro-before-clear handshake instead.
+
+26. **Inserting a step into an ordered, PERSISTED sequence is a migration.** If a cursor
+    stores a position and only resolves forward, a mid-list insertion strands everyone
+    already past that index — precisely the users it was written to protect. Ship the
+    backfill + a guard in the same change. Projects carrying such sequences should elevate
+    this into their own CLAUDE.md.
+    *Provenance:* a tutorial-step insertion soft-locked the project owner's own account
+    (Einherjar TUT-30/31).
+
+27. **Never expose user PII in public channels or shared artifacts** — usernames, emails,
+    ids stay out of anything that leaves the project's private surface.
