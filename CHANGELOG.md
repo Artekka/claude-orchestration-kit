@@ -99,3 +99,11 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
   (or `--scope local`), so the kit is active only in the repos it's installed into.
 - The SessionStart hook is opt-in per repo: it runs only where `docs/orchestration/.kit-hooks`
   exists (written by `kit-init`). A repo with its own board but no marker is never nudged.
+
+## 0.4.2 — 2026-09-29
+
+- `kit-init` writes a real `AI_CONTEXT.md` by surveying the repo (README, CLAUDE.md, manifests,
+  directory tree, git history, one gate run) plus one question to the human, and seeds the first
+  build-log entry — no template left behind.
+- `orient` bootstrap mode: if the status doc is missing or still a template, orient from the
+  project itself; the seat (or a lone session) writes the doc, siblings flag it in READY instead.

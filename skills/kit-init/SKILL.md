@@ -23,7 +23,14 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.
-3. **Fill AI_CONTEXT.md** (only if just created) — current version, test count (from one gate run), one line on what works. Leave the rest as prompts.
+3. **Write AI_CONTEXT.md from the project itself** (only if just created) — survey before writing, never leave it a template:
+   ```bash
+   ls; cat README* CLAUDE.md 2>/dev/null | head -200      # purpose, setup, conventions
+   ls package.json pyproject.toml Cargo.toml go.mod Makefile 2>/dev/null   # stack + scripts
+   find . -maxdepth 2 -type d -not -path './.git*' -not -path '*/node_modules*' | head -60
+   ls docs .github/workflows 2>/dev/null; git log --oneline -30; git tag --sort=-v:refname | head -3
+   ```
+   Fill EVERY section: version (tag/manifest), test count (one gate run, literal pass line), what works, in flight (open branches), architecture quick-ref (path → what it is), deferred work (TODO/FIXME hotspots, open issues if visible). Mark anything inferred-not-verified `(unverified)`. Ask the human ONE `AskUserQuestion` for what the repo can't tell you: top priority right now + working-style preferences (offer "skip"). Also append the first log entry: `Milestone 1 — <date>: adopted orchestration-kit (baseline: <version>, <test line>)`.
 4. **CLAUDE.md section** — offer to append `templates/CLAUDE-section.md` (managed block `<!-- orchestration-kit vX -->`). Requires the human's yes; no CLAUDE.md → offer to create it with just this section. Marker already present → diff against the new template and propose the delta.
 5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orchestration-kit:retro` writes lessons there.
 6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orchestration-kit vX"`, `git push`.
