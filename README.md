@@ -96,8 +96,9 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
   pairs, report to the seat, DERIVED vs CONSISTENCY-CHECKED), a never-builds validator seat,
   READY-signal rosters, the shared-checkout board-write recipe, push-merges-immediately,
   seat context self-check with measured fill, and all human approvals routed through the seat.
-- **Zero-setup team:** `start-team.sh` opens the seat + siblings with default names (no
-  `--name` typing); the plugin's own SessionStart hook points every fresh session at
+- **Zero-setup team:** kit-init asks two questions (start now? permission mode?) and opens the
+  team; `start-team.sh` opens the seat + siblings with default names (no `--name` typing) in
+  normal / auto / accept-edits mode, remembered for recycles; the plugin's own SessionStart hook points every fresh session at
   `/orchestration-kit:orient` + READY; all launch prompts and cross-references use the
   namespaced skill names that actually resolve.
 - **Scripts:** `start-team.sh` + `recycle-sibling.sh` on one shared launcher (`lib-launch.sh`:

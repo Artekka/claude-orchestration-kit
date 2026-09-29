@@ -96,7 +96,7 @@ MEMDIR="$HOME/.claude/projects/$(realpath -m "$TARGET" | sed 's|/|-|g')/memory"
 if [ -d "$MEMDIR" ]; then
   say "SKIP  memory starter ($MEMDIR exists — live store)"
 else
-  say "CREATE memory starter → $MEMDIR (31 curated memories + a generated index)"
+  say "CREATE memory starter → $MEMDIR ($(find "$KIT_ROOT/templates/memory-starter" -name 'feedback_*.md' | wc -l) curated memories + a generated index)"
   run mkdir -p "$MEMDIR"
   if [ "$DRY" -eq 0 ]; then
     cp "$KIT_ROOT"/templates/memory-starter/feedback_*.md "$MEMDIR/"

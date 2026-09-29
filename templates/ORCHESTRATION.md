@@ -9,7 +9,7 @@
 The trusted fast verification command(s) and what a REAL pass looks like.
 
 ```
-command:      <e.g. pnpm gate | make check | cargo test --workspace>
+command:      <e.g. npm test | make check | cargo test --workspace>
 pass proof:   <the literal summary line to assert, e.g. "Tests N passed / 0 failed" per suite —
                NEVER trust exit code alone; a chained clean run can mask an earlier failure>
 never run:    <known-flaky full-suite commands and WHY, e.g. "full parallel test — container storm">
@@ -57,15 +57,19 @@ start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips n
 recycle:        bash scripts/recycle-sibling.sh <Name> [prompt]         (Windows+WSL; else /clear by hand)
 ```
 
-Team names — optional; `scripts/start-team.sh` reads this block (flags override it; without it
-the defaults are seat `Orca`, siblings `Sib1`..`Sib2`). Keep the `team:` line unindented and the
-keys indented:
+Team — `scripts/start-team.sh` and `scripts/recycle-sibling.sh` read this block (flags override
+it; without it the defaults are seat `Orca`, siblings `Sib1`..`Sib2`, normal permissions). Keep
+the `team:` line unindented and the keys indented. `permission_mode` is one of `normal`
+(asks before risky actions), `accept-edits` (`--permission-mode acceptEdits`), `auto`
+(`--permission-mode auto`); `start-team.sh --mode X` saves it here so recycles reuse it.
+You can change any of this at any time — just ask Claude to change it.
 
 ```
 team:
-  seat:      Orca
-  prefix:    Sib
-  siblings:  2
+  seat:             Orca
+  prefix:           Sib
+  siblings:         2
+  permission_mode:  normal
 ```
 
 ## Docs (institutional memory)

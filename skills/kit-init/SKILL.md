@@ -26,12 +26,19 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 4. **CLAUDE.md section** — offer to append `templates/CLAUDE-section.md` (managed block `<!-- orchestration-kit vX -->`). Requires the human's yes; no CLAUDE.md → offer to create it with just this section. Marker already present → diff against the new template and propose the delta.
 5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orchestration-kit:retro` writes lessons there.
 6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orchestration-kit vX"`, `git push`.
-7. **Next step for the human:**
+7. **Ask to start the team — ONE `AskUserQuestion` call, two questions.** Never run start-team without the answers.
+
+   | Q | Options (first = recommended) |
+   |---|---|
+   | "Start the team now? You can change the team size, names or permission mode at any time — just ask Claude to change it." | **Seat + 2 siblings (Recommended)** · **Choose how many** (follow up: 1–9) · **Not now** |
+   | "Permission mode for the team's sessions?" | **Normal (Recommended)** — asks before risky actions (no flag) · **Auto** — `--permission-mode auto`: Claude Code's automatic permission checks decide instead of prompting · **Accept edits** — `--permission-mode acceptEdits`: file edits approved automatically, commands still ask |
+
+   On a start answer, run it through Bash — say in one line first: "Your OK on the next Bash prompt is the final go-ahead to open the windows."
+   ```bash
+   bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
-   bash scripts/start-team.sh            # opens the seat (Orca) + Sib1, Sib2 — each in its own window
-   bash scripts/start-team.sh --dry-run  # preview; launches nothing
-   ```
-   Offer to run it for them. Then: talk to the seat window only; siblings report to it. Not on Windows+WSL → the script prints the per-window `claude --name …` commands to run by hand.
+   `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Not on Windows+WSL → the script prints one `claude --name …` command per window to run by hand.
+8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
 
 ## Rules
 

@@ -7,7 +7,7 @@ metadata:
 
 **A validation that finds nothing wrong and a validation that ran on nothing are indistinguishable unless you count the matches.**
 
-2026-07-22, validating the ADR 0039 prod backfill: a script parsed 849 generated `UPDATE` statements with a regex and reported
+Validating a production backfill, a script parsed 849 generated `UPDATE` statements with a regex and reported
 
 ```
 slot-wasting in a loadout: 0

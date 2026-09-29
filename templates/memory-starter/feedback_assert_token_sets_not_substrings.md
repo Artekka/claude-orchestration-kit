@@ -2,13 +2,10 @@
 name: feedback_assert_token_sets_not_substrings
 description: "A className assertion written as toContain('h-4') cannot see a LATER utility overriding it — an added h-5 keeps the test green while changing the rendered height. Compare extracted token SETS between the two elements whose equality is the actual contract, plus a non-vacuity check."
 metadata: 
-  node_type: memory
   type: feedback
-  originSessionId: c155d416-45da-4d77-9f08-6e80fd16df69
-  modified: 2026-08-19T02:17:38.955Z
 ---
 
-2026-08-14, MOB-7B Lane B. The contract was "the item-name chip is exactly as tall as a plain caption" — the fixed-height slot that stops a bottom-anchored action bar walking up the screen when a name appears. It was asserted as `expect(cls).toContain("h-4")`.
+The contract was "the item-name chip is exactly as tall as a plain caption" — the fixed-height slot that stops a bottom-anchored action bar walking up the screen when a name appears. It was asserted as `expect(cls).toContain("h-4")`.
 
 A verifier mutation added an **overriding `h-5`** to the name-chip branch. All 22 tests stayed green while the opened orb grew 4px — i.e. the exact user-reported defect the guard existed to prevent. `toContain` is blind to a later class winning the cascade.
 

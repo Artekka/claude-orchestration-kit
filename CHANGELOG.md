@@ -75,4 +75,20 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
 - **docs/GETTING-STARTED.md** (new): install (2 commands) → one CMD window → `wsl` → `claude`
   → `/orchestration-kit:kit-init` → `bash scripts/start-team.sh`; "what you get" table;
   manual `--name` launches under Advanced. **LESSONS 28–41.**
+- **Team launch from setup:** kit-init ends with ONE `AskUserQuestion` (start the team now —
+  seat + 2 siblings / choose how many / not now; permission mode — Normal / Auto / Accept
+  edits), then runs `start-team.sh` itself only on a yes (the Bash prompt is the final OK).
+- **Permission modes:** `start-team.sh` and `recycle-sibling.sh` take
+  `--mode normal|accept-edits|auto` → no flag / `--permission-mode acceptEdits` /
+  `--permission-mode auto`. `start-team --mode` saves `permission_mode:` in the `team:` block;
+  recycles reuse it (the seat's too). Dry-run prints the exact `claude` command per session.
+  A permission-bypassing mode is deliberately not offered by the scripts.
+- **"Change it any time — just ask Claude"** lines in kit-init's question and summary, both
+  script headers, the ORCHESTRATION team block, and a GETTING-STARTED "Changing things later"
+  section with example asks.
+- **Memory starter scrubbed:** 6 personal-preference memories dropped (session style, UI-mockup
+  habit, deploy cadence, blanket approval, branch/push policy, link formatting); the other 25
+  genericized (no project names, tools, people or channels); INDEX rewritten.
+- `recycle-sibling.sh` defaults the seat's prompt to `/orchestration-kit:orchestrate` when the
+  name is the configured seat.
 - Version note: `0.3.0` was already tagged, so this release is `0.4.0`.

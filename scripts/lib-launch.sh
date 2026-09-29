@@ -22,6 +22,23 @@
 LAUNCH_NAME_RE='^[A-Za-z0-9_-]+$'
 LAUNCH_PROMPT_RE='^[A-Za-z0-9 /._:,@=+-]*$'
 
+# Permission modes (claude --help, v2.1.x). Every mode keeps Claude Code's permission checks:
+# normal = no flag (asks before risky actions), accept-edits = --permission-mode acceptEdits
+# (file edits auto-approved, commands still ask), auto = --permission-mode auto.
+LAUNCH_MODE="${LAUNCH_MODE:-normal}"
+launch_valid_mode() { case "$1" in normal|accept-edits|auto) return 0 ;; *) return 1 ;; esac; }
+launch_mode_flags() {
+  case "$1" in
+    accept-edits) printf -- '--permission-mode acceptEdits ' ;;
+    auto) printf -- '--permission-mode auto ' ;;
+    *) printf '' ;;
+  esac
+}
+launch_set_mode() {
+  launch_valid_mode "$1" || { echo "--mode must be normal|accept-edits|auto: '$1'" >&2; exit 64; }
+  LAUNCH_MODE="$1"
+}
+
 launch_valid_name()   { [[ "$1" =~ $LAUNCH_NAME_RE ]]; }
 launch_valid_prompt() { [[ "$1" =~ $LAUNCH_PROMPT_RE ]]; }
 
@@ -75,7 +92,8 @@ launch_init() {
 
 launch_pattern() { printf '^claude --name %s( |$)' "$1"; }
 launch_pids()    { pgrep -f "$(launch_pattern "$1")" || true; }
-launch_cmd()     { printf '%sclaude --name %s %s' "$LAUNCH_NVM" "$1" "$(printf '%q' "$2")"; }
+# --name stays FIRST: launch_pattern matches "^claude --name <Name>( |$)".
+launch_cmd()     { printf '%sclaude --name %s %s%s' "$LAUNCH_NVM" "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$(printf '%q' "$2")"; }
 
 _launch_wt_args() {  # fills the global array LAUNCH_WT_ARGS
   LAUNCH_WT_ARGS=(-w 0 new-tab --title "$1" wsl.exe -d "$LAUNCH_DISTRO" --cd "$LAUNCH_REPO" -e bash -lc "$(launch_cmd "$1" "$2")")
@@ -85,11 +103,53 @@ _launch_ps_cmd() {
     "$LAUNCH_DISTRO" "$LAUNCH_REPO" "$(launch_cmd "$1" "$2")"
 }
 
+# Optional `team:` block in docs/orchestration/ORCHESTRATION.md: an unindented `team:` line,
+# then indented `key: value` lines. Sets TEAM_SEAT TEAM_PREFIX TEAM_N TEAM_MODE (empty when
+# absent or invalid — template placeholders like <Orca> are ignored).
+launch_team_conf() {  # <repo>
+  local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
+  # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
+  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""
+  [ -f "$conf" ] || return 0
+  while IFS='=' read -r k v; do
+    case "$k" in
+      seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;; permission_mode) TEAM_MODE="$v" ;;
+    esac
+  done < <(awk '
+    /^team:[[:space:]]*$/ { on=1; next }
+    on && /^[[:space:]]+[a-z_]+:/ { k=$1; sub(":", "", k); v=$2; print k "=" v; next }
+    on { on=0 }' "$conf")
+  launch_valid_name "$TEAM_SEAT" || TEAM_SEAT=""
+  launch_valid_name "$TEAM_PREFIX" || TEAM_PREFIX=""
+  [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
+  launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
+}
+
+# Persist permission_mode in the team block (adding the block if missing) so recycles relaunch
+# in the same mode. Touches nothing else in the file.
+launch_save_mode() {  # <repo> <mode>
+  local conf="$1/docs/orchestration/ORCHESTRATION.md" tmp
+  if [ ! -f "$conf" ]; then echo "note: ${conf} absent — permission mode not saved" >&2; return 0; fi
+  tmp="$(mktemp)"
+  awk -v mode="$2" '
+    /^team:[[:space:]]*$/ { print; on=1; found=1; next }
+    on && /^[[:space:]]+permission_mode:/ { print "  permission_mode: " mode; done=1; next }
+    on && !/^[[:space:]]+[a-z_]+:/ { if (!done) print "  permission_mode: " mode; done=1; on=0 }
+    { print }
+    END {
+      if (on && !done) print "  permission_mode: " mode
+      if (!found) { print ""; print "team:"; print "  permission_mode: " mode }
+    }' "$conf" > "$tmp" && cat "$tmp" > "$conf"
+  rm -f "$tmp"
+  echo "saved      permission_mode: $2 in ${conf#"$1"/} (commit it so every session sees it)"
+}
+
 launch_describe_env() {
   echo "distro     $LAUNCH_DISTRO"
   echo "repo       $LAUNCH_REPO"
   echo "wt.exe     ${LAUNCH_WT:-absent -> conhost windows}"
   if [ -n "$LAUNCH_NVM" ]; then echo "nvm        sourced ($HOME/.nvm/nvm.sh)"; else echo "nvm        not installed (skipped)"; fi
+  if [ "$LAUNCH_MODE" = normal ]; then echo "mode       normal (no flag)"; else echo "mode       $LAUNCH_MODE -> $(launch_mode_flags "$LAUNCH_MODE")"; fi
 }
 
 launch_describe() {  # <name> <prompt> — print what launch_open would run

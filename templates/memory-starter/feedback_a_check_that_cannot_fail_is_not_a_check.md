@@ -2,13 +2,10 @@
 name: feedback_a_check_that_cannot_fail_is_not_a_check
 description: "Self-checks that silently match nothing report success on broken state — this shell's grep does NOT support \\| alternation, so a conflict-marker check returned 0 on a file that still had one and the markers got committed. Prove a check can fail before trusting its pass."
 metadata: 
-  node_type: memory
   type: feedback
-  originSessionId: c155d416-45da-4d77-9f08-6e80fd16df69
-  modified: 2026-08-19T02:17:02.100Z
 ---
 
-2026-08-14, MOB-7B reconcile. After resolving two merge conflicts I ran what looked like a solid guard:
+After resolving two merge conflicts I ran what looked like a solid guard:
 
 ```bash
 grep -rn "^<<<<<<< \|^>>>>>>> \|^=======$" fileA fileB | wc -l   # printed 0 → "clean!"

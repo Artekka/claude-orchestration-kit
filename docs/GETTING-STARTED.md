@@ -50,17 +50,29 @@ and asks you a few questions:
 | A validator (optional) | "none" for now |
 | Locked files (optional) | `src/pricing.ts` |
 
-Then start the team — ask Claude to run it, or type it yourself in WSL:
+Last, it asks **two questions** — whether to start the team now (and how many siblings), and
+which permission mode the sessions should use. Answer them, approve the one command it runs,
+and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). You can close the
+setup session.
 
-```bash
-bash scripts/start-team.sh
-```
+**Start with 1 seat + 2 siblings.** You can change the team size, names or permission mode at
+any time — just ask Claude to change it.
 
-Three windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). Re-running it is
-safe: sessions already running are skipped. Preview without opening anything:
-`bash scripts/start-team.sh --dry-run`. You can close the setup session.
+**Permission modes** (saved in `docs/orchestration/ORCHESTRATION.md`, so recycled sessions reopen the same way):
 
-**Start with 1 seat + 2 siblings.** When that feels routine: `bash scripts/start-team.sh --siblings 3`.
+- **Normal** (recommended) — each session asks you before risky actions, in its own window.
+  Safest while you learn the workflow.
+- **Auto** (`--permission-mode auto`) — Claude Code's automatic permission checks decide most
+  actions instead of prompting you, so the team runs with fewer interruptions.
+- **Accept edits** (`--permission-mode acceptEdits`) — file edits are approved automatically;
+  commands still ask.
+
+Change it later by asking Claude ("switch the team to normal permissions"), by editing
+`permission_mode:` in the `team:` block, or with `bash scripts/start-team.sh --mode auto`.
+It applies to sessions opened from then on.
+
+Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
+Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
 ## 3. What you get
 
@@ -116,6 +128,7 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 |---|---|
 | Siblings sit idle; the seat says nobody is ready | Siblings end orientation with a READY message. Tell the sibling: "send READY to the seat" |
 | No new windows appear | Re-run `bash scripts/start-team.sh` (it falls back to plain console windows). Still nothing → see Advanced, open them by hand |
+| Sessions keep asking for permission | That's Normal mode. Ask Claude to "switch the team to auto permissions", or say yes in each window |
 | `start-team.sh` exits 2 | You're not in WSL. It prints the `claude --name …` command for each window — run them by hand |
 | `Cannot rebase onto multiple branches` | Someone used `git pull --rebase`. Use `git fetch origin && git rebase origin/main` |
 | `cannot lock ref 'refs/remotes/origin/main'` | Two sessions fetched at once. Harmless — run it again |
@@ -124,14 +137,29 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 | Tests green in a sibling, red on main | The gate ran from the wrong folder. Run it from inside your own worktree |
 | A session gets vague or repeats itself | Context is full. Measure with `ctx-fill.py`; retro and recycle |
 
-## 7. Advanced / customize
+## 7. Changing things later
 
-- **Other names or sizes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3`,
+Nothing here is fixed. Ask Claude — in the seat's window, or any Claude session in the repo —
+and it will make the change for you. For example:
+
+| You say | What changes |
+|---|---|
+| "make it 3 siblings" | `siblings:` in the `team:` block; `start-team.sh` opens Sib3 |
+| "switch the team to normal permissions" | `permission_mode:` in the `team:` block; applies to sessions opened from then on |
+| "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
+| "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
+| "deploy with `npm run release`" | the Deploy section of `ORCHESTRATION.md` |
+| "add a column for reviewer to the board" | `docs/orchestration/AGENT_BOARD.md` layout |
+| "make orient also read docs/ARCHITECTURE.md" | a project-level copy of the skill in `.claude/skills/` |
+
+## 8. Advanced / customize
+
+- **Other names, sizes or modes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3 --mode auto`,
   or set them once in the `team:` block of `docs/orchestration/ORCHESTRATION.md`.
 - **Opening a session by hand** (other OS, or no automatic windows): one terminal per session,
   in the repo:
   ```
-  claude --name Orca /orchestration-kit:orchestrate
+  claude --name Orca /orchestration-kit:orchestrate        # add --permission-mode auto etc. after the name
   claude --name Sib1 /orchestration-kit:orient
   claude --name Sib2 /orchestration-kit:orient
   ```
