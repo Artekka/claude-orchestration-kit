@@ -2,8 +2,11 @@
 
 Run **multiple Claude Code sessions on one repo at the same time** — each dispatching
 parallel isolated-worktree subagents — without file collisions, lost work, or
-confabulated green. Proven on Einherjar/Camelot Tactics: three concurrent sessions,
+confabulated green. Proven on the origin project: three concurrent sessions,
 ~15 workstreams, one evening, zero collisions.
+
+**New here? Start with [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)** — one page
+from "I run one Claude session in WSL" to a seat + two siblings.
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -13,14 +16,23 @@ workflow; upgrade it, get the newly distilled lessons.
 
 | Piece | What it does |
 |---|---|
-| `skills/kit-init` | `/orchestration-kit:kit-init` — scaffold a project (board + overlay + CLAUDE.md section), idempotent |
-| `skills/board` | claim/update/close rows on the shared board, fence discipline |
-| `skills/verify-feature` | independent context-isolated verification at hand-offs |
-| `skills/reconcile` | land one worktree at a time onto main, re-prove the gate there |
-| `skills/orient` | five-bullet session orientation for kit-adopted projects |
-| `skills/retro` | session close-out: board close-out, lesson distillation (upstream to LESSONS.md), status refresh, clean-handoff check |
+| `skills/kit-init` | `/orchestration-kit:kit-init` — scaffold a project (board + overlay + scripts + CLAUDE.md section), idempotent |
+| `skills/orchestrate` | the seat loop: banner, single-allocator, briefed rows, DAG + disjoint fences, sibling-session verification, one-at-a-time reconcile, wave-train deploys, LOG slot, sibling + seat recycling, approvals through the seat |
+| `skills/orient` | session orientation: multi-session non-negotiables, five-bullet state, READY signal to the seat |
+| `skills/board` | claim/update/close rows, per-session prefixes, the shared-checkout write recipe, status-not-narrative + archiving |
+| `skills/verify-feature` | subagent verification — the fallback when no independent sibling session is free |
+| `skills/reconcile` | land one worktree at a time onto main, push merges immediately, re-prove the gate there |
+| `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
+| `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
-| `templates/` | `AGENT_BOARD.md`, `ORCHESTRATION.md` (project overlay), `CLAUDE-section.md` |
+| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere |
+| `scripts/start-team.sh` | Windows+WSL: open the seat + N siblings, each in its own window, default names, skips any already running; `--dry-run` |
+| `scripts/recycle-sibling.sh` | Windows+WSL: open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run` |
+| `scripts/lib-launch.sh` | the shared launcher both scripts source (distro / main checkout / wt.exe detection, conhost fallback) |
+| `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript |
+| `scripts/bootstrap.sh` | the mechanical half of `bootstrap-project` (idempotent, `--dry-run`) |
+| `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, settings snippet, optional agents + memory starter |
+| `docs/GETTING-STARTED.md` | first-timer walkthrough: install → kit-init → seat + siblings → recycling → failure modes |
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
 
 **Generic vs project-specific:** the kit never hardcodes a gate or deploy command.
@@ -30,14 +42,15 @@ portable: they land here once and every project pulls them on upgrade.
 
 ## Install
 
-One-time, user level (Art's default — available in every project):
+One-time, user level (recommended — available in every project):
 
 ```bash
-claude plugin marketplace add Artekka/claude-orchestration-kit   # or the local path
+claude plugin marketplace add Artekka/claude-orchestration-kit   # or a local path
 claude plugin install orchestration-kit@artekka-kits --scope user
 ```
 
-Then, in each project: run `/orchestration-kit:kit-init` once and commit the scaffolding.
+Then, in each project: run `/orchestration-kit:kit-init` once (it copies the scripts into
+`scripts/`), then `bash scripts/start-team.sh`. Step by step: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
 
 Per-project (self-describing repo — teammates/machines get the plugin offered
 automatically) — add to the project's `.claude/settings.json`:
@@ -67,13 +80,36 @@ markers keep your customizations safe).
 
 ## The workflow in one paragraph
 
-`git pull` → read `docs/orchestration/AGENT_BOARD.md` at HEAD → claim a row by
-**committed** board edit (session tag, file fence) → dispatch an isolated-worktree
-implementation agent with the fence in its brief (never `git stash` in a worktree) →
-independent `verify-feature` at the hand-off (contract only; PASS required) → reconcile
+The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
+READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
+→ the seat assigns a row (message + board, disjoint file fences) → the sibling builds in its
+**own worktree** (never `git add -A`, never `git stash`) → a **different sibling session**
+verifies it against the contract only (PASS required) → the seat reconciles
 **one worktree at a time** onto main, re-proving the overlay's gate with the literal
 pass line → update the board, release the fence → deploy only via the exclusive DEPLOY
-row claim. Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
+row claim, in wave trains. Full sessions retro, reply "retro complete", and are recycled.
+Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
+
+## v0.4.0 — the seat + siblings upgrade
+
+- **`orchestrate` rewritten** around sibling-SESSION verification (no self-reads, no mutual
+  pairs, report to the seat, DERIVED vs CONSISTENCY-CHECKED), a never-builds validator seat,
+  READY-signal rosters, the shared-checkout board-write recipe, push-merges-immediately,
+  seat context self-check with measured fill, and all human approvals routed through the seat.
+- **Zero-setup team:** `start-team.sh` opens the seat + siblings with default names (no
+  `--name` typing); the plugin's own SessionStart hook points every fresh session at
+  `/orchestration-kit:orient` + READY; all launch prompts and cross-references use the
+  namespaced skill names that actually resolve.
+- **Scripts:** `start-team.sh` + `recycle-sibling.sh` on one shared launcher (`lib-launch.sh`:
+  Windows+WSL, conhost fallback, `--dry-run`), and `ctx-fill.py` (real context fill; refuses to
+  guess the session).
+- **Institutional memory scaffolded:** kit-init creates `docs/AI_CONTEXT.md` and an
+  append-only `docs/timeline/build-log.md`; orient reads them, retro/orchestrate append with
+  Edit (never Write). Lessons go to Claude Code's own auto-memory.
+- **Git hardening across skills/templates:** `fetch && rebase origin/main` instead of
+  `pull --rebase` (shared FETCH_HEAD race), HEAD + index guards for board writes, gate from
+  your own worktree, board = status with dated verbatim archives.
+- **`docs/GETTING-STARTED.md`** and LESSONS 28–41.
 
 ## v0.3.0 — the orchestrated-autonomy port
 

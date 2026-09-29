@@ -9,9 +9,9 @@
 # action (MKDIR/INIT/CREATE/SKIP) without touching the filesystem.
 #
 # NOT installed by this script (deliberately):
-#   - settings.json snippets (SessionStart hook, autoCompact) — user config;
-#     the bootstrap-project SKILL offers them approval-gated from
-#     templates/settings-snippets.md.
+#   - the autoCompact setting — user config; the bootstrap-project SKILL offers
+#     it approval-gated from templates/settings-snippets.md. (The SessionStart
+#     hook ships with the plugin itself.)
 #   - plugins — user-level; see README "Assumed plugins".
 #   - team agents — only with --with-team-agents (user-level defs take
 #     precedence; project copies are for machines/collaborators without them).
@@ -60,6 +60,16 @@ else
   install_if_missing templates/CLAUDE-section.md CLAUDE.md
 fi
 
+# ── 2b. Session scripts (context measurement + sibling recycling) ────────────
+for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py; do
+  install_if_missing "scripts/$f" "scripts/$f"
+done
+[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py}
+
+# ── 2c. Institutional-memory docs (status doc + append-only log) ─────────────
+install_if_missing templates/AI_CONTEXT.md docs/AI_CONTEXT.md
+install_if_missing templates/build-log.md docs/timeline/build-log.md
+
 # ── 3. Skills (orchestration core only — extras/ stay opt-in) ───────────────
 for s in "$KIT_ROOT"/skills/*/; do
   name="$(basename "$s")"
@@ -102,5 +112,5 @@ else
 fi
 
 # ── 6. Close ────────────────────────────────────────────────────────────────
-say "DONE. Not installed by design: settings snippets (see templates/settings-snippets.md — approval-gated), plugins (user-level), extras/ (opt-in)."
+say "DONE. Not installed by design: the autoCompact setting (templates/settings-snippets.md — approval-gated), plugins (user-level), extras/ (opt-in)."
 say "Next: fill docs/orchestration/ORCHESTRATION.md (gate, classes, deploy, locked) WITH the human — never guess a gate."

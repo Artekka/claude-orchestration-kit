@@ -10,7 +10,8 @@ A worktree green is necessary, not sufficient — it can be off a stale main, hi
 ## Steps
 
 1. **Identify branch + scope.** `git worktree list` + the agent's report. `git diff --stat main <branch>` — confirm no files outside the row's fence (stray edits to locked items = stop and flag), and classify the change per ORCHESTRATION.md's change classes → that picks the gate.
-2. **Land it.** `git cherry-pick <branch>` (range or `merge --no-ff` for multi-commit). Sequential only: land one chunk before dispatching the next so it branches off the landed plumbing.
+2. **Land it.** `git cherry-pick <branch>` (range or `merge --no-ff` for multi-commit). Sequential only: land one chunk before dispatching the next so it branches off the landed plumbing. Land in the shared checkout only after the HEAD guard (`[ "$(git symbolic-ref -q HEAD)" = refs/heads/main ]`) and a clean `git diff HEAD --quiet`; never `git stash` to get there.
+   **After a `merge --no-ff`, push IMMEDIATELY** (before notes, before the gate) — a later plain `git rebase` linearizes an unpushed merge and the builder's SHAs never reach origin. Refresh with `git fetch origin && git rebase --rebase-merges origin/main` while a merge is unpushed.
    **⚠ After ANY interrupted/conflicted sequence: COUNT THE PICKS** — compare landed commits against the branch's commit list; a conflict abort can silently drop a commit (LESSON 20).
 3. **Rebuild derived artifacts** the project's typecheck/tests read (ORCHESTRATION.md names them), e.g. a shared package's dist.
 4. **Run the class gate — read the REAL result.** Capture output yourself; assert the literal "N passed / 0 failed" line AND a clean exit (LESSON 10). Never run the project's known-flaky full suite; run the changed integration surfaces isolated, one at a time, if the class calls for them.

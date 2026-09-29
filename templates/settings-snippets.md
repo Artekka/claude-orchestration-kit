@@ -1,33 +1,21 @@
 # Settings snippets — offered by bootstrap-project, APPROVAL-GATED
 
-Both snippets edit the project's `.claude/settings.json` — user configuration. The
-bootstrap OFFERS them as ONE approval step (they pair: the hook starts sessions right,
-the compact setting keeps them coherent); it never applies them without a yes.
+These edit the project's `.claude/settings.json` — user configuration. The bootstrap OFFERS
+them; it never applies them without a yes.
 
-## 1. SessionStart hook — fresh sessions orient + check the banner
+## SessionStart hook — nothing to add
 
-Skips resume/compact re-entries so only genuinely fresh sessions get the nudge.
+Since v0.4.0 the plugin ships its own SessionStart hook (`hooks/hooks.json`): on a fresh
+session (startup or /clear) in a repo that has `docs/orchestration/AGENT_BOARD.md`, it tells
+the session to run `/orchestration-kit:orient` and, if an `ORCHESTRATOR ACTIVE` banner names
+another session, to send that seat a READY signal instead of asking the user for work. In any
+other repo it is a silent no-op. If you copied the v0.3.0 hook snippet into
+`.claude/settings.json`, remove it — otherwise sessions get the nudge twice.
 
-```json
-"hooks": {
-  "SessionStart": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "in=$(cat); case \"$in\" in *'\"source\":\"resume\"'*|*'\"source\":\"compact\"'*) ;; *) printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Fresh session: run /orient before any other work. Then check the top of docs/orchestration/AGENT_BOARD.md for an ORCHESTRATOR ACTIVE banner - if one names another session as orchestrator, report availability to it instead of asking the human for work.\"}}';; esac",
-          "timeout": 10
-        }
-      ]
-    }
-  ]
-}
-```
+## Auto-compact off — the no-/compact house flow
 
-## 2. Auto-compact off — the no-/compact house flow
-
-The CLAUDE-section carries the rule (never /compact mid-orchestration; context pressure →
-retro-before-clear handshake). This setting makes the automatic side match:
+The CLAUDE-section carries the rule (never /compact; context pressure → retro, then recycle).
+This setting makes the automatic side match:
 
 ```json
 "autoCompact": false
