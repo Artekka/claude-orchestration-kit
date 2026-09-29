@@ -107,3 +107,10 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
   build-log entry — no template left behind.
 - `orient` bootstrap mode: if the status doc is missing or still a template, orient from the
   project itself; the seat (or a lone session) writes the doc, siblings flag it in READY instead.
+
+## 0.4.3 — 2026-09-29
+
+- No orientation doc? The seat (or `kit-init`, or a lone session) asks ONCE how to learn the project:
+  search the repo, use an outline the human provides (path or paste), or both (outline checked
+  against the repo — the repo wins on facts). The doc it then writes means the question never repeats.
+  Siblings never ask; they flag it to the seat.

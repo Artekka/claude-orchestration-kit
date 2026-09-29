@@ -19,10 +19,10 @@ Load a fresh session's working memory without the human re-explaining. End state
 ## Steps 1–6 — The reads, in order
 
 1. The status doc (ORCHESTRATION.md → Docs; default `docs/AI_CONTEXT.md`) — note how stale its "Last refresh" is.
-   **Missing, or still has `<…>` placeholders? → bootstrap mode:** orient from the project itself instead — `README*`, `CLAUDE.md`, the package manifest(s), `ls docs/`, a 2-level directory listing, `git log --oneline -30`. Then:
+   **Missing, or still has `<…>` placeholders? → bootstrap mode:** orient from an outline the human provides and/or the project itself — `README*`, `CLAUDE.md`, the package manifest(s), `ls docs/`, a 2-level directory listing, `git log --oneline -30`. Then:
    | You are | Do |
    |---|---|
-   | The seat, or a lone session (no banner) | Write/fill the status doc from what you read (mark guesses `(unverified)`), commit it via the board-write recipe, say so in your summary |
+   | The seat, or a lone session (no banner) | **First ask, once — ONE `AskUserQuestion`:** "No orientation doc found. How should I learn this project?" → **Search the project (Recommended)** · **I'll give you an outline** (a file path, or paste it in your reply) · **Both — my outline first, then check it against the project**. With an outline: read it, treat it as the human's word on purpose/priorities, and verify its factual claims (paths, commands, versions) against the repo — the repo wins on facts, flag any mismatch. The doc you then write is the record, so this question never repeats. Then write/fill the status doc (mark guesses `(unverified)`), commit it via the board-write recipe, say so in your summary |
    | A sibling under a banner | Do NOT write it (concurrent writers) — orient from the sources, and put "status doc missing/template" in your READY so the seat fills it |
 2. `CLAUDE.md` top to bottom — the ground rules. (Claude Code's auto-memory index loads by itself.)
 3. `docs/orchestration/ORCHESTRATION.md` — gate, change classes, deploy, validator, locked items, hazards.

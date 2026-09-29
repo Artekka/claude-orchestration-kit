@@ -23,7 +23,9 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.
-3. **Write AI_CONTEXT.md from the project itself** (only if just created) — survey before writing, never leave it a template:
+3. **Write AI_CONTEXT.md** (only if just created) — never leave it a template.
+   **First ask, once — ONE `AskUserQuestion`:** "No orientation doc found. How should I learn this project?" → **Search the project (Recommended)** · **I'll give you an outline** (a file path, or paste it in your reply) · **Both — my outline first, then check it against the project**. With an outline: read it, treat it as the human's word on purpose/priorities, and verify its factual claims (paths, commands, versions) against the repo — the repo wins on facts, flag any mismatch. The doc you then write is the record, so this question never repeats.
+   Survey (search path, or to check an outline):
    ```bash
    ls; cat README* CLAUDE.md 2>/dev/null | head -200      # purpose, setup, conventions
    ls package.json pyproject.toml Cargo.toml go.mod Makefile 2>/dev/null   # stack + scripts
