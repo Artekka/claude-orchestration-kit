@@ -11,6 +11,9 @@ each other. No names to type, no settings to edit.
   your terminal; on Windows, inside WSL).
 - A git repo (e.g. `~/projects/myapp`) with a remote you can push to.
 - The launch script picks how to open windows on your machine — see the per-OS notes below.
+- **A recent Claude Code** — run `claude update` first. The seat and siblings talk to each other
+  with Claude Code's **built-in** SendMessage / ListAgents tools (nothing to install); they are
+  newer features, so an old version may not have them.
 
 ### Windows (WSL)
 
@@ -167,6 +170,13 @@ Claude to). Sessions already running are skipped; `--dry-run` previews without o
 
 Your job: talk to the seat window. You can ignore the sibling windows — if a sibling needs
 you, the seat says so.
+
+**Check the sessions can hear each other** (once, after the windows open): in the seat window ask
+*"list the other Claude sessions"*. If it names Sib1, Sib2 … messaging works. If it doesn't,
+run `claude update` in each window and restart the team. Even without messaging the workflow
+still runs — the board file (`docs/orchestration/AGENT_BOARD.md`) is the guaranteed channel:
+siblings post `AVAILABLE` / status lines there and the seat reads it. It's just slower, because
+nobody gets pinged.
 
 ## 5. Recycling when a session fills up
 

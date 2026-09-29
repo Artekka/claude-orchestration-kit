@@ -158,3 +158,5 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
 - Docs: GETTING-STARTED covers Windows (WSL), macOS, Linux and SSH/headless/tmux; README
   "What's inside"; ORCHESTRATION template `terminal:` key; orchestrate recycle row; the stale
   `v0.4.0` in bootstrap-project's commit message is now `vX` (the installed version).
+- GETTING-STARTED: SendMessage / ListAgents are built into Claude Code (nothing to install) —
+  update first, a one-line "list the other Claude sessions" check, and the board-only fallback.
