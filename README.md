@@ -42,12 +42,16 @@ portable: they land here once and every project pulls them on upgrade.
 
 ## Install
 
-One-time, user level (recommended — available in every project):
+Per repo (recommended — the kit is active only in the repos you install it into).
+Run from inside the repo:
 
 ```bash
 claude plugin marketplace add Artekka/claude-orchestration-kit   # or a local path
-claude plugin install orchestration-kit@artekka-kits --scope user
+claude plugin install orchestration-kit@artekka-kits --scope project   # or --scope local
 ```
+
+Even when installed more widely, its SessionStart hook stays silent unless the repo carries
+the opt-in marker `docs/orchestration/.kit-hooks` (created by `kit-init`).
 
 Then, in each project: run `/orchestration-kit:kit-init` once (it copies the scripts into
 `scripts/`), then `bash scripts/start-team.sh`. Step by step: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).

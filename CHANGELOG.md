@@ -92,3 +92,10 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
 - `recycle-sibling.sh` defaults the seat's prompt to `/orchestration-kit:orchestrate` when the
   name is the configured seat.
 - Version note: `0.3.0` was already tagged, so this release is `0.4.0`.
+
+## 0.4.1 — 2026-09-29
+
+- Per-repo by default: install docs now use `claude plugin install … --scope project`
+  (or `--scope local`), so the kit is active only in the repos it's installed into.
+- The SessionStart hook is opt-in per repo: it runs only where `docs/orchestration/.kit-hooks`
+  exists (written by `kit-init`). A repo with its own board but no marker is never nudged.

@@ -15,14 +15,20 @@ type, no settings to edit.
 
 ## 1. Install the plugin (once)
 
-In a WSL terminal:
+In a WSL terminal, **from inside the repo you want to use it in** (type these at the
+normal `$` prompt, not inside Claude):
 
 ```bash
+cd ~/projects/myapp
 claude plugin marketplace add Artekka/claude-orchestration-kit
-claude plugin install orchestration-kit@artekka-kits
+claude plugin install orchestration-kit@artekka-kits --scope project
 ```
 
-(`install` defaults to `--scope user`, so it's available in every repo.)
+`--scope project` turns the kit on for **this repo only** — your other projects are
+untouched. (Use `--scope local` instead if you don't want the setting committed for
+collaborators.) Repeat the `install` line inside any other repo you want it in.
+Already inside Claude? The same commands work as `/plugin marketplace add …` and
+`/plugin install …`; restart Claude afterwards.
 
 ## 2. Set up your repo and start the team (once per repo)
 
