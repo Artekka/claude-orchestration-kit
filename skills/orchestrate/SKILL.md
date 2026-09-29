@@ -115,7 +115,7 @@ Claim LOG slot (number allocated inside the claim text) → append the entry to 
 | Signal | Action |
 |---|---|
 | Sibling self-reports fill at the prompt mark; incoherent status; stale claim | SendMessage **"run /orchestration-kit:retro now"** + board note. A row already in flight finishes first |
-| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name>` (launch fresh → wait → SIGTERM old). No WSL/wt → tell the human "terminal <Name> is safe to /clear, then /orchestration-kit:orient" |
+| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name>` (launch fresh → wait → SIGTERM old). Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to /clear, then /orchestration-kit:orient" |
 | Fresh sibling sends READY | Assign the next DAG node (check `seen:` before giving it a READ) |
 
 Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear.

@@ -132,3 +132,29 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
 - Docs: GETTING-STARTED "Worktrees: advised vs enforced" (incl. shared-tree workflows, how to
   switch); README hook row; CLAUDE-section (marker v0.4.4) and orient Step 0 note the rule is
   instructed by default, enforced only if the repo opted in.
+
+## 0.4.5 — 2026-09-29
+
+- **Cross-platform session launcher.** `lib-launch.sh` detects the OS and terminal and picks a
+  backend: `tmux` (already inside tmux — first, even on WSL or a desktop), `wsl-wt` /
+  `wsl-conhost` (Windows + WSL, unchanged), `tmux-detached` over SSH, `macos-iterm` /
+  `macos-terminal` (osascript), `gitbash-cmd` (Git Bash: `cmd.exe /c start`), `linux-<emulator>`
+  (`$TERMINAL`, x-terminal-emulator, gnome-terminal, konsole, xfce4-terminal, kitty, alacritty,
+  wezterm, foot, xterm — each with its own "run this command" syntax), `tmux-detached` when
+  headless, else `manual` (prints the per-window commands, exits 2 — the old non-WSL behavior).
+- Override precedence: `--terminal <backend>` flag > `terminal:` in the ORCHESTRATION.md `team:`
+  block (template default `auto`) > auto-detect. `--terminal list` prints every backend and
+  whether it is available here. A forced backend that is not available refuses a real launch
+  (exit 64); `--dry-run` still shows its command lines.
+- Every backend runs the same `cd <repo> && [nvm] && claude --name <Name> [mode] <prompt>`;
+  launch-first-then-SIGTERM and the `pgrep -f "^claude --name <Name>( |$)"` fresh-process wait
+  are unchanged (the pattern is valid for BSD pgrep on macOS too). Without pgrep (Git Bash)
+  launches are reported unverified and `recycle-sibling.sh` never kills the old session.
+- One quoting function per backend family; the WSL no-`;`/`"`/`'` rule (and the no-spaces repo
+  path rule) now applies to WSL only. `--dry-run` prints the backend, why it was chosen, and the
+  exact command per session.
+- `kit-init`: no new question — the setup summary says "Windows will open via: <backend>";
+  on `manual` it shows the commands instead of launching.
+- Docs: GETTING-STARTED covers Windows (WSL), macOS, Linux and SSH/headless/tmux; README
+  "What's inside"; ORCHESTRATION template `terminal:` key; orchestrate recycle row; the stale
+  `v0.4.0` in bootstrap-project's commit message is now `vX` (the installed version).

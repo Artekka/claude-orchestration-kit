@@ -3,13 +3,15 @@
 #
 # Zero setup: with no flags and no config it opens `Orca` (/orchestration-kit:orchestrate) and
 # `Sib1`..`Sib2` (/orchestration-kit:orient) in the repo's main checkout, in normal permission
-# mode. Names already running are SKIPPED, so re-running only fills the gaps. Windows + WSL only
-# (see lib-launch.sh); elsewhere it prints the commands to run by hand and exits 2.
-# You can change the team size, names or permission mode at any time — just ask Claude to change it.
+# mode. Names already running are SKIPPED, so re-running only fills the gaps. The terminal is
+# detected per machine (WSL, tmux, macOS Terminal/iTerm2, Linux desktop emulators, Git Bash;
+# see lib-launch.sh); with nothing usable it prints the commands to run by hand and exits 2.
+# You can change the team size, names, permission mode or terminal at any time — just ask Claude.
 #
 # Usage:
 #   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX]
-#                         [--mode normal|accept-edits|auto] [--repo DIR]
+#                         [--mode normal|accept-edits|auto] [--terminal BACKEND|auto|list] [--repo DIR]
+#   --terminal list   print every backend and whether it is available here, then exit
 #
 # Precedence: flags > the optional `team:` block in docs/orchestration/ORCHESTRATION.md > defaults.
 # A --mode flag is saved into that block (permission_mode:) so recycles relaunch in the same mode.
@@ -18,15 +20,16 @@
 #     prefix:           Sib
 #     siblings:         2
 #     permission_mode:  normal
+#     terminal:         auto
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '10,20p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '11,23p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -34,6 +37,7 @@ while [ $# -gt 0 ]; do
     --seat) shift; f_seat="${1:?--seat needs a name}" ;;
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
+    --terminal) shift; f_term="${1:?--terminal needs a backend, auto, or list}" ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     -h|--help) usage ;;
     *) echo "unknown argument: $1" >&2; usage ;;
@@ -41,8 +45,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Repo first (the config lives in it). Works outside WSL too, for the manual-instructions path.
 REPO="$(launch_repo "$REPO")" || exit 64
+if [ "$f_term" = list ]; then launch_list_backends; exit 0; fi
 launch_team_conf "$REPO"
 
 seat="${f_seat:-${TEAM_SEAT:-Orca}}"
@@ -55,22 +59,27 @@ names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
 for i in "${!names[@]}"; do launch_check_args "${names[$i]}" "${prompts[$i]}"; done
 
-if ! launch_is_wsl; then
-  echo "start-team.sh only automates Windows + WSL. Open one terminal per session in $REPO and run:" >&2
-  LAUNCH_NVM=""
-  for i in "${!names[@]}"; do echo "  $(launch_cmd "${names[$i]}" "${prompts[$i]}")" >&2; done
-  exit 2
-fi
-launch_init "$REPO"
+launch_init "$REPO" "${f_term:-${TEAM_TERMINAL:-}}"
 
 if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or saved"
   launch_describe_env
   src="none (built-in defaults)"
-  if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_N$TEAM_MODE" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
-  echo "team       seat=${seat} siblings=${n} prefix=${prefix} mode=${LAUNCH_MODE}   config: ${src}; flags override"
-elif [ -n "$f_mode" ] && [ "$f_mode" != "$TEAM_MODE" ]; then
-  launch_save_mode "$REPO" "$LAUNCH_MODE"
+  if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_N$TEAM_MODE$TEAM_TERMINAL" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
+  echo "team       seat=${seat} siblings=${n} prefix=${prefix} mode=${LAUNCH_MODE} terminal=${f_term:-${TEAM_TERMINAL:-auto}}   config: ${src}; flags override"
+  if [ "$LAUNCH_BACKEND" = manual ]; then echo "manual     nothing can open windows here; a real run prints these commands and exits 2"; fi
+else
+  if [ "$LAUNCH_FORCED" = 1 ] && [ "$LAUNCH_AVAILABLE" = 0 ]; then
+    echo "terminal '$LAUNCH_BACKEND' — $LAUNCH_REASON. See: scripts/start-team.sh --terminal list" >&2; exit 64
+  fi
+  if [ -n "$f_mode" ] && [ "$f_mode" != "$TEAM_MODE" ]; then launch_save_mode "$REPO" "$LAUNCH_MODE"; fi
+  if [ "$LAUNCH_BACKEND" = manual ]; then
+    echo "No terminal this script can open windows in ($LAUNCH_REASON)." >&2
+    echo "Open one terminal per session and run:" >&2
+    for i in "${!names[@]}"; do echo "  $(launch_manual_cmd "${names[$i]}" "${prompts[$i]}")" >&2; done
+    exit 2
+  fi
+  echo "terminal   $LAUNCH_BACKEND ($LAUNCH_REASON)"
 fi
 
 failed=0
@@ -87,14 +96,16 @@ for i in "${!names[@]}"; do
     continue
   fi
   if launch_open "$name" "$prompt" ""; then
-    echo "OPENED $name (pid $LAUNCH_FRESH)"
+    if [ "$LAUNCH_FRESH" = unverified ]; then echo "OPENED $name (not verifiable here: no pgrep)"
+    else echo "OPENED $name (pid $LAUNCH_FRESH)"; fi
   else
-    echo "FAILED $name — no process appeared; open a window and run: $(launch_cmd "$name" "$prompt")" >&2
+    echo "FAILED $name — no process appeared; open a terminal and run: $(launch_manual_cmd "$name" "$prompt")" >&2
     failed=1
   fi
 done
 if [ "$DRY" -eq 0 ] && [ "$failed" -eq 0 ]; then
+  if [ "$LAUNCH_BACKEND" = tmux-detached ]; then echo "attach with: tmux attach -t $(launch_tmux_session)"; fi
   echo "Team up. Talk to the seat (${seat}); siblings report to it."
-  echo "You can change the team size, names or permission mode any time — just ask Claude."
+  echo "You can change the team size, names, permission mode or terminal any time — just ask Claude."
 fi
 exit "$failed"

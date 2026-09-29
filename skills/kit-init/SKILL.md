@@ -37,6 +37,10 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orchestration-kit:retro` writes lessons there.
 6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orchestration-kit vX"`, `git push`.
 7. **Ask to start the team — ONE `AskUserQuestion` call, three questions.** Never run start-team without the answers.
+   First detect the terminal backend (no question — shown in the summary; override later with `terminal:` in the team block):
+   ```bash
+   bash scripts/start-team.sh --dry-run --siblings 0 | grep -E '^(backend|reason) '   # backend + why it was picked
+   ```
 
    | Q | Options (first = recommended) |
    |---|---|
@@ -48,7 +52,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    ```bash
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
-   `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Not on Windows+WSL → the script prints one `claude --name …` command per window to run by hand.
+   `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
    Persist the worktree answer the same way, whatever the start answer (`advised` or `enforced`), then commit that path:
    ```bash
    C=docs/orchestration/ORCHESTRATION.md; W=<advised|enforced>
@@ -58,7 +62,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    git add "$C" && git commit -m "chore(orchestration): worktrees: $W"
    ```
    `enforced` takes effect at once: the plugin's PreToolUse hook reads the file on every edit (only in repos with `.kit-hooks`).
-8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
+8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
 
 ## Rules
 

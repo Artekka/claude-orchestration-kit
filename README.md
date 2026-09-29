@@ -6,7 +6,7 @@ confabulated green. Proven on the origin project: three concurrent sessions,
 ~15 workstreams, one evening, zero collisions.
 
 **New here? Start with [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)** — one page
-from "I run one Claude session in WSL" to a seat + two siblings.
+from "I run one Claude session" to a seat + two siblings, on Windows (WSL), macOS or Linux.
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -26,9 +26,9 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
 | `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) |
-| `scripts/start-team.sh` | Windows+WSL: open the seat + N siblings, each in its own window, default names, skips any already running; `--dry-run` |
-| `scripts/recycle-sibling.sh` | Windows+WSL: open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run` |
-| `scripts/lib-launch.sh` | the shared launcher both scripts source (distro / main checkout / wt.exe detection, conhost fallback) |
+| `scripts/start-team.sh` | open the seat + N siblings, each in its own window (terminal auto-detected), default names, skips any already running; `--dry-run`, `--terminal <backend>` / `--terminal list` |
+| `scripts/recycle-sibling.sh` | open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run`, `--terminal` |
+| `scripts/lib-launch.sh` | the shared launcher both scripts source: detects the terminal backend — `tmux` (already inside tmux), `wsl-wt` / `wsl-conhost` (Windows + WSL), `macos-iterm` / `macos-terminal`, `gitbash-cmd`, `linux-<emulator>` (gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, foot, xterm, `$TERMINAL`, x-terminal-emulator), `tmux-detached` (SSH / headless), else `manual` (prints the commands, exits 2). Override: `--terminal` flag > `terminal:` in the team block > auto |
 | `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript |
 | `scripts/bootstrap.sh` | the mechanical half of `bootstrap-project` (idempotent, `--dry-run`) |
 | `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, settings snippet, optional agents + memory starter |

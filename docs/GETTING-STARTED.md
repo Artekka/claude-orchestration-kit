@@ -1,22 +1,56 @@
 # Getting started — from one Claude session to a seat + siblings
 
-For someone who today opens **CMD**, types `wsl`, and runs `claude` inside WSL. After this page
-you will run one **seat** (the orchestrator you talk to) and two **siblings** (builders) on
-the same repo, each in its own window, without them stepping on each other. No names to
-type, no settings to edit.
+For someone who today opens a terminal and runs `claude` in one repo — on **Windows (WSL),
+macOS or Linux**. After this page you will run one **seat** (the orchestrator you talk to) and
+two **siblings** (builders) on the same repo, each in its own window, without them stepping on
+each other. No names to type, no settings to edit.
 
 ## 0. What you need
 
-- Windows with WSL (Ubuntu or similar) and Claude Code installed **inside WSL**
-  (`claude --version` works after `wsl`).
-- A git repo inside WSL (e.g. `~/projects/myapp`) with a remote you can push to.
-- Keep the repo in the Linux filesystem (`~/…`), not under `/mnt/c/…`, and with no spaces
-  in its path — git and worktrees are much faster there, and the launch scripts require it.
+- **Windows (WSL), macOS or Linux**, with Claude Code installed (`claude --version` works in
+  your terminal; on Windows, inside WSL).
+- A git repo (e.g. `~/projects/myapp`) with a remote you can push to.
+- The launch script picks how to open windows on your machine — see the per-OS notes below.
+
+### Windows (WSL)
+
+You open **CMD**, type `wsl`, and run `claude` inside WSL. Claude Code must be installed
+**inside WSL** (`claude --version` works after `wsl`). Keep the repo in the Linux filesystem
+(`~/…`), not under `/mnt/c/…`, and with no spaces in its path — git and worktrees are much
+faster there, and the Windows launcher requires it. Windows open in **Windows Terminal** if you
+have it, else in plain console windows.
+
+Git Bash without WSL also works, less well: windows open as `cmd.exe` consoles, but Git Bash
+has no `pgrep`, so the scripts can't see which sessions are running — recycling opens the fresh
+window and asks you to close the old one yourself.
+
+### macOS
+
+Use Terminal or iTerm2. Windows open in **iTerm2** when you run the setup from iTerm2 (or it's
+running), else in **Terminal**. The first time, macOS asks whether your terminal may control
+Terminal/iTerm2 ("automation" permission) — allow it, or no windows appear.
+
+### Linux
+
+On a desktop session, windows open in your terminal emulator: `$TERMINAL` if you set it, else
+the first one found of x-terminal-emulator, gnome-terminal, konsole, xfce4-terminal, kitty,
+alacritty, wezterm, foot, xterm.
+
+### Over SSH, headless, or already in tmux
+
+If you run the setup **inside tmux**, each session opens as a new tmux window (on any OS). Over
+**SSH** or on a machine with no desktop, the sessions open in a detached tmux session named
+after the repo — attach with `tmux attach -t <repo-name>` (the script prints the exact
+command). No tmux installed → the script prints one command per window for you to run.
+
+To see what your machine supports: `bash scripts/start-team.sh --terminal list`. To pick one
+yourself, ask Claude ("open the team in tmux"), set `terminal:` in the `team:` block of
+`docs/orchestration/ORCHESTRATION.md`, or pass `--terminal <backend>`.
 
 ## 1. Install the plugin (once)
 
-In a WSL terminal, **from inside the repo you want to use it in** (type these at the
-normal `$` prompt, not inside Claude):
+In a terminal (on Windows: a WSL terminal), **from inside the repo you want to use it in**
+(type these at the normal `$` prompt, not inside Claude):
 
 ```bash
 cd ~/projects/myapp
@@ -32,13 +66,15 @@ Already inside Claude? The same commands work as `/plugin marketplace add …` a
 
 ## 2. Set up your repo and start the team (once per repo)
 
-Open **one** CMD window:
+Open **one** terminal in the repo and start Claude. On Windows, that's one CMD window:
 
 ```
 wsl
 cd ~/projects/myapp
 claude
 ```
+
+On macOS or Linux: `cd ~/projects/myapp && claude`.
 
 In that Claude session run:
 
@@ -59,8 +95,8 @@ and asks you a few questions:
 Last, it asks **three questions** — whether to start the team now (and how many siblings),
 which permission mode the sessions should use, and whether separate worktrees per session are
 advised or enforced. Answer them, approve the one command it runs,
-and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). You can close the
-setup session.
+and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
+says how they open on your machine ("Windows will open via: …"). You can close the setup session.
 
 **Start with 1 seat + 2 siblings.** You can change the team size, names, permission mode or worktree setting at
 any time — just ask Claude to change it.
@@ -141,8 +177,8 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 2. The seat tells that sibling to retro. The sibling saves lessons, updates the board,
    commits, and replies **"retro complete"**.
 3. The seat runs `bash scripts/recycle-sibling.sh Sib1`: a **new window** opens with a fresh
-   Sib1, and only then is the old one closed. Windows Terminal is used if you have it, a plain
-   console window otherwise.
+   Sib1, and only then is the old one closed. It opens the same way `start-team.sh` does on
+   your machine (Windows Terminal, Terminal/iTerm2, your Linux emulator, or a tmux window).
 4. The seat recycles itself the same way after writing a handover note on the board. If the
    script can't run, the seat asks you to type `/clear` in that window and then
    `/orchestration-kit:orient` (siblings) or `/orchestration-kit:orchestrate` (seat).
@@ -152,9 +188,9 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 | Symptom | Cause → fix |
 |---|---|
 | Siblings sit idle; the seat says nobody is ready | Siblings end orientation with a READY message. Tell the sibling: "send READY to the seat" |
-| No new windows appear | Re-run `bash scripts/start-team.sh` (it falls back to plain console windows). Still nothing → see Advanced, open them by hand |
+| No new windows appear | Run `bash scripts/start-team.sh --dry-run` to see which terminal it picked and why; `--terminal list` shows the alternatives. On macOS, allow the "automation" prompt. Over SSH / tmux-detached: `tmux attach -t <repo-name>`. Still nothing → see Advanced, open them by hand |
 | Sessions keep asking for permission | That's Normal mode. Ask Claude to "switch the team to auto permissions", or say yes in each window |
-| `start-team.sh` exits 2 | You're not in WSL. It prints the `claude --name …` command for each window — run them by hand |
+| `start-team.sh` exits 2 | It found no terminal it can open windows in (no WSL, tmux, macOS, desktop emulator). It prints the `claude --name …` command for each window — run them by hand, or install tmux |
 | `Cannot rebase onto multiple branches` | Someone used `git pull --rebase`. Use `git fetch origin && git rebase origin/main` |
 | `cannot lock ref 'refs/remotes/origin/main'` | Two sessions fetched at once. Harmless — run it again |
 | Your edit shows up inside someone else's commit | Someone ran `git add -A` or edited outside a worktree. Stage explicit paths only |
@@ -171,6 +207,7 @@ and it will make the change for you. For example:
 |---|---|
 | "make it 3 siblings" | `siblings:` in the `team:` block; `start-team.sh` opens Sib3 |
 | "switch the team to normal permissions" | `permission_mode:` in the `team:` block; applies to sessions opened from then on |
+| "open the team in tmux" / "use iTerm" | `terminal:` in the `team:` block (`tmux`, `tmux-detached`, `macos-iterm`, … or `auto`) |
 | "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
 | "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
@@ -182,7 +219,7 @@ and it will make the change for you. For example:
 
 - **Other names, sizes or modes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3 --mode auto`,
   or set them once in the `team:` block of `docs/orchestration/ORCHESTRATION.md`.
-- **Opening a session by hand** (other OS, or no automatic windows): one terminal per session,
+- **Opening a session by hand** (no automatic windows, e.g. native Windows without WSL): one terminal per session,
   in the repo:
   ```
   claude --name Orca /orchestration-kit:orchestrate        # add --permission-mode auto etc. after the name

@@ -18,7 +18,7 @@ Superset of `/orchestration-kit:kit-init`: kit-init scaffolds the board/overlay 
 3. **Fill the overlay WITH the human.** Open `docs/orchestration/ORCHESTRATION.md`: gate command + pass-proof line, change classes, never-run commands, deploy vehicle, locked items. Infer candidates from the repo; NEVER silently guess a gate.
 4. **CLAUDE.md when it already existed:** the script only NOTEs it. Offer `templates/CLAUDE-section.md` as an append (managed marker `<!-- orchestration-kit vX -->`); requires the human's yes.
 5. **Settings snippet — approval-gated** (`templates/settings-snippets.md`): `autoCompact: false` (the no-/compact house flow). It edits `.claude/settings.json` (user config) — apply only on an explicit yes, after verifying the key against the current Claude Code version. The SessionStart hook ships with the plugin; nothing to add.
-6. **Commit** in the target repo: `chore(orchestration): bootstrap orchestration-kit v0.4.0`.
+6. **Commit** in the target repo: `chore(orchestration): bootstrap orchestration-kit vX` (X = the installed kit version, from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`).
 7. **Next step:** `bash scripts/start-team.sh` (seat + 2 siblings, each in its own window; `--dry-run` to preview) — offer to run it.
 
 ## Rules

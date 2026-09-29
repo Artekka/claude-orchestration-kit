@@ -54,7 +54,7 @@ tag scheme:     <Name> [<ref>]  — Name = the terminal's `claude --name`, ref =
 context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~140K / ~160K
                 measure: python3 scripts/ctx-fill.py [--window N]   (never bytes ÷ 4)
 start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips names already running)
-recycle:        bash scripts/recycle-sibling.sh <Name> [prompt]         (Windows+WSL; else /clear by hand)
+recycle:        bash scripts/recycle-sibling.sh <Name> [prompt]         (prints commands + exits 2 where no terminal can be opened)
 ```
 
 Team — `scripts/start-team.sh` and `scripts/recycle-sibling.sh` read this block (flags override
@@ -66,6 +66,10 @@ the `team:` line unindented and the keys indented. `permission_mode` is one of `
 blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the main checkout, except
 `docs/orchestration/**`, the log and the status doc — needs the `.kit-hooks` marker). Keep
 `advised` if your workflow deliberately shares one tree or file between agents.
+`terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
+`tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
+(e.g. `linux-gnome-terminal`), `manual`. `bash scripts/start-team.sh --terminal list` shows
+what is available on this machine; a `--terminal` flag overrides this key.
 You can change any of this at any time — just ask Claude to change it.
 
 ```
@@ -75,6 +79,7 @@ team:
   siblings:         2
   permission_mode:  normal
   worktrees:        advised
+  terminal:         auto
 ```
 
 ## Docs (institutional memory)
