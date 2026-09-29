@@ -62,6 +62,10 @@ it; without it the defaults are seat `Orca`, siblings `Sib1`..`Sib2`, normal per
 the `team:` line unindented and the keys indented. `permission_mode` is one of `normal`
 (asks before risky actions), `accept-edits` (`--permission-mode acceptEdits`), `auto`
 (`--permission-mode auto`); `start-team.sh --mode X` saves it here so recycles reuse it.
+`worktrees` is `advised` (every session is instructed to work in its own git worktree; nothing
+blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the main checkout, except
+`docs/orchestration/**`, the log and the status doc — needs the `.kit-hooks` marker). Keep
+`advised` if your workflow deliberately shares one tree or file between agents.
 You can change any of this at any time — just ask Claude to change it.
 
 ```
@@ -70,6 +74,7 @@ team:
   prefix:           Sib
   siblings:         2
   permission_mode:  normal
+  worktrees:        advised
 ```
 
 ## Docs (institutional memory)

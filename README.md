@@ -25,7 +25,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
 | `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
-| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere |
+| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) |
 | `scripts/start-team.sh` | Windows+WSL: open the seat + N siblings, each in its own window, default names, skips any already running; `--dry-run` |
 | `scripts/recycle-sibling.sh` | Windows+WSL: open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run` |
 | `scripts/lib-launch.sh` | the shared launcher both scripts source (distro / main checkout / wt.exe detection, conhost fallback) |
@@ -50,8 +50,9 @@ claude plugin marketplace add Artekka/claude-orchestration-kit   # or a local pa
 claude plugin install orchestration-kit@artekka-kits --scope project   # or --scope local
 ```
 
-Even when installed more widely, its SessionStart hook stays silent unless the repo carries
-the opt-in marker `docs/orchestration/.kit-hooks` (created by `kit-init`).
+Even when installed more widely, its hooks stay silent unless the repo carries
+the opt-in marker `docs/orchestration/.kit-hooks` (created by `kit-init`); the worktree guard
+additionally needs `worktrees: enforced`.
 
 Then, in each project: run `/orchestration-kit:kit-init` once (it copies the scripts into
 `scripts/`), then `bash scripts/start-team.sh`. Step by step: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).

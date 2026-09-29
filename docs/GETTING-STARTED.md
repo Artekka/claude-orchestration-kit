@@ -56,12 +56,13 @@ and asks you a few questions:
 | A validator (optional) | "none" for now |
 | Locked files (optional) | `src/pricing.ts` |
 
-Last, it asks **two questions** — whether to start the team now (and how many siblings), and
-which permission mode the sessions should use. Answer them, approve the one command it runs,
+Last, it asks **three questions** — whether to start the team now (and how many siblings),
+which permission mode the sessions should use, and whether separate worktrees per session are
+advised or enforced. Answer them, approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). You can close the
 setup session.
 
-**Start with 1 seat + 2 siblings.** You can change the team size, names or permission mode at
+**Start with 1 seat + 2 siblings.** You can change the team size, names, permission mode or worktree setting at
 any time — just ask Claude to change it.
 
 **Permission modes** (saved in `docs/orchestration/ORCHESTRATION.md`, so recycled sessions reopen the same way):
@@ -76,6 +77,23 @@ any time — just ask Claude to change it.
 Change it later by asking Claude ("switch the team to normal permissions"), by editing
 `permission_mode:` in the `team:` block, or with `bash scripts/start-team.sh --mode auto`.
 It applies to sessions opened from then on.
+
+**Worktrees: advised vs enforced** (saved as `worktrees:` in the same `team:` block). Either way,
+every session is instructed to work in its own git worktree, so two sessions never edit the same
+checkout at once.
+
+- **Advised** (recommended) — the instruction only; nothing blocks an edit. Pick this if your
+  workflow deliberately shares one tree or file between agents (pairing two sessions on one
+  branch, a helper agent writing into the tree another session owns, one-person repos), or while
+  you learn the workflow.
+- **Enforced** — a hook blocks file edits in the main checkout, so a session that forgot to
+  create its worktree is stopped and told how. The board, the log and the status doc stay
+  editable in place (they are committed within seconds by design), as does anything outside the
+  repo. Pick this once several sessions run at the same time and a stray edit on main has cost
+  you work.
+
+Switch any time by asking Claude ("enforce worktrees", "make worktrees advised again"), or by
+editing `worktrees:` in `docs/orchestration/ORCHESTRATION.md`. It takes effect on the next edit.
 
 Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
@@ -92,6 +110,7 @@ Claude to). Sessions already running are skipped; `--dry-run` previews without o
 | `/orchestration-kit:verify-feature` | Subagent verification — fallback when no sibling is free to verify |
 | `/orchestration-kit:post-feature` · `/orchestration-kit:kit-init` · `/orchestration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
 | SessionStart hook (automatic) | Every fresh session in a repo with a board is told to orient and report to the seat. Silent in other repos |
+| Worktree guard (PreToolUse hook) | Only with `worktrees: enforced`: blocks edits in the main checkout except board/log/status files. Silent otherwise |
 | `docs/orchestration/AGENT_BOARD.md` | The shared board: who is doing what, and which files they own |
 | `docs/orchestration/ORCHESTRATION.md` | Your project's settings: gate, deploy, team names, doc paths |
 | `docs/AI_CONTEXT.md` · `docs/timeline/build-log.md` | Status doc (read first by every session) · append-only history |
@@ -152,6 +171,7 @@ and it will make the change for you. For example:
 |---|---|
 | "make it 3 siblings" | `siblings:` in the `team:` block; `start-team.sh` opens Sib3 |
 | "switch the team to normal permissions" | `permission_mode:` in the `team:` block; applies to sessions opened from then on |
+| "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
 | "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
 | "deploy with `npm run release`" | the Deploy section of `ORCHESTRATION.md` |

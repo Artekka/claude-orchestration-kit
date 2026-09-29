@@ -114,3 +114,21 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
   search the repo, use an outline the human provides (path or paste), or both (outline checked
   against the repo — the repo wins on facts). The doc it then writes means the question never repeats.
   Siblings never ask; they flag it to the seat.
+
+## 0.4.4 — 2026-09-29
+
+- **Optional worktree enforcement.** New `worktrees: advised | enforced` key in the
+  ORCHESTRATION.md `team:` block (default `advised` — today's behavior: every session is
+  instructed to use its own worktree, nothing blocks it).
+- New PreToolUse hook `hooks/worktree-guard.sh` (Edit|Write|MultiEdit|NotebookEdit): with
+  `worktrees: enforced` and the `.kit-hooks` marker, denies edits whose target resolves inside the
+  MAIN checkout (first `git worktree list` entry), with a reason telling Claude to create or use its
+  own worktree. Always allowed: linked worktrees, `docs/orchestration/**`, the log and status doc
+  (paths from ORCHESTRATION.md → Docs), anything outside the repo. Any parse error allows; no
+  `set -e`; no network; two git calls.
+- `kit-init` step 7 asks a third question in the same `AskUserQuestion` ("Separate worktrees per
+  session?" — Advised (Recommended) / Enforced), persists it to the `team:` block, and the
+  end-of-setup summary states which one is active.
+- Docs: GETTING-STARTED "Worktrees: advised vs enforced" (incl. shared-tree workflows, how to
+  switch); README hook row; CLAUDE-section (marker v0.4.4) and orient Step 0 note the rule is
+  instructed by default, enforced only if the repo opted in.

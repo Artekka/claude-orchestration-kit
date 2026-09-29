@@ -1,4 +1,4 @@
-<!-- orchestration-kit v0.4.0 — managed section; upgrades diff against this marker -->
+<!-- orchestration-kit v0.4.4 — managed section; upgrades diff against this marker -->
 ## Multi-session orchestration (orchestration-kit)
 
 This project runs the multi-session claimable-board workflow from the `orchestration-kit`.
@@ -6,7 +6,9 @@ Protocol table lives in the board file; project specifics in `docs/orchestration
 
 ### The non-negotiables
 
-1. **Every session works in its own worktree** — the main thread included. Never
+1. **Every session works in its own worktree** — the main thread included. This is instructed
+   by default, and enforced by a hook only if the repo opted in (`worktrees: enforced` in
+   `docs/orchestration/ORCHESTRATION.md`). Never
    `git add -A` / `.` / `git commit -a` (a wildcard annexes a sibling's live WIP); never
    `git stash` (stash refs are shared across worktrees). A dirty status you didn't cause is
    a sibling at work — leave it alone.
