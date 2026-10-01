@@ -36,7 +36,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 4. **CLAUDE.md section** — offer to append `templates/CLAUDE-section.md` (managed block `<!-- orchestration-kit vX -->`). Requires the human's yes; no CLAUDE.md → offer to create it with just this section. Marker already present → diff against the new template and propose the delta.
 5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orchestration-kit:retro` writes lessons there.
 6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orchestration-kit vX"`, `git push`.
-7. **Ask to start the team — ONE `AskUserQuestion` call, three questions.** Never run start-team without the answers.
+7. **Ask to start the team — ONE `AskUserQuestion` call, four questions.** Never run start-team without the answers.
    First detect the terminal backend (no question — shown in the summary; override later with `terminal:` in the team block):
    ```bash
    bash scripts/start-team.sh --dry-run --siblings 0 | grep -E '^(backend|reason) '   # backend + why it was picked
@@ -47,24 +47,28 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    | "Start the team now? You can change the team size, names, permission mode or worktree setting at any time — just ask Claude to change it." | **Seat + 2 siblings (Recommended)** · **Choose how many** (follow up: 1–9) · **Not now** |
    | "Permission mode for the team's sessions?" | **Normal (Recommended)** — asks before risky actions (no flag) · **Auto** — `--permission-mode auto`: Claude Code's automatic permission checks decide instead of prompting · **Accept edits** — `--permission-mode acceptEdits`: file edits approved automatically, commands still ask |
    | "Separate worktrees per session? Sessions are instructed to use their own worktree either way; some workflows deliberately share one tree or file between agents, so enforcement is optional." | **Advised (Recommended)** — every session is told to use its own worktree, but nothing blocks it · **Enforced** — a hook blocks edits in the main checkout except board/log files |
+   | "Block risky shared-repo git commands (git stash, git add -A / ., git commit -a, git pull --rebase)?" | **On (Recommended for 2+ sessions)** — a hook refuses them and tells Claude the safe alternative · **Off** — instructions only |
 
    On a start answer, run it through Bash — say in one line first: "Your OK on the next Bash prompt is the final go-ahead to open the windows."
    ```bash
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
    `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
-   Persist the worktree answer the same way, whatever the start answer (`advised` or `enforced`), then commit that path:
+   Persist the worktree and git-guard answers the same way, whatever the start answer, then commit that path:
    ```bash
-   C=docs/orchestration/ORCHESTRATION.md; W=<advised|enforced>
-   if grep -Eq '^[[:space:]]+worktrees:' "$C"; then sed -i -E "s/^([[:space:]]+worktrees:[[:space:]]*).*/\1$W/" "$C"
-   elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  worktrees:        $W" "$C"
-   else printf '\nteam:\n  worktrees:        %s\n' "$W" >> "$C"; fi
-   git add "$C" && git commit -m "chore(orchestration): worktrees: $W"
+   C=docs/orchestration/ORCHESTRATION.md
+   setkey() {  # <key> <value>
+     if grep -Eq "^[[:space:]]+$1:" "$C"; then sed -i -E "s/^([[:space:]]+$1:[[:space:]]*).*/\1$2/" "$C"
+     elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $1:        $2" "$C"
+     else printf '\nteam:\n  %s:        %s\n' "$1" "$2" >> "$C"; fi
+   }
+   setkey worktrees <advised|enforced>; setkey git_guard <on|off>
+   git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard settings"
    ```
-   `enforced` takes effect at once: the plugin's PreToolUse hook reads the file on every edit (only in repos with `.kit-hooks`).
-8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
+   Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
+8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked/not blocked] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
 
 ## Rules
 
 - Idempotent: never overwrite; re-running reports SKIP for everything that exists.
-- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) and PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`). Both run only in repos carrying `.kit-hooks`.
+- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`) and PreToolUse `git-guard.sh` on Bash (a no-op unless `git_guard: on`). All run only in repos carrying `.kit-hooks`.

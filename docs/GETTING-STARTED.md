@@ -95,9 +95,9 @@ and asks you a few questions:
 | A validator (optional) | "none" for now |
 | Locked files (optional) | `src/pricing.ts` |
 
-Last, it asks **three questions** — whether to start the team now (and how many siblings),
-which permission mode the sessions should use, and whether separate worktrees per session are
-advised or enforced. Answer them, approve the one command it runs,
+Last, it asks **four questions** — whether to start the team now (and how many siblings),
+which permission mode the sessions should use, whether separate worktrees per session are
+advised or enforced, and whether to turn on the git guard. Answer them, approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
 says how they open on your machine ("Windows will open via: …"). You can close the setup session.
 
@@ -134,6 +134,20 @@ checkout at once.
 Switch any time by asking Claude ("enforce worktrees", "make worktrees advised again"), or by
 editing `worktrees:` in `docs/orchestration/ORCHESTRATION.md`. It takes effect on the next edit.
 
+**Git guard: off vs on** (saved as `git_guard:` in the same `team:` block). Four git habits that
+are harmless alone damage other sessions' work in a shared repo:
+
+| Blocked when on | Why | Claude is told to use |
+|---|---|---|
+| `git stash` (except `list` / `show`) | Stashes are shared by every worktree; a pop can take another session's work | commit WIP on its branch, or copy to a scratch dir |
+| `git add -A` / `--all` / `.` / `-u` with no paths | Stages other sessions' uncommitted files | `git add <explicit paths>` |
+| `git commit -a` / `--all` | Same, at commit time | `git add <paths> && git commit` |
+| `git pull --rebase` | Races on the shared `.git/FETCH_HEAD` | `git fetch origin && git rebase origin/main` |
+
+It only reads Claude's Bash commands (quoted text and commit messages that merely *mention* these
+are fine); you can still run anything yourself in your own terminal. Turn it on with "turn on the
+git guard", or `git_guard: on`.
+
 Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
@@ -150,6 +164,7 @@ Claude to). Sessions already running are skipped; `--dry-run` previews without o
 | `/orchestration-kit:post-feature` · `/orchestration-kit:kit-init` · `/orchestration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
 | SessionStart hook (automatic) | Every fresh session in a repo with a board is told to orient and report to the seat. Silent in other repos |
 | Worktree guard (PreToolUse hook) | Only with `worktrees: enforced`: blocks edits in the main checkout except board/log/status files. Silent otherwise |
+| Git guard (PreToolUse hook on Bash) | Only with `git_guard: on`: refuses `git stash`, `git add -A` / `.`, `git commit -a`, `git pull --rebase` and tells Claude the safe command. Silent otherwise |
 | `docs/orchestration/AGENT_BOARD.md` | The shared board: who is doing what, and which files they own |
 | `docs/orchestration/ORCHESTRATION.md` | Your project's settings: gate, deploy, team names, doc paths |
 | `docs/AI_CONTEXT.md` · `docs/timeline/build-log.md` | Status doc (read first by every session) · append-only history |
@@ -219,6 +234,7 @@ and it will make the change for you. For example:
 | "switch the team to normal permissions" | `permission_mode:` in the `team:` block; applies to sessions opened from then on |
 | "open the team in tmux" / "use iTerm" | `terminal:` in the `team:` block (`tmux`, `tmux-detached`, `macos-iterm`, … or `auto`) |
 | "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
+| "turn on the git guard" / "turn off the git guard" | `git_guard:` in the `team:` block; takes effect on the next command |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
 | "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
 | "deploy with `npm run release`" | the Deploy section of `ORCHESTRATION.md` |
