@@ -86,7 +86,7 @@ kit's whole reason to exist.
     is a read-then-write with no lock; sessions append in different places so git never
     conflicts, both ids go live, and a grep returns two unrelated rows that look deliberate.
     Prefix = session tag (`O7-1`, `FQ-2`); collisions become impossible by construction.
-    *Provenance:* six manual reconciliations in two days (origin project M416).
+    *Provenance:* six manual reconciliations in two days (origin project).
 
 17. **Milestone/log numbers are allocated through a claimed LOG slot** (same shape as the
     DEPLOY slot). Any shared monotonic counter needs a single allocator while concurrent
@@ -140,7 +140,7 @@ kit's whole reason to exist.
     backfill + a guard in the same change. Projects carrying such sequences should elevate
     this into their own CLAUDE.md.
     *Provenance:* a tutorial-step insertion soft-locked the project owner's own account
-    (origin project TUT-30/31).
+    (origin project).
 
 27. **Never expose user PII in public channels or shared artifacts** — usernames, emails,
     ids stay out of anything that leaves the project's private surface.

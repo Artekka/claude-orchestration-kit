@@ -1,9 +1,14 @@
-# Getting started — from one Claude session to a seat + siblings
+# Getting started — solo mode first, then a seat + siblings
 
 For someone who today opens a terminal and runs `claude` in one repo — on **Windows (WSL),
-macOS or Linux**. After this page you will run one **seat** (the orchestrator you talk to) and
-two **siblings** (builders) on the same repo, each in its own window, without them stepping on
-each other. No names to type, no settings to edit.
+macOS or Linux**. Two paths, in this order:
+
+1. **Solo mode (start here)** — two Claude sessions on one repo, coordinated by a shared board,
+   each one's work checked by the other. You are the coordinator. ([§3](#3-start-small-solo-mode-two-terminals-no-seat))
+2. **Team mode (Advanced)** — one **seat** (an orchestrator session you talk to) plans, assigns,
+   verifies and merges for two or more **siblings** (builders), each in its own window.
+
+New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](GLOSSARY.md).
 
 ## 0. What you need
 
@@ -67,7 +72,7 @@ collaborators.) Repeat the `install` line inside any other repo you want it in.
 Already inside Claude? The same commands work as `/plugin marketplace add …` and
 `/plugin install …`; restart Claude afterwards.
 
-## 2. Set up your repo and start the team (once per repo)
+## 2. Set up your repo (once per repo)
 
 Open **one** terminal in the repo and start Claude. On Windows, that's one CMD window:
 
@@ -97,7 +102,12 @@ and asks you a few questions:
 
 Last, it asks **four questions** — whether to start the team now (and how many siblings),
 which permission mode the sessions should use, whether separate worktrees per session are
-advised or enforced, and whether to turn on the git guard. Answer them, approve the one command it runs,
+advised or enforced, and whether to turn on the git guard.
+
+**Solo mode (recommended first time):** answer **Not now** to starting the team, pick the other
+three, and continue at [§3](#3-start-small-solo-mode-two-terminals-no-seat).
+
+**Team mode (Advanced):** answer with a team size, approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
 says how they open on your machine ("Windows will open via: …"). You can close the setup session.
 
@@ -151,7 +161,38 @@ git guard", or `git_guard: on`.
 Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
-## 3. What you get
+## 3. Start small: solo mode (two terminals, no seat)
+
+The board and independent verification are most of the value; the seat is an add-on. Run two
+sessions yourself and let the board keep them apart:
+
+```bash
+# Terminal 1 (on Windows: `wsl` first)
+cd ~/projects/myapp && claude --name Dev1 /orchestration-kit:orient
+# Terminal 2
+cd ~/projects/myapp && claude --name Dev2 /orchestration-kit:orient
+```
+
+Then type, in plain language:
+
+| Where | You say | What happens |
+|---|---|---|
+| Dev1 | "add rows to the board for: fix the login timeout; add CSV export" | Rows `Dev1-1`, `Dev1-2` appear on `docs/orchestration/AGENT_BOARD.md`, committed + pushed |
+| Dev1 | "claim Dev1-1 and build it in your own worktree" | Claims the row (with a file fence), works on its own branch |
+| Dev2 | "claim Dev1-2 and build it in your own worktree" | Same, with a fence that doesn't overlap |
+| Dev2 (when Dev1 is done) | "verify Dev1-1 against its row — contract only, don't fix anything" | Dev2 never saw Dev1's reasoning, so it checks the work against the row, not against the author's intent. Or run `/orchestration-kit:verify-feature` |
+| Dev1 (after PASS) | "/orchestration-kit:reconcile Dev1-1" | Lands the branch on main, re-runs your gate, closes the row |
+
+Rules that make this safe (the sessions already know them): each session edits in its own git
+worktree, stages explicit paths, never stashes, and verifies the *other* session's rows, never
+its own. When a session's context fills, run `/orchestration-kit:retro` in it, then `/clear`
+and `/orchestration-kit:orient`.
+
+**Ready for more?** Move to team mode when you're the bottleneck — relaying between windows,
+deciding who takes what. `bash scripts/start-team.sh` opens a seat + siblings; the rest of this
+page covers it.
+
+## 4. What you get
 
 | Piece | What it is |
 |---|---|
@@ -172,7 +213,7 @@ Claude to). Sessions already running are skipped; `--dry-run` previews without o
 | `scripts/start-team.sh` · `scripts/recycle-sibling.sh` · `scripts/ctx-fill.py` | Open the team · replace a full session · measure a session's context |
 | Memory | Automatic: Claude Code keeps per-project memory under `~/.claude/projects/…/memory/`; `retro` saves lessons there |
 
-## 4. Who does what
+## 5. Advanced: team mode — who does what
 
 | Seat (Orca) | Siblings (Sib1, Sib2, …) |
 |---|---|
@@ -194,7 +235,7 @@ still runs — the board file (`docs/orchestration/AGENT_BOARD.md`) is the guara
 siblings post `AVAILABLE` / status lines there and the seat reads it. It's just slower, because
 nobody gets pinged.
 
-## 5. Recycling when a session fills up
+## 6. Recycling when a session fills up
 
 Long sessions degrade as their context fills. The kit replaces them cleanly instead of `/compact`.
 
@@ -213,7 +254,7 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
    script can't run, the seat asks you to type `/clear` in that window and then
    `/orchestration-kit:orient` (siblings) or `/orchestration-kit:orchestrate` (seat).
 
-## 6. Common failure modes
+## 7. Common failure modes
 
 | Symptom | Cause → fix |
 |---|---|
@@ -228,7 +269,7 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 | Tests green in a sibling, red on main | The gate ran from the wrong folder. Run it from inside your own worktree |
 | A session gets vague or repeats itself | Context is full. Measure with `ctx-fill.py`; retro and recycle |
 
-## 7. Changing things later
+## 8. Changing things later
 
 Nothing here is fixed. Ask Claude — in the seat's window, or any Claude session in the repo —
 and it will make the change for you. For example:
@@ -246,7 +287,7 @@ and it will make the change for you. For example:
 | "add a column for reviewer to the board" | `docs/orchestration/AGENT_BOARD.md` layout |
 | "make orient also read docs/ARCHITECTURE.md" | a project-level copy of the skill in `.claude/skills/` |
 
-## 8. Advanced / customize
+## 9. Advanced / customize
 
 - **Other names, sizes or modes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3 --mode auto`,
   or set them once in the `team:` block of `docs/orchestration/ORCHESTRATION.md`.
