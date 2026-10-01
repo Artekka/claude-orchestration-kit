@@ -31,6 +31,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `scripts/recycle-sibling.sh` | open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run`, `--terminal` |
 | `scripts/lib-launch.sh` | the shared launcher both scripts source: detects the terminal backend — `tmux` (already inside tmux), `wsl-wt` / `wsl-conhost` (Windows + WSL), `macos-iterm` / `macos-terminal`, `gitbash-cmd`, `linux-<emulator>` (gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, foot, xterm, `$TERMINAL`, x-terminal-emulator), `tmux-detached` (SSH / headless), else `manual` (prints the commands, exits 2). Override: `--terminal` flag > `terminal:` in the team block > auto |
 | `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript |
+| `scripts/statusline-ctx.sh` | optional statusline: live context fill vs the 350K/400K marks (yellow = self-report, red = hand over); enable via `templates/settings-snippets.md` |
 | `scripts/bootstrap.sh` | the mechanical half of `bootstrap-project` (idempotent, `--dry-run`) |
 | `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, settings snippet, optional agents + memory starter |
 | `docs/GETTING-STARTED.md` | first-timer walkthrough: install → kit-init → seat + siblings → recycling → failure modes |

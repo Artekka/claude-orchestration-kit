@@ -12,6 +12,22 @@ another session, to send that seat a READY signal instead of asking the user for
 other repo it is a silent no-op. If you copied the v0.3.0 hook snippet into
 `.claude/settings.json`, remove it — otherwise sessions get the nudge twice.
 
+## Context-fill statusline (optional)
+
+Shows the session's real context fill against the kit's marks in Claude Code's status bar —
+`ctx 212K · prompt 350K · handover 400K`, yellow at the prompt mark (self-report), red past
+handover (retro, then recycle). Same measure as `scripts/ctx-fill.py`. `kit-init` copies
+`scripts/statusline-ctx.sh`; enable it in `.claude/settings.json` (or `~/.claude/settings.json`
+for every repo, after copying the script somewhere stable):
+
+```json
+"statusLine": { "type": "command", "command": "bash scripts/statusline-ctx.sh" }
+```
+
+On a 200K-window model set `CTX_WINDOW=200000` in the session's environment (marks become
+140K / 160K) unless Claude Code already passes the window size to the statusline. Already
+have a statusline? Have your script call this one with the same stdin and join the outputs.
+
 ## Auto-compact off — the no-/compact house flow
 
 The CLAUDE-section carries the rule (never /compact; context pressure → retro, then recycle).

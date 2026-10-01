@@ -18,8 +18,8 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    put "$K/templates/AI_CONTEXT.md"    docs/AI_CONTEXT.md
    put "$K/templates/build-log.md"     docs/timeline/build-log.md
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py; do put "$K/scripts/$f" "scripts/$f"; done
-   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py
+   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh; do put "$K/scripts/$f" "scripts/$f"; done
+   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.

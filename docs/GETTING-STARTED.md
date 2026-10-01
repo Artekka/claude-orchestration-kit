@@ -200,6 +200,10 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 
 1. Each session measures itself with `python3 scripts/ctx-fill.py`. On a 1M-token model it
    self-reports around **350K** and hands over by **400K** (200K model: ~140K / ~160K).
+   Optional: show it permanently in the status bar — add
+   `"statusLine": { "type": "command", "command": "bash scripts/statusline-ctx.sh" }` to
+   `.claude/settings.json` (or ask Claude: "add the context statusline"). It turns yellow at the
+   self-report mark and red at handover.
 2. The seat tells that sibling to retro. The sibling saves lessons, updates the board,
    commits, and replies **"retro complete"**.
 3. The seat runs `bash scripts/recycle-sibling.sh Sib1`: a **new window** opens with a fresh
