@@ -1,35 +1,107 @@
 # Changelog — orchestration-kit
 
-## 0.2.0 — 2026-08-08
+Newest first.
 
-- New skill: `retro` — the write-back half of `orient` (board close-out, lesson
-  distillation with upstream-to-kit propagation, status-doc refresh, clean-handoff
-  check). Without it, LESSONS.md had no trigger to accrete — the upgrade payload
-  only grows if session-end prompts the write. (the maintainer's observation, night one.)
+## 0.5.0 — 2026-09-30
 
-## 0.1.0 — 2026-08-08
+The public-release pass: an easier first path, one more guard, and the tests to back it.
 
-Initial release, extracted from the origin project's multi-session workflow
-(the 2026-08-08 three-session evening: fable-A/B/3, ~15 workstreams, zero collisions).
+- **Solo mode is the starting path.** README opens with a 5-minute "two terminals, one repo"
+  quickstart; GETTING-STARTED §3 "Start small: solo mode" (board + cross-verification, no seat).
+  Team mode (seat + siblings) is labelled Advanced. kit-init's "Not now" answer routes to solo.
+- **Git guard hook (opt-in):** `hooks/git-guard.sh`, PreToolUse on Bash. With the `.kit-hooks`
+  marker and `git_guard: on` in ORCHESTRATION.md it refuses `git stash` (except list/show),
+  `git add -A` / `--all` / `.` / `:/` / `-u` without paths, `git commit -a` / `--all`, and
+  `git pull --rebase`, with the reason and the safe command. Shell-style tokenizer in POSIX awk
+  (quotes, comments, heredocs, `$(...)`, `bash -c`), so text that merely mentions these isn't
+  blocked. Template default `off`; kit-init asks a fourth setup question.
+- **`falsify` skill:** mutation-prove a test or guard can fail — commit GREEN first, prediction
+  written before the run, anchored + diff-verified mutant, red observed unfiltered, byte-clean
+  restore, re-green; scoring and mutant-design tables. Stack-agnostic.
+- **Context-fill statusline (optional):** `scripts/statusline-ctx.sh` shows the real fill against
+  the 350K / 400K marks (70% / 80% under a 500K window); green / yellow "self-report" / red
+  "hand over". Copied by kit-init and bootstrap; enable via `templates/settings-snippets.md`.
+- **Tests:** `bash tests/run.sh` — git guard (55 command cases under every awk found + end-to-end
+  opt-in gating), statusline (bands, 200K marks, overrides), bootstrap (dry-run touches nothing,
+  second run is a no-op, live files never overwritten).
+- **Ported from two never-published local releases** (their 0.4.0 / 0.4.1 numbers were reused
+  above for other work): `docs/EXAMPLE-SESSION.md` (an annotated 12-hour seat + 3 siblings
+  session, including the seat's six mistakes); LESSONS 42–60 (enumeration as deliverable,
+  per-hit verdicts, restore = clean AND fix present, wrong-reason mutants, hedges, knobs over
+  etiquette, train coupling, fail-open client guards …); verifier hardening (rebuild
+  enumerations, reproduce mutants, authorized exceptions, count deltas, false signals, compile
+  to prove "output unchanged", mirror assertions, delta re-verify); verify-feature's
+  contract-items table; orchestrate brief rules, push verification and train coupling.
+- **`LICENSE`** (MIT — plugin.json already declared it). **`docs/GLOSSARY.md`**.
+- Leak sweep: internal row ids removed from lesson provenance. CHANGELOG is now newest-first.
 
-- Board template + claim protocol (fences, statuses, committed edits, session tags).
-- Project overlay model (`ORCHESTRATION.md`: gate, change classes, deploy, locked, hazards).
-- Skills: kit-init, board, verify-feature, reconcile, orient.
-- Agent: `verifier` (contract-only, read-only, four checks, structured verdict).
-- LESSONS.md v1: 15 incident-backed rules, including the two added the night of
-  extraction — never `git stash` in worktree agents (shared stash refs), and
-  exclusive DEPLOY-row claims.
+## 0.4.5 — 2026-09-29
 
-## 0.3.0 — 2026-08-21
+- **Cross-platform session launcher.** `lib-launch.sh` detects the OS and terminal and picks a
+  backend: `tmux` (already inside tmux — first, even on WSL or a desktop), `wsl-wt` /
+  `wsl-conhost` (Windows + WSL, unchanged), `tmux-detached` over SSH, `macos-iterm` /
+  `macos-terminal` (osascript), `gitbash-cmd` (Git Bash: `cmd.exe /c start`), `linux-<emulator>`
+  (`$TERMINAL`, x-terminal-emulator, gnome-terminal, konsole, xfce4-terminal, kitty, alacritty,
+  wezterm, foot, xterm — each with its own "run this command" syntax), `tmux-detached` when
+  headless, else `manual` (prints the per-window commands, exits 2 — the old non-WSL behavior).
+- Override precedence: `--terminal <backend>` flag > `terminal:` in the ORCHESTRATION.md `team:`
+  block (template default `auto`) > auto-detect. `--terminal list` prints every backend and
+  whether it is available here. A forced backend that is not available refuses a real launch
+  (exit 64); `--dry-run` still shows its command lines.
+- Every backend runs the same `cd <repo> && [nvm] && claude --name <Name> [mode] <prompt>`;
+  launch-first-then-SIGTERM and the `pgrep -f "^claude --name <Name>( |$)"` fresh-process wait
+  are unchanged (the pattern is valid for BSD pgrep on macOS too). Without pgrep (Git Bash)
+  launches are reported unverified and `recycle-sibling.sh` never kills the old session.
+- One quoting function per backend family; the WSL no-`;`/`"`/`'` rule (and the no-spaces repo
+  path rule) now applies to WSL only. `--dry-run` prints the backend, why it was chosen, and the
+  exact command per session.
+- `kit-init`: no new question — the setup summary says "Windows will open via: <backend>";
+  on `manual` it shows the commands instead of launching.
+- Docs: GETTING-STARTED covers Windows (WSL), macOS, Linux and SSH/headless/tmux; README
+  "What's inside"; ORCHESTRATION template `terminal:` key; orchestrate recycle row; the stale
+  `v0.4.0` in bootstrap-project's commit message is now `vX` (the installed version).
+- GETTING-STARTED: SendMessage / ListAgents are built into Claude Code (nothing to install) —
+  update first, a one-line "list the other Claude sessions" check, and the board-only fallback.
 
-The orchestrated-autonomy port (from the origin project's pilot, 2026-08-20/21) + the
-`bootstrap-project` super-init. New: orchestrate, bootstrap-project (+ scripts/bootstrap.sh,
-idempotent + --dry-run), post-feature, generic team-agent templates (optional,
-install-only-if-missing, user-level precedence), agnostic memory starter (31: 30 ratified + 1 canonical merge,
-trust grants excluded), extras/backfill, settings-snippets template (SessionStart hook +
-auto-compact off, one approval step), LESSONS 16–27. Refreshed: orient, reconcile, retro,
-verify-feature, board, CLAUDE-section (v0.3.0 marker), verifier (model-pinned;
-bypassPermissions demoted to an opt-in comment — trust grants never ship as defaults).
+## 0.4.4 — 2026-09-29
+
+- **Optional worktree enforcement.** New `worktrees: advised | enforced` key in the
+  ORCHESTRATION.md `team:` block (default `advised` — today's behavior: every session is
+  instructed to use its own worktree, nothing blocks it).
+- New PreToolUse hook `hooks/worktree-guard.sh` (Edit|Write|MultiEdit|NotebookEdit): with
+  `worktrees: enforced` and the `.kit-hooks` marker, denies edits whose target resolves inside the
+  MAIN checkout (first `git worktree list` entry), with a reason telling Claude to create or use its
+  own worktree. Always allowed: linked worktrees, `docs/orchestration/**`, the log and status doc
+  (paths from ORCHESTRATION.md → Docs), anything outside the repo. Any parse error allows; no
+  `set -e`; no network; two git calls.
+- `kit-init` step 7 asks a third question in the same `AskUserQuestion` ("Separate worktrees per
+  session?" — Advised (Recommended) / Enforced), persists it to the `team:` block, and the
+  end-of-setup summary states which one is active.
+- Docs: GETTING-STARTED "Worktrees: advised vs enforced" (incl. shared-tree workflows, how to
+  switch); README hook row; CLAUDE-section (marker v0.4.4) and orient Step 0 note the rule is
+  instructed by default, enforced only if the repo opted in.
+
+## 0.4.3 — 2026-09-29
+
+- No orientation doc? The seat (or `kit-init`, or a lone session) asks ONCE how to learn the project:
+  search the repo, use an outline the human provides (path or paste), or both (outline checked
+  against the repo — the repo wins on facts). The doc it then writes means the question never repeats.
+  Siblings never ask; they flag it to the seat.
+
+## 0.4.2 — 2026-09-29
+
+- `kit-init` writes a real `AI_CONTEXT.md` by surveying the repo (README, CLAUDE.md, manifests,
+  directory tree, git history, one gate run) plus one question to the human, and seeds the first
+  build-log entry — no template left behind.
+- `orient` bootstrap mode: if the status doc is missing or still a template, orient from the
+  project itself; the seat (or a lone session) writes the doc, siblings flag it in READY instead.
+
+## 0.4.1 — 2026-09-29
+
+- Per-repo by default: install docs now use `claude plugin install … --scope project`
+  (or `--scope local`), so the kit is active only in the repos it's installed into.
+- The SessionStart hook is opt-in per repo: it runs only where `docs/orchestration/.kit-hooks`
+  exists (written by `kit-init`). A repo with its own board but no marker is never nudged.
 
 ## 0.4.0 — 2026-09-29
 
@@ -93,70 +165,33 @@ and 2+ builder sessions on one repo (Windows + WSL first-class).
   name is the configured seat.
 - Version note: `0.3.0` was already tagged, so this release is `0.4.0`.
 
-## 0.4.1 — 2026-09-29
+## 0.3.0 — 2026-08-21
 
-- Per-repo by default: install docs now use `claude plugin install … --scope project`
-  (or `--scope local`), so the kit is active only in the repos it's installed into.
-- The SessionStart hook is opt-in per repo: it runs only where `docs/orchestration/.kit-hooks`
-  exists (written by `kit-init`). A repo with its own board but no marker is never nudged.
+The orchestrated-autonomy port (from the origin project's pilot, 2026-08-20/21) + the
+`bootstrap-project` super-init. New: orchestrate, bootstrap-project (+ scripts/bootstrap.sh,
+idempotent + --dry-run), post-feature, generic team-agent templates (optional,
+install-only-if-missing, user-level precedence), agnostic memory starter (31: 30 ratified + 1 canonical merge,
+trust grants excluded), extras/backfill, settings-snippets template (SessionStart hook +
+auto-compact off, one approval step), LESSONS 16–27. Refreshed: orient, reconcile, retro,
+verify-feature, board, CLAUDE-section (v0.3.0 marker), verifier (model-pinned;
+bypassPermissions demoted to an opt-in comment — trust grants never ship as defaults).
 
-## 0.4.2 — 2026-09-29
+## 0.2.0 — 2026-08-08
 
-- `kit-init` writes a real `AI_CONTEXT.md` by surveying the repo (README, CLAUDE.md, manifests,
-  directory tree, git history, one gate run) plus one question to the human, and seeds the first
-  build-log entry — no template left behind.
-- `orient` bootstrap mode: if the status doc is missing or still a template, orient from the
-  project itself; the seat (or a lone session) writes the doc, siblings flag it in READY instead.
+- New skill: `retro` — the write-back half of `orient` (board close-out, lesson
+  distillation with upstream-to-kit propagation, status-doc refresh, clean-handoff
+  check). Without it, LESSONS.md had no trigger to accrete — the upgrade payload
+  only grows if session-end prompts the write. (the maintainer's observation, night one.)
 
-## 0.4.3 — 2026-09-29
+## 0.1.0 — 2026-08-08
 
-- No orientation doc? The seat (or `kit-init`, or a lone session) asks ONCE how to learn the project:
-  search the repo, use an outline the human provides (path or paste), or both (outline checked
-  against the repo — the repo wins on facts). The doc it then writes means the question never repeats.
-  Siblings never ask; they flag it to the seat.
+Initial release, extracted from the origin project's multi-session workflow
+(the 2026-08-08 three-session evening: ~15 workstreams, zero collisions).
 
-## 0.4.4 — 2026-09-29
-
-- **Optional worktree enforcement.** New `worktrees: advised | enforced` key in the
-  ORCHESTRATION.md `team:` block (default `advised` — today's behavior: every session is
-  instructed to use its own worktree, nothing blocks it).
-- New PreToolUse hook `hooks/worktree-guard.sh` (Edit|Write|MultiEdit|NotebookEdit): with
-  `worktrees: enforced` and the `.kit-hooks` marker, denies edits whose target resolves inside the
-  MAIN checkout (first `git worktree list` entry), with a reason telling Claude to create or use its
-  own worktree. Always allowed: linked worktrees, `docs/orchestration/**`, the log and status doc
-  (paths from ORCHESTRATION.md → Docs), anything outside the repo. Any parse error allows; no
-  `set -e`; no network; two git calls.
-- `kit-init` step 7 asks a third question in the same `AskUserQuestion` ("Separate worktrees per
-  session?" — Advised (Recommended) / Enforced), persists it to the `team:` block, and the
-  end-of-setup summary states which one is active.
-- Docs: GETTING-STARTED "Worktrees: advised vs enforced" (incl. shared-tree workflows, how to
-  switch); README hook row; CLAUDE-section (marker v0.4.4) and orient Step 0 note the rule is
-  instructed by default, enforced only if the repo opted in.
-
-## 0.4.5 — 2026-09-29
-
-- **Cross-platform session launcher.** `lib-launch.sh` detects the OS and terminal and picks a
-  backend: `tmux` (already inside tmux — first, even on WSL or a desktop), `wsl-wt` /
-  `wsl-conhost` (Windows + WSL, unchanged), `tmux-detached` over SSH, `macos-iterm` /
-  `macos-terminal` (osascript), `gitbash-cmd` (Git Bash: `cmd.exe /c start`), `linux-<emulator>`
-  (`$TERMINAL`, x-terminal-emulator, gnome-terminal, konsole, xfce4-terminal, kitty, alacritty,
-  wezterm, foot, xterm — each with its own "run this command" syntax), `tmux-detached` when
-  headless, else `manual` (prints the per-window commands, exits 2 — the old non-WSL behavior).
-- Override precedence: `--terminal <backend>` flag > `terminal:` in the ORCHESTRATION.md `team:`
-  block (template default `auto`) > auto-detect. `--terminal list` prints every backend and
-  whether it is available here. A forced backend that is not available refuses a real launch
-  (exit 64); `--dry-run` still shows its command lines.
-- Every backend runs the same `cd <repo> && [nvm] && claude --name <Name> [mode] <prompt>`;
-  launch-first-then-SIGTERM and the `pgrep -f "^claude --name <Name>( |$)"` fresh-process wait
-  are unchanged (the pattern is valid for BSD pgrep on macOS too). Without pgrep (Git Bash)
-  launches are reported unverified and `recycle-sibling.sh` never kills the old session.
-- One quoting function per backend family; the WSL no-`;`/`"`/`'` rule (and the no-spaces repo
-  path rule) now applies to WSL only. `--dry-run` prints the backend, why it was chosen, and the
-  exact command per session.
-- `kit-init`: no new question — the setup summary says "Windows will open via: <backend>";
-  on `manual` it shows the commands instead of launching.
-- Docs: GETTING-STARTED covers Windows (WSL), macOS, Linux and SSH/headless/tmux; README
-  "What's inside"; ORCHESTRATION template `terminal:` key; orchestrate recycle row; the stale
-  `v0.4.0` in bootstrap-project's commit message is now `vX` (the installed version).
-- GETTING-STARTED: SendMessage / ListAgents are built into Claude Code (nothing to install) —
-  update first, a one-line "list the other Claude sessions" check, and the board-only fallback.
+- Board template + claim protocol (fences, statuses, committed edits, session tags).
+- Project overlay model (`ORCHESTRATION.md`: gate, change classes, deploy, locked, hazards).
+- Skills: kit-init, board, verify-feature, reconcile, orient.
+- Agent: `verifier` (contract-only, read-only, four checks, structured verdict).
+- LESSONS.md v1: 15 incident-backed rules, including the two added the night of
+  extraction — never `git stash` in worktree agents (shared stash refs), and
+  exclusive DEPLOY-row claims.
