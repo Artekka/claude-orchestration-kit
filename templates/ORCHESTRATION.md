@@ -68,8 +68,9 @@ blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the mai
 `advised` if your workflow deliberately shares one tree or file between agents.
 `git_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's PreToolUse Bash
 hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` without paths,
-`git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Recommended
-once two or more sessions share the repo; a human can still run those in their own terminal.
+`git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
+`off` in solo mode; kit-init sets `on` when it starts a team (seat + siblings). A human can still
+run those in their own terminal.
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
 `tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
 (e.g. `linux-gnome-terminal`), `manual`. `bash scripts/start-team.sh --terminal list` shows

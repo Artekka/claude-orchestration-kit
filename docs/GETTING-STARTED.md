@@ -100,12 +100,13 @@ and asks you a few questions:
 | A validator (optional) | "none" for now |
 | Locked files (optional) | `src/pricing.ts` |
 
-Last, it asks **four questions** — whether to start the team now (and how many siblings),
-which permission mode the sessions should use, whether separate worktrees per session are
-advised or enforced, and whether to turn on the git guard.
+Last, it asks **three questions** — whether to start the team now (and how many siblings),
+which permission mode the sessions should use, and whether separate worktrees per session are
+advised or enforced. The git guard (below) follows your first answer: **on** if you start a
+team, **off** for solo mode.
 
 **Solo mode (recommended first time):** answer **Not now** to starting the team, pick the other
-three, and continue at [§3](#3-start-small-solo-mode-two-terminals-no-seat).
+two, and continue at [§3](#3-start-small-solo-mode-two-terminals-no-seat).
 
 **Team mode (Advanced):** answer with a team size, approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
@@ -144,7 +145,8 @@ checkout at once.
 Switch any time by asking Claude ("enforce worktrees", "make worktrees advised again"), or by
 editing `worktrees:` in `docs/orchestration/ORCHESTRATION.md`. It takes effect on the next edit.
 
-**Git guard: off vs on** (saved as `git_guard:` in the same `team:` block). Four git habits that
+**Git guard: on in team mode, off in solo mode** (saved as `git_guard:` in the same `team:`
+block; kit-init sets it from your start answer). Four git habits that
 are harmless alone damage other sessions' work in a shared repo:
 
 | Blocked when on | Why | Claude is told to use |
@@ -155,8 +157,8 @@ are harmless alone damage other sessions' work in a shared repo:
 | `git pull --rebase` | Races on the shared `.git/FETCH_HEAD` | `git fetch origin && git rebase origin/main` |
 
 It only reads Claude's Bash commands (quoted text and commit messages that merely *mention* these
-are fine); you can still run anything yourself in your own terminal. Turn it on with "turn on the
-git guard", or `git_guard: on`.
+are fine); you can still run anything yourself in your own terminal. Change it with "turn on the
+git guard" / "turn off the git guard", or `git_guard: on|off`.
 
 Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
@@ -189,7 +191,8 @@ its own. When a session's context fills, run `/orchestration-kit:retro` in it, t
 and `/orchestration-kit:orient`.
 
 **Ready for more?** Move to team mode when you're the bottleneck — relaying between windows,
-deciding who takes what. `bash scripts/start-team.sh` opens a seat + siblings; the rest of this
+deciding who takes what. Say "turn on the git guard" (team mode's default), then
+`bash scripts/start-team.sh` opens a seat + siblings; the rest of this
 page covers it.
 
 ## 4. What you get

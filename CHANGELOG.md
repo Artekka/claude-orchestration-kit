@@ -14,7 +14,8 @@ The public-release pass: an easier first path, one more guard, and the tests to 
   `git add -A` / `--all` / `.` / `:/` / `-u` without paths, `git commit -a` / `--all`, and
   `git pull --rebase`, with the reason and the safe command. Shell-style tokenizer in POSIX awk
   (quotes, comments, heredocs, `$(...)`, `bash -c`), so text that merely mentions these isn't
-  blocked. Template default `off`; kit-init asks a fourth setup question.
+  blocked. **On by default in team mode, off in solo mode:** kit-init sets `git_guard: on` when
+  it starts a team (seat + siblings) and `off` on "Not now"; the template default is `off`.
 - **`falsify` skill:** mutation-prove a test or guard can fail — commit GREEN first, prediction
   written before the run, anchored + diff-verified mutant, red observed unfiltered, byte-clean
   restore, re-green; scoring and mutant-design tables. Stack-agnostic.

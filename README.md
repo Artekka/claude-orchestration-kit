@@ -135,7 +135,7 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
-v0.5.0: solo mode as the starting path, an opt-in git guard hook, the `falsify` skill, a
+v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off solo), the `falsify` skill, a
 context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
 example session. Full history: [`CHANGELOG.md`](CHANGELOG.md).
 
