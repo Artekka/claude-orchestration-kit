@@ -20,6 +20,18 @@ A validator node with a gate at each hand-off edge, anchored to canonical ground
 
 Dispatch a **fresh** `verifier`-type agent with the **contract only**: `spec` (canonical text — board row / ADR / design doc, NOT the implementer's summary) + `target` (branch/worktree/diff) + `change_class` (→ gate command + model from ORCHESTRATION.md's table). The verifier is read-only; discipline + four checks + output schema live in `agents/verifier.md`.
 
+**The contract must also carry** (each omission has produced a wrong verdict):
+
+| Item | Why |
+|---|---|
+| **Authorized exceptions** — every fence extension / bundled work you approved | Or the verifier reports your own approvals as deviations |
+| **Enumeration instruction** — "rebuild the population from scratch; do not check the builder's list" for any "every X" requirement | A verifier confirming a list inherits its blind spots |
+| **Output-compilation instruction** — for any "output/rendering unchanged" claim | A text diff cannot prove its output identical; compile base + head and compare |
+| **The environment's false-signal shapes** — killed runs, crash-after-pass, pipe-masked exits, plus any live shared-resource knobs (e.g. a container-sweep floor to raise) | Or an infra failure gets attributed to the code — or the verifier's gate kills a sibling's run |
+| **Reference counts** — the current main gate numbers, and the branch's base if it predates them | Or a stale base reads as a regression |
+
+For a **delta re-verify** after a fix-roundtrip: name the previously-verified SHA + the deviation list, and scope to the fixes (the agent def carries the delta discipline).
+
 If the `verifier` agent type isn't registered (defs load at session start), fall back to a general agent at the same model with an explicit `READ-ONLY — report, do not fix` line + the full discipline pasted in — prose-only enforcement, so prefer the real type once reloaded.
 
 ## Model policy

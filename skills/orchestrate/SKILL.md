@@ -5,7 +5,7 @@ description: Run the orchestrated-autonomy loop as the ACTIVE ORCHESTRATOR ("the
 
 # orchestrate
 
-One session (the **seat**) plans, assigns, verifies-by-proxy, lands and ships; 2+ **siblings** build in their own worktrees. Exists because distributed writers minting shared IDs / mutating shared state with no lock collide silently (LESSONS 16–17, 28–41). Project specifics (gate, deploy, validator, board path) come from `docs/orchestration/ORCHESTRATION.md`.
+One session (the **seat**) plans, assigns, verifies-by-proxy, lands and ships; 2+ **siblings** build in their own worktrees. Exists because distributed writers minting shared IDs / mutating shared state with no lock collide silently (LESSONS 16–17, 28–60). Project specifics (gate, deploy, validator, board path) come from `docs/orchestration/ORCHESTRATION.md`.
 
 ## 0 · Take the seat
 
@@ -50,6 +50,11 @@ Rules: own worktree · report at phase boundaries · no deploy · no out-of-fenc
 ```
 Every brief is a hypothesis — a builder correcting it upward is expected, not insubordination.
 
+| Brief rule | Why |
+|---|---|
+| **Never illustrate a "find every X" requirement.** Name the enumeration itself as the deliverable ("send me the table, then fix"); the verifier rebuilds it independently | An illustration inside a requirement is read AS the requirement — two rows guarded exactly the 3 named sites of populations of 8 and 13 (LESSON 42) |
+| **"X is broken" rows report the POPULATION COUNT before building.** Say "zero" out loud on the row | Zero is a finding; two rows died that way in one session (LESSON 58) |
+
 ## 3 · DAG + assignment
 
 1. Decompose into a DAG: nodes = fenced rows, edges = verify-gated hand-offs. **Concurrent nodes' fences must be disjoint** — check BEFORE assigning, including each row's acceptance-criteria surface (tests, fixtures, docs it must touch).
@@ -62,6 +67,8 @@ Every brief is a hypothesis — a builder correcting it upward is expected, not 
 - Siblings report at phase boundaries: claimed → RED → GREEN + self-gate (literal pass line) → blocked/done.
 - Silent >30 min mid-build → `git log origin/main` + board + message. Truly stalled → banner the stall, reassign (never two silent owners on one row).
 - A correction that changes a builder's next hour goes in a **top-of-board banner**, not only a message.
+- **A knob beats etiquette** (LESSON 54). Before telling siblings "don't run X", check whether the toolchain runs X for them; if so the rule is unachievable — ship an env knob and announce it. "I didn't run X" ≠ "X didn't run".
+- **Keep a builder's hedges when you summarise** (LESSON 52). "A small piece of evidence" stays exactly that on the board.
 
 ## 5 · Hand-off verify gate — a SIBLING SESSION verifies
 
@@ -80,6 +87,8 @@ Every hand-off edge (downstream consumes upstream output) and every high-risk cl
 
 **Validator seat (recommended):** one sibling (ORCHESTRATION.md → Validator) that **never builds** — READ, re-read, train/merge verification, falsification, measurement. A terminal that never builds is independent of every row. Others may READ when it's busy. Never hand the validator a build or fix round.
 
+**The contract also carries** (each omission has produced a wrong verdict): authorized exceptions you approved (fence extensions, bundled work) · "rebuild any enumeration from scratch, don't check the builder's" · for "output unchanged" claims, "compile/build base + head and compare" · the environment's false-signal shapes (killed background run = NON-result; crash after passing summaries ≠ red; pass summary + non-zero exit = REAL failure; never pipe the gate) · reference gate counts for main and the branch's base.
+
 Verdicts: **PASS** → reconcile. **DEVIATES/BROKEN** → findings to the SAME builder (fix-roundtrip) → scoped delta re-read; downstream blocked until PASS (LESSON 18). The subagent `verifier` (`/orchestration-kit:verify-feature`) remains the fallback when no independent sibling is free — say so on the row.
 
 ## 6 · Reconcile + board writes
@@ -87,6 +96,7 @@ Verdicts: **PASS** → reconcile. **DEVIATES/BROKEN** → findings to the SAME b
 - **One row at a time** (`/orchestration-kit:reconcile`), never parallel. Before each: no foreign rebase in progress; `git status` in the builder's worktree.
 - After `git merge --no-ff`, **push immediately** (before notes, before the gate) — an unpushed merge gets linearized by the next plain rebase and the builder's SHAs never reach origin. Refresh with `git rebase --rebase-merges origin/main` while a merge is unpushed.
 - Quote **on-main** SHAs only: `git branch -r --contains <sha> | grep -q origin/main`.
+- ⚠ **`git push origin main` from INSIDE a worktree pushes that worktree's stale local `main`** — success line, nothing landed. Merge + push from the shared checkout and **verify every push by re-reading the remote** (the `--contains` check above).
 
 **Board write in the shared checkout (every time):**
 ```bash
@@ -102,6 +112,7 @@ git push origin main                                # never HEAD:main
 
 ## 7 · Wave-train deploys
 
+- **Couple rows into one train when the INTERMEDIATE state is worse than either endpoint** (LESSON 55), not merely because they are related.
 - Deploy after each reconcile wave (1–3 rows finishing together); a hotfix or human-awaited fix ships immediately. Main never sits ahead of live past a working day.
 - Claim DEPLOY slot (written + pushed BEFORE running) → announce the window → run **ORCHESTRATION.md → Deploy `vehicle`** → verify with its `post-deploy` check (a marker from this train in the live artifact + the version string) → release the slot with the verified version.
 - Siblings never deploy while the banner stands; they hand SHAs to the seat.

@@ -201,3 +201,122 @@ kit's whole reason to exist.
 41. **A suite nothing runs rots silently.** A fast DB-free gate is right per change, but some
     exhaustive sweep must run before trains or nightly — a change can be green on its own
     evidence and break a suite one directory over.
+
+## Enumeration, evidence and honest claims (harvest 2026-08-28)
+
+*One 12-hour orchestrated session, three sibling builders, two deploy trains, nine rows
+shipped, two rows killed. Every lesson below came from a verifier finding, a sibling
+correcting the orchestrator, or a sibling correcting itself.*
+
+42. **The enumeration is the deliverable; the fix is the easy part.** Two independent rows
+    failed identically the same day: each brief said "find every X" and then *illustrated*
+    with three examples, and each builder fixed exactly those three. Independent
+    re-enumeration found **eight** and **thirteen**. An illustration placed inside a
+    requirement gets read AS the requirement. Name the enumeration as the artifact you
+    want, and have the verifier rebuild it from scratch rather than check the builder's.
+    *Provenance:* origin project — one row guarded 3 of 8 sites, another fixed 6 of 19 comments.
+
+43. **A term-sweep converges only when every hit gets a written verdict.** Iterative
+    "search and fix" rounds do not converge: round 1 found 9, round 2 fixed 6, round 3
+    found 11 more. The cause is **not** vocabulary — the searches were fine. A grep over a
+    large repo returns mostly noise, so the reader **unconsciously filters by plausibility**
+    and a hit in a file that looks like someone else's area is skipped without a decision
+    being made. Forcing a typed verdict per hit removes the filter, because "unrelated"
+    must be *written* rather than assumed. Generalises to any audit-by-grep.
+
+44. **When a fact is documented more than once, fixing ONE copy makes the others harder to
+    find** — the fixed copy stops matching your grep and reads as done. Work twin-first:
+    find a poison case, look for its bleed twin immediately; fix a mirror, fix its source.
+    *Provenance:* one type file carried the same rider doc **four** times; a round whose
+    stated purpose was "I fixed one half and left the twin" then fixed the wrong pair.
+
+45. **A component test cannot see a regime that never mounts the component.** A feature
+    shipped fully working — and absent on the one device/breakpoint the original reporter
+    used — because a different component is substituted there. All its tests rendered the
+    component directly. Pin the **composition** that chooses the component, and assert the
+    regime is actually active so the test cannot pass by falling through to the other path.
+
+46. **A guard that compares NAMES cannot see TYPES.** An entire family of drift guards
+    compared key sets; flipping a field's declared type in the *canonical schema* left the
+    dedicated drift guard green at 47/47. The only backstop was the compiler, and only
+    *incidentally* — one file built typed literals while its neighbour used a cast. Decide
+    explicitly whether a guard covers types, and write down which backstop you are relying
+    on. Relying on one without knowing it is the failure.
+
+47. **A restore check must assert TWO things: tree clean AND the fix still present.** A
+    mutation-restore run against a baseline that never carried the fix is a **delete**, not
+    a restore — and it prints `nothing to commit, working tree clean` plus a GREEN gate on
+    the *pre-fix* SHA. Clean status alone cannot distinguish restored from deleted. Always
+    commit GREEN before mutating.
+
+48. **A mutant that reds for the wrong reason is not evidence.** A "mutant" that *inserted*
+    a duplicate step rather than *relocating* one produced a red — but proved only
+    sensitivity to placement, not that the guard catches the reorder it was written for.
+    Diff-verify every mutant; a red you wanted is the easiest thing in the world to accept.
+
+49. **Report the non-findings.** An audit that finds a defect in everything it inspects is
+    usually an audit performing thoroughness — the useful output is *which* items were wrong
+    and *why the others were not*. For a sweep, the negative results are half the
+    deliverable: "your two hypotheses are falsified across 39 suites" is what lets an
+    orchestrator ship without hedging.
+
+50. **Propose an omission with the evidence that makes it safe, not the conclusion.** "I
+    skipped the integration re-run — here is the diff proving nothing in those paths
+    changed" is a thirty-second decision. "Should be fine" costs a full re-run.
+
+51. **A test file that overstates its own coverage is worse than a missing test, because
+    the next reader stops looking.** A coverage claim is a claim: it needs the same evidence
+    as a behavioural one. *Provenance:* a header fixed an over-claim about code scope and
+    introduced a fresh one about test coverage **in the same edit** — the tidy sentence
+    arrives first, and repairing a claim feels careful enough to skip checking the new one.
+
+52. **The hedge is the untidy part, and a write-up wants a clean rule — whoever is writing.**
+    An orchestrator turned a builder's "I ran no sweep" into "patience saved a sibling's
+    run," and its "a small piece of evidence" into "a natural experiment." A builder turned
+    "three of six sites guarded" into "the state is unreachable." **The self-inflicted case
+    is harder to catch, because there is no second party whose qualifier you notice yourself
+    dropping.** When a builder qualifies a claim, the qualifier IS part of the finding.
+
+53. **Sweeps run from a SHA-pinned worktree, and you must replay your scoping patterns
+    against the full file list before claiming coverage.** A shared checkout moves under a
+    long sweep as siblings commit, making chunks incomparable and attribution worthless.
+    And scoped chunks silently drop anything the patterns miss — one suite matched no chunk
+    pattern and had never run; the report would have said "149/149" having run 148. **The
+    omission is invisible from inside the chunking.**
+
+54. **A standing instruction that a tool violates automatically is not a standing
+    instruction.** "Don't clean the shared containers" was unachievable, because the gate
+    invokes that cleanup at stage 1. The fix is a knob (an env var raising the liveness
+    floor), not a rule. Corollary: **"I didn't run X" is not the same claim as "X didn't
+    run"** — report on the tooling's behaviour, not only your own actions.
+
+55. **Couple two changes into one train when the INTERMEDIATE state is worse than either
+    endpoint** — not merely because they are related. Shipping an ordering fix without its
+    replay-parity companion would have released a version whose own fix made replays lie.
+
+56. **Memory recall runs on the description, not the body — check what a description is
+    retrievable BY, not just whether it is correct.** An accurate, indexed, week-old memory
+    answered a question three sessions had; none found it, because its description named the
+    *subsystem* and never the *tool everyone runs*. **A memory retrievable only by people
+    already thinking about its topic is retrievable mainly by people who don't need it.**
+    This is a writing-time discipline. The wrong conclusion is "write more memories."
+
+57. **Knowing a rule does not prevent the failure it describes.** A builder cited the
+    restore-was-a-delete rule to the orchestrator hours before walking into it. Recall is
+    not the bottleneck; *applying a rule while inside the situation it describes* is a
+    separate skill. Build the check into the procedure rather than trusting recall.
+
+58. **Killing a row on zero population is a good outcome, not a wasted afternoon.** Two rows
+    died that way in one session — one because a backfill described in the *future tense* had
+    actually shipped five weeks earlier, so an audit believed the comment over the data.
+    Require the population count *before* the build, and say "zero" out loud so nobody
+    re-files it.
+
+59. **Fail-open vs fail-closed is the load-bearing property of any client-side guard.** A
+    disable derived from data that may not have loaded must degrade to *enabled* — the
+    server's refusal is the real guard. A false disable silently denies a legitimate action
+    with no error and no recourse, which is far worse than the dead click it replaced.
+
+60. **A guard that cries wolf gets deleted.** Measure a marker/heuristic set against the real
+    corpus before shipping it: a first-choice marker matched three files, two of which were
+    unrelated. Precision is what keeps a guard alive long enough to catch anything.

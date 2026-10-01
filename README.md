@@ -34,6 +34,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, settings snippet, optional agents + memory starter |
 | `docs/GETTING-STARTED.md` | first-timer walkthrough: install → kit-init → seat + siblings → recycling → failure modes |
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
+| `docs/EXAMPLE-SESSION.md` | **a real annotated 12-hour session** — one seat, three sibling builders, two deploy trains, and the six things the seat got wrong |
 
 **Generic vs project-specific:** the kit never hardcodes a gate or deploy command.
 Project specifics live in the consuming repo's `docs/orchestration/ORCHESTRATION.md`
