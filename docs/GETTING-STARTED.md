@@ -158,6 +158,7 @@ Claude to). Sessions already running are skipped; `--dry-run` previews without o
 | `/orchestration-kit:orchestrate` | The seat's loop — plans, assigns, verifies, merges, deploys, recycles |
 | `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
 | `/orchestration-kit:board` | Claiming, updating and archiving board rows |
+| `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
 | `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
 | `/orchestration-kit:retro` | Closing a session: lessons saved, board updated, work committed |
 | `/orchestration-kit:verify-feature` | Subagent verification — fallback when no sibling is free to verify |

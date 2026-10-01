@@ -21,6 +21,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/orient` | session orientation: multi-session non-negotiables, five-bullet state, READY signal to the seat |
 | `skills/board` | claim/update/close rows, per-session prefixes, the shared-checkout write recipe, status-not-narrative + archiving |
 | `skills/verify-feature` | subagent verification — the fallback when no independent sibling session is free |
+| `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
 | `skills/reconcile` | land one worktree at a time onto main, push merges immediately, re-prove the gate there |
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
 | `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
