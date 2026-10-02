@@ -12,6 +12,7 @@
 #   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX]
 #                         [--mode normal|accept-edits|auto] [--terminal BACKEND|auto|list] [--repo DIR]
 #   --terminal list   print every backend and whether it is available here, then exit
+#   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
 #
 # Precedence: flags > the optional `team:` block in docs/orchestration/ORCHESTRATION.md > defaults.
 # A --mode flag is saved into that block (permission_mode:) so recycles relaunch in the same mode.
@@ -25,11 +26,11 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '11,23p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '11,24p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -37,6 +38,7 @@ while [ $# -gt 0 ]; do
     --seat) shift; f_seat="${1:?--seat needs a name}" ;;
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
+    --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     --terminal) shift; f_term="${1:?--terminal needs a backend, auto, or list}" ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     -h|--help) usage ;;
@@ -54,6 +56,7 @@ prefix="${f_prefix:-${TEAM_PREFIX:-Sib}}"
 n="${f_n:-${TEAM_N:-2}}"
 if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 64; fi
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
+launch_set_account "$f_account"
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done

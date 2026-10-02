@@ -2,6 +2,23 @@
 
 Newest first.
 
+## Unreleased — multi-account (optional)
+
+- **`docs/MULTI-ACCOUNT.md`:** run one team across several Claude Code accounts. Each account gets
+  its own config dir via `CLAUDE_CONFIG_DIR` (`~/.claude-acctN` convention, a `claudeN` alias).
+  Shared links for `sessions/` (the registry `ListAgents` reads, without which other-account
+  sessions are invisible and unreachable), `projects/` (memories, transcripts, ctx-fill),
+  `skills/` and `agents/`; `settings.json` is copied and `.credentials.json` is never shared.
+  Covers the `ln -s`-into-an-existing-dir pitfall.
+- **`--account N|DIR` on `recycle-sibling.sh` and `start-team.sh`.** A recycle with no flag
+  inherits the old session's account from its process environment (`/proc/<pid>/environ`, or
+  `ps eww` on macOS). Refused with exit 64: a missing dir, no login, or unsafe characters in the
+  path. An optional `ACCOUNT` file labels the dir in dry-run and launch output. Implemented once
+  in `lib-launch.sh` (`launch_set_account`, `launch_account_of_pid`, `_launch_env`) for every
+  backend, including the cmd.exe `set VAR=...&&` form.
+- **`tests/multi-account.test.sh`** (11 checks: default, explicit, inherit, override, three
+  refusals, start-team). Mutation-checked: dropping inheritance turns it red.
+
 ## 0.5.0 — 2026-09-30
 
 The public-release pass: an easier first path, one more guard, and the tests to back it.

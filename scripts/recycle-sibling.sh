@@ -10,10 +10,12 @@
 # You can change the team's names, permission mode or terminal at any time — just ask Claude.
 #
 # Usage:
-#   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto]
+#   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
 #     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
 #     mode / terminal default to the team block (ORCHESTRATION.md), else normal / auto-detect.
+#     account: the fresh session INHERITS the old one's Claude Code account (its CLAUDE_CONFIG_DIR);
+#     --account N|DIR moves it (1 = default ~/.claude, N = ~/.claude-acctN). docs/MULTI-ACCOUNT.md
 #   scripts/recycle-sibling.sh Orca          # seat self-recycle
 #
 # Env overrides: REPO_DIR (repo to open in), WT_EXE (full path to wt.exe).
@@ -21,14 +23,15 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '12,19p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '12,21p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
-DRY=0; REPO=""; MODE=""; TERM_OPT=""; args=()
+DRY=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; args=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
+    --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     --terminal) shift; TERM_OPT="${1:?--terminal needs a backend, auto, or list}" ;;
     -h|--help) usage ;;
     *) args+=("$1") ;;
@@ -57,6 +60,11 @@ HELP
 }
 
 old="$(launch_pids "$name")"
+if [ -n "$ACCOUNT" ]; then
+  launch_set_account "$ACCOUNT"
+elif [ -n "$old" ]; then  # keep the session on the account it was running on
+  launch_set_account "$(launch_account_of_pid "$(printf '%s\n' "$old" | head -1)")"
+fi
 if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or killed"
   launch_describe_env
@@ -86,5 +94,5 @@ fi
 
 # shellcheck disable=SC2086  # $old may hold several pids, one per line
 if [ -n "$old" ]; then kill -TERM $old; fi
-echo "fresh ${name}: ${LAUNCH_FRESH} · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
+echo "fresh ${name}: ${LAUNCH_FRESH} · account $(launch_account_label) · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
 if [ "$LAUNCH_BACKEND" = tmux-detached ]; then echo "attach with: tmux attach -t $(launch_tmux_session)"; fi

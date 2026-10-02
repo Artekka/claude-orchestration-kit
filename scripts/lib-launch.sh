@@ -57,6 +57,57 @@ launch_mode_flags() {
     *) printf '' ;;
   esac
 }
+# Accounts (optional; docs/MULTI-ACCOUNT.md). Each Claude Code account keeps its login and config in
+# its own directory, chosen by CLAUDE_CONFIG_DIR (unset = the default ~/.claude). Convention: account
+# N>1 lives in ~/.claude-acctN. LAUNCH_ACCOUNT_DIR empty = the default account, and no prefix is added.
+# The prefix is an environment assignment, not argv, so the pgrep pattern below is unaffected.
+LAUNCH_ACCOUNT_DIR="${LAUNCH_ACCOUNT_DIR:-}"
+launch_account_dir_for() {  # <N|dir|''> -> config dir ('' = default account)
+  case "$1" in
+    ''|1) printf '' ;;
+    *[!0-9]*) printf '%s' "$1" ;;
+    *) printf '%s' "$HOME/.claude-acct$1" ;;
+  esac
+}
+# The account a RUNNING session uses: its CLAUDE_CONFIG_DIR ('' = default or unreadable).
+launch_account_of_pid() {  # <pid>
+  if [ -r "/proc/$1/environ" ]; then
+    tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | sed -n 's/^CLAUDE_CONFIG_DIR=//p' | head -1
+  elif [ "$(uname -s)" = Darwin ]; then
+    ps eww -o command= -p "$1" 2>/dev/null | tr ' ' '\n' | sed -n 's/^CLAUDE_CONFIG_DIR=//p' | head -1
+  fi
+}
+launch_set_account() {  # <N|dir|''>
+  LAUNCH_ACCOUNT_DIR="$(launch_account_dir_for "$1")"
+  [ -n "$LAUNCH_ACCOUNT_DIR" ] || return 0
+  case "$LAUNCH_ACCOUNT_DIR" in *[\;\"\'\ %^\&\|\<\>]*)
+    echo "account dir must not contain spaces or ; \" ' % ^ & | < > : $LAUNCH_ACCOUNT_DIR" >&2; exit 64 ;; esac
+  if [ ! -d "$LAUNCH_ACCOUNT_DIR" ]; then
+    echo "account dir $LAUNCH_ACCOUNT_DIR does not exist — set it up first (docs/MULTI-ACCOUNT.md)" >&2; exit 64
+  fi
+  # Linux/WSL keep the login in .credentials.json; macOS keeps it in the Keychain, so skip the check there.
+  if [ "$(uname -s)" != Darwin ] && [ ! -f "$LAUNCH_ACCOUNT_DIR/.credentials.json" ]; then
+    echo "account dir $LAUNCH_ACCOUNT_DIR has no login — start Claude Code with it once and /login" >&2; exit 64
+  fi
+}
+# Display name: the first line of an optional ACCOUNT file in the config dir, else the dir itself.
+launch_account_label() {
+  local d="${LAUNCH_ACCOUNT_DIR:-$HOME/.claude}" l
+  l="$(head -1 "$d/ACCOUNT" 2>/dev/null || true)"
+  printf '%s' "${l:-$d}"
+  if [ -z "$LAUNCH_ACCOUNT_DIR" ]; then printf ' (default account)'; fi
+}
+_launch_env() {  # <quote-fn> — the CLAUDE_CONFIG_DIR prefix, or nothing for the default account
+  [ -n "$LAUNCH_ACCOUNT_DIR" ] || return 0
+  if [ "$1" = _launch_q_cmd ]; then
+    local w="$LAUNCH_ACCOUNT_DIR"
+    if command -v cygpath >/dev/null 2>&1; then w="$(cygpath -w "$w")"; fi
+    printf 'set CLAUDE_CONFIG_DIR=%s&& ' "$w"   # cmd.exe: no space before && or it joins the value
+  else
+    printf 'CLAUDE_CONFIG_DIR=%s ' "$(printf '%q' "$LAUNCH_ACCOUNT_DIR")"
+  fi
+}
+
 launch_set_mode() {
   launch_valid_mode "$1" || { echo "--mode must be normal|accept-edits|auto: '$1'" >&2; exit 64; }
   LAUNCH_MODE="$1"
@@ -287,9 +338,9 @@ launch_init() {
 
 # The part identified by pgrep: `claude --name N [flags] prompt` (or the test override).
 _launch_core() {  # <name> <prompt> <quote-fn>
-  if [ -n "${LAUNCH_CMD_OVERRIDE:-}" ]; then printf '%s' "${LAUNCH_CMD_OVERRIDE//\{name\}/$1}"; return; fi
+  if [ -n "${LAUNCH_CMD_OVERRIDE:-}" ]; then printf '%s%s' "$(_launch_env "$3")" "${LAUNCH_CMD_OVERRIDE//\{name\}/$1}"; return; fi
   # --name stays FIRST: launch_pattern matches "^claude --name <Name>( |$)".
-  printf 'claude --name %s %s%s' "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$("$3" "$2")"
+  printf '%sclaude --name %s %s%s' "$(_launch_env "$3")" "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$("$3" "$2")"
 }
 
 # Quoting, one per backend family.
@@ -432,6 +483,7 @@ launch_describe_env() {
     tmux-detached) echo "tmux       session '$(launch_tmux_session)' (created if missing) — attach with: tmux attach -t $(launch_tmux_session)" ;;
   esac
   if [ -n "$LAUNCH_NVM" ]; then echo "nvm        sourced ($HOME/.nvm/nvm.sh)"; else echo "nvm        not sourced"; fi
+  echo "account    $(launch_account_label)"
   if [ "$LAUNCH_MODE" = normal ]; then echo "mode       normal (no flag)"; else echo "mode       $LAUNCH_MODE -> $(launch_mode_flags "$LAUNCH_MODE")"; fi
   if [ "$LAUNCH_CAN_VERIFY" != 1 ]; then echo "verify     no pgrep here: launches cannot be confirmed, running sessions cannot be detected"; fi
 }
