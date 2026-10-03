@@ -174,10 +174,10 @@ F5_ALLOW=(
   'startup or /clear'
   'terminals were cleared before'                 # a past incident, told as history
   'Nowhere does the kit tell a user to bare `/clear` to recycle'
-  '(a )?bare `/clear`( in an old terminal)? keeps'          # the warning itself
+  '(a )?bare `/clear`( in an old terminal)? keeps (the|its|that)( terminal'"'"'s)?( OLD| old)?( model|$)'   # the warning itself, up to "keeps the ... model" (or wrapped after "keeps the")
   'never a bare `/clear`'
   'if you (do|must) `/clear`, run `/model'                  # the safe way, model first
-  '[Aa] bare `/clear`$'                                     # that warning wrapped at the line end
+  '(^|[.)] +)A bare `/clear`$'                              # that warning wrapped at the line end, only as a sentence start
 )
 # f5_left <line>: what is left of the line after the allowed phrases are removed, if it still holds
 # a clear-word (or /reset, /new). Empty output = the line is fine.
@@ -212,7 +212,9 @@ for fx in \
   '(launch fresh → wait → SIGTERM old, or have the human `/clear` it; no `--model` = the default, never the old session'"'"'s) | Script exits 2' \
   'then relaunch it with `--model` (a bare `/clear` keeps the old model); or `/reset` it.' \
   'then relaunch it with `--model`, or open a `/new` session.' \
-  'close it with `--model` set, or Clear the terminal.' ; do
+  'close it with `--model` set, or Clear the terminal.' \
+  'A bare `/clear` keeps things simple: use it to recycle.' \
+  'In a hurry, to recycle use a bare `/clear`' ; do   # the last: its sentence continues on the NEXT line ("and carry on."); only a sentence-START "A bare `/clear`" may end a line
   [ -n "$(f5_left "$fx")" ] && ok || bad "F5 hole not caught (the guard passes this line): $fx"
 done
 # ...and the legitimate phrasings, alone and combined on one long line, are NOT flagged (false-flag control).
