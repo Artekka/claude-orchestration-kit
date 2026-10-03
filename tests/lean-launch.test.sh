@@ -181,6 +181,13 @@ for badargs in "--bogus ZzNone" "ZzNone --bogus" "ZzNone -x" "-x" "--dangerously
   out="$(rs $badargs; echo "rc=$?")"
   has "recycle-sibling refuses '$badargs' rc 64" "rc=64" "$out"
   hasnt "recycle-sibling '$badargs' prints no command" "claude --name" "$out"
+  # The flag arm and launch_check_args both refuse a `-`-led word, so rc 64 alone cannot tell which one
+  # fired (falsify M4: deleting the arm survived). Pin the arm's own diagnosis, which is also the one a
+  # human needs ("unknown flag: --bogus", not "name must not start with '-'").
+  case "$badargs" in
+    *extra) has "recycle-sibling '$badargs' says too many arguments" "too many arguments" "$out" ;;
+    *) has "recycle-sibling '$badargs' says unknown flag" "unknown flag: " "$out" ;;
+  esac
 done
 for badargs in "--bogus" "-x" "extra"; do
   # shellcheck disable=SC2086
