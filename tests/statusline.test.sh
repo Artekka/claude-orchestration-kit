@@ -24,8 +24,13 @@ transcript "$T" 1000 355000 4000
 check "at prompt mark" "ctx 360K ▲ self-report now · handover 400K" "{\"transcript_path\":\"$T\"}"
 transcript "$T" 0 401000 0
 check "past handover" "ctx 401K ■ HAND OVER" "{\"transcript_path\":\"$T\"}"
+transcript "$T" 0 130000 0
+check "200K window from input -> 120K/150K marks" "ctx 130K ▲ self-report now · handover 150K" "{\"transcript_path\":\"$T\",\"context_window\":{\"context_window_size\":200000}}"
+transcript "$T" 0 151000 0
+check "200K window past its handover" "ctx 151K ■ HAND OVER" "{\"transcript_path\":\"$T\",\"context_window\":{\"context_window_size\":200000}}"
+transcript "$T" 0 119000 0
+check "200K window below its prompt mark" "ctx 119K · prompt 120K · handover 150K" "{\"transcript_path\":\"$T\",\"context_window\":{\"context_window_size\":200000}}"
 transcript "$T" 0 150000 0
-check "200K window from input -> 140K/160K marks" "ctx 150K ▲ self-report now · handover 160K" "{\"transcript_path\":\"$T\",\"context_window\":{\"context_window_size\":200000}}"
 check "CTX_WINDOW env wins" "ctx 150K · prompt 350K" "{\"transcript_path\":\"$T\",\"context_window\":{\"context_window_size\":200000}}" CTX_WINDOW=1000000
 check "fallback to current_usage in input" "ctx 42K" '{"transcript_path":"/nonexistent","context_window":{"current_usage":{"input_tokens":2000,"cache_read_input_tokens":40000,"cache_creation_input_tokens":0}}}'
 out="$(printf '{}' | bash "$SL"; echo "rc=$?")"

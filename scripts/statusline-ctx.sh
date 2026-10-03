@@ -8,7 +8,8 @@
 #
 # Same measure as scripts/ctx-fill.py: input + cache_read + cache_creation tokens off the LAST
 # assistant turn's `usage` block in the transcript (never bytes ÷ 4).
-# Marks: window >= 500K or unknown -> 350K / 400K; smaller window -> 70% / 80% of it.
+# Marks: window >= 500K or unknown -> 350K / 400K; smaller window -> 60% / 75% of it (200K -> 120K / 150K,
+# the same marks as scripts/ctx-fill.py: a 200K-window seat died at 175,725 with no handover).
 # Window, first found: CTX_WINDOW env > `context_window_size` in the statusline input > unknown.
 #
 # Enable — add to .claude/settings.json (project) or ~/.claude/settings.json (every repo):
@@ -45,7 +46,7 @@ win="${CTX_WINDOW:-}"
 case "$win" in ''|*[!0-9]*) win="$(num context_window_size "$input")" ;; esac
 prompt=350000; handover=400000
 if [ -n "$win" ] && [ "$win" -gt 0 ] && [ "$win" -lt 500000 ]; then
-  prompt=$(( win * 70 / 100 )); handover=$(( win * 80 / 100 ))
+  prompt=$(( win * 60 / 100 )); handover=$(( win * 75 / 100 ))
 fi
 
 k() { printf '%sK' $(( ($1 + 500) / 1000 )); }
