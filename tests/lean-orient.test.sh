@@ -102,6 +102,23 @@ $board")"
   [ -z "$none" ] && ok || bad "a board without a banner must print nothing: $none"
 fi
 
+# ORCA107-1(b) port: a heading that says `superseded` is never taken for the current banner, so a board
+# left with ONLY superseded banner headings prints nothing (no seat), not a stale era's section.
+if [ -n "$board" ]; then
+  pipeline="${board#git show origin/main:docs/orchestration/AGENT_BOARD.md | }"
+  printf '%s\n' "# Board" "## (era-8 header, superseded) 🎛 ORCHESTRATOR ACTIVE — **era-8 · Old \`[def456]\`**" "old row X8-1 → Sib9" \
+    "## (era-7 header, SUPERSEDED) ORCHESTRATOR ACTIVE — era-7" "older row" "## Open rows" "row Q-1" > "$TMP/superseded-board.md"
+  out="$(bash -c "cat '$TMP/superseded-board.md' | $pipeline" 2>&1)"
+  [ -z "$out" ] && ok || bad "a board holding only superseded banners must print nothing: $out"
+  # ...and a superseded header ABOVE the live one is skipped, the live one printed.
+  printf '%s\n' "# Board" "## (era-8 header, superseded) ORCHESTRATOR ACTIVE — era-8" "old row X8-1" \
+    "## 🎛 ORCHESTRATOR ACTIVE — **era-9 · Zed \`[abc123]\`**" "row Z9-1 → Sib1" "## Open rows" "row Q-1" > "$TMP/mixed-board.md"
+  out="$(bash -c "cat '$TMP/mixed-board.md' | $pipeline" 2>&1)"
+  has "a superseded header above the live banner is skipped" "row Z9-1 → Sib1" "$out"
+  hasnt "the superseded section above is not printed" "old row X8-1" "$out"
+  hasnt "the section after the banner is not printed" "row Q-1" "$out"
+fi
+
 # ---- F3: READY names the seat + era the builder saw ---------------------------------------------
 readies="$(grep '^READY <PREFIX>' "$SKILL" || true)"
 [ -n "$readies" ] && ok || bad "no READY format line found in the orient skill"
@@ -137,21 +154,24 @@ for spec in "$ORCH|^## 3a" "$GS|^### Model per lane"; do
 done
 has "orchestrate keeps the 'small model never writes facts' rule" "The small model never writes facts" "$(cat "$ORCH")"
 
-# ---- F5: nowhere is a user told to bare `/clear` to recycle ---------------------------------------
-# A bare /clear keeps the terminal's OLD model. Every line that mentions /clear must either be a
-# non-recycling mention (allow-list below) or name the explicit relaunch: `--model` or `/model` first.
-allow='uptime survives|evaporate on|destroys unpersisted|Retro-before-clear|retro-before-clear|Never pre-announce'
-for f in skills/orchestrate/SKILL.md docs/GETTING-STARTED.md templates/CLAUDE-section.md docs/LESSONS.md \
-         docs/EXAMPLE-SESSION.md docs/MULTI-ACCOUNT.md docs/GLOSSARY.md README.md skills/orient/SKILL.md \
-         skills/retro/SKILL.md skills/bootstrap-project/SKILL.md skills/kit-init/SKILL.md skills/board/SKILL.md; do
-  [ -f "$ROOT/$f" ] || continue
+# ---- F5: nowhere is a user told to bare `/clear` (or "clear" a terminal) to recycle ---------------
+# A bare /clear keeps the terminal's OLD model. Scan EVERY shipped .md (templates/memory-starter/ ships
+# into every adopter's memory) for the WORD clear (/clear, clear, cleared, clears, clearing; not
+# "clearly"), not just the `/clear` command: "safe to clear" slipped past a `/clear`-only scan.
+# A line passes if it names the explicit relaunch (`--model` / `/model`) or is a non-recycling mention.
+allow='uptime survives|evaporate on|destroys (unpersisted )?context|[Rr]etro-before-clear|Never pre-announce a clear|Retro should come before a clear|clear output|startup\|clear|startup or /clear|terminals were cleared before|Nowhere does the kit tell a user to bare'
+n_md=0
+while IFS= read -r f; do
+  n_md=$((n_md+1))
   while IFS= read -r l; do
     [ -z "$l" ] && continue
     if printf '%s' "$l" | grep -Eq "$allow"; then continue; fi
     if printf '%s' "$l" | grep -Eq -- '--model|/model'; then continue; fi
-    bad "F5 $f mentions /clear without an explicit --model relaunch: $(printf '%s' "$l" | cut -c1-200)"
-  done < <(grep -n '/clear' "$ROOT/$f" | cut -d: -f2-)
-done
+    bad "F5 ${f#"$ROOT"/} says clear without an explicit --model relaunch: $(printf '%s' "$l" | cut -c1-200)"
+  done < <(grep -niwE 'clear(s|ed|ing)?' "$f" | cut -d: -f2-)
+done < <(find "$ROOT" -name '*.md' -not -path '*/.git/*' | LC_ALL=C sort)
+[ "$n_md" -ge 40 ] && ok || bad "F5 scan found only $n_md .md files (the find is broken?)"
+[ -f "$ROOT/templates/memory-starter/feedback_retro_before_clear_handshake.md" ] && ok || bad "F5 scan target templates/memory-starter/ missing"
 # The recycle row's line carries `--model` for the script, so the line check above cannot see its
 # fallback clause; pin the old phrasings directly (a bare /clear keeps the terminal's OLD model).
 hasnt "orchestrate no longer says a terminal is 'safe to /clear'" "safe to /clear" "$(cat "$ORCH")"

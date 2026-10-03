@@ -47,7 +47,6 @@ while [ $# -gt 0 ]; do
     --effort=*) EFFORT="${1#--effort=}"; EFFORT_SET=1 ;;
     --terminal) shift; TERM_OPT="${1:?--terminal needs a backend, auto, or list}" ;;
     -h|--help) usage ;;
-    -h|--help) usage ;;
     -*) echo "unknown flag: $1" >&2; usage ;;
     *) args+=("$1") ;;
   esac

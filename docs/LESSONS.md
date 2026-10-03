@@ -128,7 +128,8 @@ kit's whole reason to exist.
 
 24. **Retro-before-clear is a HANDSHAKE.** `/clear` destroys unpersisted context; the retro
     converts it into memories and tied-off state. Order: retro order → the session's
-    explicit "retro complete" → only then "safe to clear", one terminal at a time.
+    explicit "retro complete" → only then close the terminal and relaunch it with an explicit
+    `--model` (a bare `/clear` keeps the old model), one terminal at a time.
 
 25. **No mid-orchestration `/compact`.** Context quality is load-bearing at hand-offs;
     compaction mid-arc loses exactly the correction/decision detail the next phase needs.
