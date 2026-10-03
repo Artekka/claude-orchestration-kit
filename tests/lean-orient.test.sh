@@ -214,7 +214,8 @@ for fx in \
   'then relaunch it with `--model`, or open a `/new` session.' \
   'close it with `--model` set, or Clear the terminal.' \
   'A bare `/clear` keeps things simple: use it to recycle.' \
-  'In a hurry, to recycle use a bare `/clear`' ; do   # the last: its sentence continues on the NEXT line ("and carry on."); only a sentence-START "A bare `/clear`" may end a line
+  'In a hurry, to recycle use a bare `/clear`' \
+  'To recycle, tell the human: A bare `/clear`' ; do   # the last: its sentence continues on the NEXT line ("and carry on."); only a sentence-START "A bare `/clear`" may end a line
   [ -n "$(f5_left "$fx")" ] && ok || bad "F5 hole not caught (the guard passes this line): $fx"
 done
 # ...and the legitimate phrasings, alone and combined on one long line, are NOT flagged (false-flag control).
