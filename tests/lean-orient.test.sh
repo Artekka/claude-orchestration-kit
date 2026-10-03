@@ -111,6 +111,11 @@ while IFS= read -r r; do
 done <<EOF
 $readies
 EOF
+# The other copies of the READY format (the board template the seat reads, the orchestrate skill's
+# inline format) must agree with the skill, or a seat copies a stale one.
+has "board template READY format names the seat + era" 'saw <seat Name [ref]> era-<N>' "$(grep '^READY <PREFIX>' "$ROOT/templates/AGENT_BOARD.md")"
+has "board template READY format carries model + marks" 'model <id> · fill <current> · marks <prompt>/<handover>' "$(grep '^READY <PREFIX>' "$ROOT/templates/AGENT_BOARD.md")"
+has "orchestrate READY format names the seat + era" 'saw <seat Name [ref]> era-<N>' "$(grep 'Wait for \*\*READY\*\*' "$ORCH")"
 has "brief template names the seat" "| seat |" "$(cat "$BRIEF_T")"
 
 # ---- F4: board/log/fact-writing lanes sit on the MID model, never the small one ------------------

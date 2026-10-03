@@ -7,6 +7,7 @@
 | field | value |
 |---|---|
 | row | `<ROW>` (the seat's prefix) · severity · tracker/issue id or `—` |
+| seat | `<Name> [<ref>]` (era-<N>): the READY goes here, and the builder's READY names it |
 | model / effort | `opus[1m]` · `sonnet[1m]` · `haiku` (orchestrate skill, "Model per lane") · `--effort <level>` or default |
 | base branch | `origin/main` or `origin/<train-branch>` @ `<sha>` |
 | branch / worktree | `<prefix>/<row-lowercase>` in its own worktree |

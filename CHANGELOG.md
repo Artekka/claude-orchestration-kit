@@ -43,10 +43,26 @@ lean orient and window-aware marks), generalized to the kit's backends and file 
   model/effort, report protocol) and a README. Installed to `docs/orchestration/briefs/` by
   `bootstrap.sh` and kit-init. The seat commits and pushes the brief, then sends an assign message
   that only names the file. `orchestrate` §2 now points at it instead of an inline template.
+- **Launch values are validated like input.** A model must start with a letter (`^[a-z][a-z0-9.-]*(\[1m\])?$`), so
+  `--model --dangerously-skip-permissions`, `-x` and `.` are refused with exit 64 and never reach the
+  `claude` command line, in both scripts and for `model:` / `effort:` in the team block (a bad block
+  value now refuses to launch instead of warning and running the default). An empty or missing
+  `--model` / `--effort` (`--model`, `--model ''`, `--model=`) is exit 64 too, tracked as "given" apart
+  from "empty" so it cannot fall through to the block. `recycle-sibling.sh` refuses unknown flags, a
+  `-`-led name or prompt, and a third positional.
+- **Lean orient is runnable.** Step 1 is `git fetch` (one retry) then `git show origin/main:<brief>`,
+  falling back to the working tree and then to the seat; step 2 extracts the current `ORCHESTRATOR
+  ACTIVE` banner section only. READY names the seat and era the builder saw (`saw <seat [ref]> era-<N>`),
+  and the brief template has a `seat` row. `tests/lean-orient.test.sh` extracts those commands from the
+  skill and runs them against a bare origin, a stale clone and a live-shaped board.
+- **Board, log and fact-writing lanes run on the mid model**, never the small one (the small model never
+  writes facts). Nowhere does the kit tell a user to bare `/clear` to recycle: a bare `/clear` keeps the
+  terminal's old model, so every fallback relaunches with an explicit `--model` (or `/model` first).
 - **`templates/CLAUDE-slimness.md`:** why `CLAUDE.md` must stay slim (it is the startup floor, re-read
   every turn of every session) and how: rules in the file, narrative in a dated, linked archive;
   compress rationale, never the command, flag or guard. `CLAUDE-section.md` gains a short "Models"
-  note and points at it.
+  note and points at it. `bootstrap.sh` and kit-init install it to
+  `docs/orchestration/CLAUDE-slimness.md`, the path the section names.
 
 ### Per-window context marks
 

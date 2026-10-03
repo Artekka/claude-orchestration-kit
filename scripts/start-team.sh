@@ -37,7 +37,9 @@ usage() { sed -n '11,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0
+# A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
+need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -46,10 +48,11 @@ while [ $# -gt 0 ]; do
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
-    --model) shift; f_model="${1:?--model needs a model id, e.g. opus[1m]}" ;;
-    --model=*) f_model="${1#--model=}" ;;
-    --effort) shift; f_effort="${1:?--effort needs low|medium|high|xhigh|max}" ;;
-    --effort=*) f_effort="${1#--effort=}" ;;
+    # f_model_set / f_effort_set record "given", apart from "empty": `--model=` is a given, invalid value.
+    --model) need_value $# --model "a model id, e.g. opus[1m]"; shift; f_model="$1"; f_model_set=1 ;;
+    --model=*) f_model="${1#--model=}"; f_model_set=1 ;;
+    --effort) need_value $# --effort "low|medium|high|xhigh|max"; shift; f_effort="$1"; f_effort_set=1 ;;
+    --effort=*) f_effort="${1#--effort=}"; f_effort_set=1 ;;
     --terminal) shift; f_term="${1:?--terminal needs a backend, auto, or list}" ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     -h|--help) usage ;;
@@ -68,7 +71,7 @@ n="${f_n:-${TEAM_N:-2}}"
 if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 64; fi
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
 launch_set_account "$f_account"
-launch_resolve_model "$f_model" "$f_effort"
+launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set"
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done

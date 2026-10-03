@@ -49,7 +49,7 @@ window comes from your own env block, not the transcript: `ctx-fill.py <uuid> --
 1M window: self-report at ~350K, hand over by ~400K; 200K window: ~120K / ~150K. Report your
 fill AND your model with every hand-off. Then the handshake: seat orders `/orchestration-kit:retro` →
 you reply "retro complete" → the seat recycles your terminal (`scripts/recycle-sibling.sh`)
-or the human `/clear`s it. A row already in flight finishes first.
+or the human relaunches it with an explicit `--model` (a bare `/clear` keeps the old model). A row already in flight finishes first.
 
 ### Models
 
@@ -59,7 +59,7 @@ one. Read your own model and window from your env block, and state both in READY
 with `/orchestration-kit:orient --brief <ROW>` when the seat gave them a brief file.
 
 > Keep this file slim: it is re-read on every turn of every session. Rules here, narrative in a
-> linked archive (`templates/CLAUDE-slimness.md`).
+> linked archive (`docs/orchestration/CLAUDE-slimness.md`).
 
 ### Testing gate (fill per project in ORCHESTRATION.md)
 

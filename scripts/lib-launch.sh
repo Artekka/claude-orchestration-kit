@@ -63,9 +63,13 @@ launch_mode_flags() {
 # model either (unlike its account, which is inherited on purpose: that is where the login lives).
 # Default, first found: --model flag > `model:` in the team block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL
 # (below). --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
-# Validated before anything launches: a malformed model or unknown effort is refused, exit 64.
+# Validated before anything launches: a malformed model or unknown effort is refused, exit 64, whether it
+# came from a flag, an EMPTY flag value, or the team block (a bad block value is refused too: warning and
+# quietly launching on the default is the silent-wrong-model failure this block exists to prevent).
 LAUNCH_DEFAULT_MODEL="opus[1m]"   # the seat and the top-tier lanes; an alias, so it tracks the newest opus
-LAUNCH_MODEL_RE='^[a-z0-9.-]+(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | a full model id; never a shell metacharacter
+# Must START with a letter: a leading `-` is a flag (`--model --dangerously-skip-permissions` would hand
+# claude a second flag) and a leading `.` is no model id. Lowercase letters, digits, `.` and `-` only.
+LAUNCH_MODEL_RE='^[a-z][a-z0-9.-]*(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | a full model id
 LAUNCH_MODEL="$LAUNCH_DEFAULT_MODEL"; LAUNCH_MODEL_SRC="default"
 LAUNCH_EFFORT=""; LAUNCH_EFFORT_SRC=""
 launch_valid_model()  { [[ "$1" =~ $LAUNCH_MODEL_RE ]]; }
@@ -144,6 +148,9 @@ launch_valid_prompt() { [[ "$1" =~ $LAUNCH_PROMPT_RE ]]; }
 
 launch_check_args() {  # <name> <prompt> — exit 64 on unsafe input
   launch_valid_name "$1" || { echo "name must match [A-Za-z0-9_-]+ : '$1'" >&2; exit 64; }
+  # A `-`-led name or prompt would be read by claude as one of ITS flags (`claude --name N -x`).
+  case "$1" in -*) echo "name must not start with '-': '$1'" >&2; exit 64 ;; esac
+  case "$2" in -*) echo "prompt must not start with '-' (it would be read as a claude flag): '$2'" >&2; exit 64 ;; esac
   launch_valid_prompt "$2" || {
     echo "prompt may only contain letters, digits, spaces and / . _ : , @ = + -  (no ; \" ' ): '$2'" >&2
     exit 64
@@ -457,9 +464,9 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 
 # Optional `team:` block in docs/orchestration/ORCHESTRATION.md: an unindented `team:` line,
 # then indented `key: value` lines. Sets TEAM_SEAT TEAM_PREFIX TEAM_N TEAM_MODE TEAM_TERMINAL
-# TEAM_MODEL TEAM_EFFORT (empty when absent or invalid — template placeholders like <Orca> are
-# ignored; an invalid model/effort also warns, since silently launching on the default model is
-# the failure this block exists to prevent).
+# TEAM_MODEL TEAM_EFFORT (empty when absent; template placeholders like <Orca> are ignored for the
+# name/mode keys, but an invalid model/effort EXITS 64, since silently launching on the default model
+# is the failure this block exists to prevent).
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
@@ -480,20 +487,22 @@ launch_team_conf() {  # <repo>
   [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
   if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
-    echo "team block: model '$TEAM_MODEL' is not valid — ignored, using $LAUNCH_DEFAULT_MODEL" >&2; TEAM_MODEL=""
+    echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
   fi
   if [ -n "$TEAM_EFFORT" ] && ! launch_valid_effort "$TEAM_EFFORT"; then
-    echo "team block: effort '$TEAM_EFFORT' is not valid — ignored" >&2; TEAM_EFFORT=""
+    echo "team block: effort '$TEAM_EFFORT' is not valid (low|medium|high|xhigh|max; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
   fi
   if [ "$TEAM_TERMINAL" != auto ] && ! launch_known_backend "$TEAM_TERMINAL"; then TEAM_TERMINAL=""; fi
 }
 
-# launch_resolve_model <flag-model> <flag-effort> — flags > team block > defaults; exit 64 on a bad flag.
+# launch_resolve_model <flag-model> <model-given 0|1> <flag-effort> <effort-given 0|1>
+# flags > team block > defaults; exit 64 on a bad flag. "Given" is tracked apart from "empty": an empty
+# `--model=` is a GIVEN, invalid value (refused), never "not given" (which would fall through to the block).
 # Call after launch_team_conf. Never reads a running session: nothing is inherited.
 launch_resolve_model() {
-  if [ -n "$1" ]; then launch_set_model "$1" "--model"
+  if [ "${2:-0}" = 1 ]; then launch_set_model "$1" "--model"
   elif [ -n "${TEAM_MODEL:-}" ]; then launch_set_model "$TEAM_MODEL" "team block"; fi
-  if [ -n "$2" ]; then launch_set_effort "$2" "--effort"
+  if [ "${4:-0}" = 1 ]; then launch_set_effort "$3" "--effort"
   elif [ -n "${TEAM_EFFORT:-}" ]; then launch_set_effort "$TEAM_EFFORT" "team block"; fi
 }
 

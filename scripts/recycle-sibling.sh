@@ -31,23 +31,29 @@ set -euo pipefail
 
 usage() { sed -n '12,27p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
-DRY=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; MODEL=""; EFFORT=""; args=()
+DRY=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; MODEL=""; EFFORT=""; MODEL_SET=0; EFFORT_SET=0; args=()
+# A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
+need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
-    --model) shift; MODEL="${1:?--model needs a model id, e.g. opus[1m]}" ;;
-    --model=*) MODEL="${1#--model=}" ;;
-    --effort) shift; EFFORT="${1:?--effort needs low|medium|high|xhigh|max}" ;;
-    --effort=*) EFFORT="${1#--effort=}" ;;
+    # MODEL_SET / EFFORT_SET record "given", apart from "empty": `--model=` is a given, invalid value.
+    --model) need_value $# --model "a model id, e.g. opus[1m]"; shift; MODEL="$1"; MODEL_SET=1 ;;
+    --model=*) MODEL="${1#--model=}"; MODEL_SET=1 ;;
+    --effort) need_value $# --effort "low|medium|high|xhigh|max"; shift; EFFORT="$1"; EFFORT_SET=1 ;;
+    --effort=*) EFFORT="${1#--effort=}"; EFFORT_SET=1 ;;
     --terminal) shift; TERM_OPT="${1:?--terminal needs a backend, auto, or list}" ;;
     -h|--help) usage ;;
+    -h|--help) usage ;;
+    -*) echo "unknown flag: $1" >&2; usage ;;
     *) args+=("$1") ;;
   esac
   shift
 done
+[ "${#args[@]}" -le 2 ] || { echo "too many arguments (<Name> [prompt] only; quote a prompt that has spaces): ${args[*]}" >&2; usage; }
 REPO="$(launch_repo "$REPO")" || exit 64
 if [ "$TERM_OPT" = list ]; then launch_list_backends; exit 0; fi
 [ "${#args[@]}" -ge 1 ] || usage
@@ -58,7 +64,7 @@ if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then default_prompt="/orchestration-kit:o
 prompt="${args[1]:-$default_prompt}"
 launch_check_args "$name" "$prompt"
 launch_set_mode "${MODE:-${TEAM_MODE:-normal}}"
-launch_resolve_model "$MODEL" "$EFFORT"
+launch_resolve_model "$MODEL" "$MODEL_SET" "$EFFORT" "$EFFORT_SET"
 launch_init "$REPO" "${TERM_OPT:-${TEAM_TERMINAL:-}}"
 
 manual_help() {

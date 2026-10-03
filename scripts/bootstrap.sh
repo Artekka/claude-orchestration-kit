@@ -52,6 +52,7 @@ install_if_missing templates/AGENT_BOARD.md docs/orchestration/AGENT_BOARD.md
 install_if_missing templates/ORCHESTRATION.md docs/orchestration/ORCHESTRATION.md
 install_if_missing templates/briefs/README.md docs/orchestration/briefs/README.md
 install_if_missing templates/briefs/_TEMPLATE.md docs/orchestration/briefs/_TEMPLATE.md
+install_if_missing templates/CLAUDE-slimness.md docs/orchestration/CLAUDE-slimness.md
 if [ -e "$TARGET/CLAUDE.md" ]; then
   if grep -q "orchestration-kit v" "$TARGET/CLAUDE.md" 2>/dev/null; then
     say "SKIP  CLAUDE.md section (managed marker present — upgrades diff, not clobber)"

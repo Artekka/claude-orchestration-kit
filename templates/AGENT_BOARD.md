@@ -65,7 +65,7 @@ section is here, no orchestrator is active.
 | Validator `[<ref>]` | V- | <NNN,NNN> | READ only | none |
 
 READY signal (sent by SendMessage; board fallback: an "AVAILABLE <prefix>" line under the banner):
-READY <PREFIX> [<ref>] · fill <current> · <what you can take> · seen: <rows already read | none>
+READY <PREFIX> [<ref>] · model <id> · fill <current> · marks <prompt>/<handover> · saw <seat Name [ref]> era-<N> · <what you can take> · seen: <rows already read | none>
 
 ⏭ **HANDOVER (era-<N> → <N+1>), <HH:MM TZ>** (seat fill <NNN,NNN> measured; nothing of the seat's in flight):
 ✅ LIVE <version> (main `<sha>`) · DEPLOY FREE · LOG FREE, next <N>

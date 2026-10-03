@@ -116,11 +116,21 @@ has "team block effort" "effort     medium (team block)" "$out"
 has "team block reaches the command" '--model sonnet\[1m\] --effort medium' "$out"
 out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1)"
 has "flag beats the team block" "model      haiku (--model)" "$out"
-printf 'team:\n  model: not;a;model\n  effort: ultra\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
-has "bad team model warns" "team block: model 'not;a;model' is not valid" "$out"
-has "bad team model falls back to the default" "model      opus[1m] (default)" "$out"
-has "bad team effort warns" "team block: effort 'ultra' is not valid" "$out"
+# (ORCA106-5b, seat ruling) A bad block value is REFUSED, exit 64, not ignored: warning and quietly
+# launching on the default model is the silent-wrong-model failure the block exists to prevent.
+printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+has "bad team model refused rc 64" "rc=64" "$out"
+has "bad team model says why" "team block: model 'not;a;model' is not valid" "$out"
+hasnt "bad team model prints no command" "claude --name" "$out"
+printf 'team:\n  effort: ultra\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+has "bad team effort refused rc 64" "rc=64" "$out"
+has "bad team effort says why" "team block: effort 'ultra' is not valid" "$out"
+# The block is read (and refused) before flags apply, so a broken file is fixed, not routed around.
+printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1; echo "rc=$?")"
+has "a valid --model does not route around a broken team block" "rc=64" "$out"
 
 # 8. (ORCA106-5b F1) A model value must look like a model, not a flag. A flag-shaped value would be
 #    spliced into `claude --name N --model <value> ...` and read by claude as ITS OWN flag
@@ -139,23 +149,28 @@ for bad in '--effort' '--dangerously-skip-permissions' '-x' '.' '-' '--'; do
     done
   done
 done
-# The team-block path shares the validator. Documented leniency is kept (a bad block value warns and
-# the built-in default stands, like permission_mode), but a flag-shaped value must NEVER reach the
-# command line, in either script.
+# The team-block path shares the validator and is REFUSED too (exit 64, seat ruling): a flag-shaped
+# `model:` / `effort:` in ORCHESTRATION.md must never reach the command line, and must not be
+# swallowed into a warning plus a silent default either. Both scripts.
 for bad in '--effort' '--dangerously-skip-permissions' '-x' '.'; do
   printf 'team:\n  model: %s\n' "$bad" > "$R/docs/orchestration/ORCHESTRATION.md"
-  out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
-  has "F1 team block model '$bad' warns" "team block: model '$bad' is not valid" "$out"
-  has "F1 team block model '$bad' falls back to the default" "model      opus[1m] (default)" "$out"
-  hasnt "F1 team block model '$bad' never reaches the command" "--model $bad" "$out"
-  out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1)"
-  has "F1 start-team team block model '$bad' warns" "team block: model '$bad' is not valid" "$out"
-  hasnt "F1 start-team team block model '$bad' never reaches the command" "--model $bad" "$out"
+  out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+  has "F1 recycle-sibling team block model '$bad' refused rc 64" "rc=64" "$out"
+  has "F1 recycle-sibling team block model '$bad' says why" "team block: model '$bad' is not valid" "$out"
+  hasnt "F1 recycle-sibling team block model '$bad' prints no command" "claude --name" "$out"
+  out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"
+  has "F1 start-team team block model '$bad' refused rc 64" "rc=64" "$out"
+  has "F1 start-team team block model '$bad' says why" "team block: model '$bad' is not valid" "$out"
+  hasnt "F1 start-team team block model '$bad' prints no command" "claude --name" "$out"
 done
 printf 'team:\n  effort: --dangerously-skip-permissions\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
-has "F1 team block flag-shaped effort warns" "team block: effort '--dangerously-skip-permissions' is not valid" "$out"
-hasnt "F1 team block flag-shaped effort never reaches the command" "--effort --dangerously" "$out"
+for tool in rs st; do
+  if [ "$tool" = rs ]; then out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+  else out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"; fi
+  has "F1 $tool team block flag-shaped effort refused rc 64" "rc=64" "$out"
+  has "F1 $tool team block flag-shaped effort says why" "team block: effort '--dangerously-skip-permissions' is not valid" "$out"
+  hasnt "F1 $tool team block flag-shaped effort prints no command" "claude --name" "$out"
+done
 
 # Unknown flags and a `-`-led positional (a name or a prompt) are refused, not passed through to
 # claude: `recycle-sibling.sh ZzNone --bogus` used to exit 0 with `--bogus` in argv. A third
@@ -173,6 +188,16 @@ for badargs in "--bogus" "-x" "extra"; do
   has "start-team refuses '$badargs' rc 64" "rc=64" "$out"
   hasnt "start-team '$badargs' prints no command" "claude --name" "$out"
 done
+
+# The shared check is the last line of defence for a name or prompt a caller built itself (the flag
+# parsers above refuse `-x` first, so only a direct call reaches it).
+for pair in "-x|/orchestration-kit:orient" "ZzNone|-x" "ZzNone|--dangerously-skip-permissions"; do
+  out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args "$2" "$3"; echo ok' _ "$ROOT" "${pair%%|*}" "${pair#*|}" 2>&1; echo "rc=$?")"
+  has "launch_check_args refuses '$pair' rc 64" "rc=64" "$out"
+  hasnt "launch_check_args '$pair' does not pass" "ok" "${out%rc=*}"
+done
+out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args ZzNone /orchestration-kit:orient; echo ok' _ "$ROOT" 2>&1; echo "rc=$?")"
+has "launch_check_args accepts a normal name + slash prompt" "ok" "$out"
 
 # 9. (ORCA106-5b F2) An EMPTY or MISSING value is a refusal (rc 64), for both flags and both scripts:
 #    `--model`, `--model ''`, `--model=`, same for `--effort`. "Given" is tracked apart from "empty":

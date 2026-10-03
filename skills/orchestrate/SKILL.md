@@ -47,7 +47,7 @@ Every brief is a hypothesis — a builder correcting it upward is expected, not 
 ## 3 · DAG + assignment
 
 1. Decompose into a DAG: nodes = fenced rows, edges = verify-gated hand-offs. **Concurrent nodes' fences must be disjoint** — check BEFORE assigning, including each row's acceptance-criteria surface (tests, fixtures, docs it must touch).
-2. Wait for **READY** from each sibling (format in `/orchestration-kit:orient` Step 7): `READY <PREFIX> [<ref>] · model <id> · fill <current> · marks <p>/<h> · <can take> · seen: <rows already read>`. The `seen:` list decides who may later VERIFY what.
+2. Wait for **READY** from each sibling (format in `/orchestration-kit:orient` Step 7): `READY <PREFIX> [<ref>] · model <id> · fill <current> · marks <p>/<h> · saw <seat Name [ref]> era-<N> · <can take> · seen: <rows already read>`. The `seen:` list decides who may later VERIFY what.
 3. **Assignment = SendMessage + the same assignment on the board row** (an undelivered message is silent; the board always works).
 4. First reply confirms receipt. No reply in ~10 min → check the board; still nothing → banner note, reassign when someone frees up.
 
@@ -59,10 +59,11 @@ The seat chooses a session's model at launch; a recycled session **never inherit
 |---|---|
 | Heavy reasoning and verification: core logic and math, data migrations, security, money/billing, anything whose bug is silent; **every READ of those**; the seat; the validator | top tier, 1M — `opus[1m]` |
 | Routine work: UI, wire/schema plumbing, ordinary features, test-only fixes | mid tier, 1M — `sonnet[1m]` |
-| Docs, board/log edits, copy changes, mechanical sweeps, searches that only locate code | small tier, 200K window — `haiku` |
+| Board and log entries, write-ups, anything that states SHAs, counts or verdicts | mid tier, 1M — `sonnet[1m]` (facts need a model that does not fabricate) |
+| Copy changes, mechanical sweeps, searches that only locate code | small tier, 200K window — `haiku` (never writes facts, see below) |
 
 - Launch: `bash scripts/recycle-sibling.sh <Name> [prompt] --model <m> [--effort <e>]`; `start-team.sh --model <m>` gives the whole team one model. The default when you pass nothing is the team block's `model:` in `ORCHESTRATION.md`, else `opus[1m]`.
-- **The small model never writes facts** — log entries, verdicts, measured numbers, SHAs. Small models invent them. Give it text to move, not claims to make.
+- **The small model never writes facts** — log entries, board entries, verdicts, measured numbers, SHAs. Small models invent them. Give it text to move, not claims to make.
 - Put the model on the row's brief so the builder, the verifier and the next seat can see what the lane was given.
 
 **Subagents vs sessions (hybrid policy):**
@@ -140,7 +141,7 @@ Claim LOG slot (number allocated inside the claim text) → append the entry to 
 | Signal | Action |
 |---|---|
 | Sibling self-reports fill at the prompt mark; incoherent status; stale claim | SendMessage **"run /orchestration-kit:retro now"** + board note. A row already in flight finishes first |
-| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name> ["/orchestration-kit:orient --brief <ROW>"] --model <lane model, §3a> [--effort <e>]` (launch fresh → wait → SIGTERM old; no `--model` = the default, never the old session's). Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to /clear, then /orchestration-kit:orient" |
+| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name> ["/orchestration-kit:orient --brief <ROW>"] --model <lane model, §3a> [--effort <e>]` (launch fresh → wait → SIGTERM old; no `--model` = the default, never the old session's). Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to close — relaunch it with `claude --name <Name> --model <lane model> "/orchestration-kit:orient"` (a bare `/clear` keeps that terminal's OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`)" |
 | Fresh sibling sends READY | Assign the next DAG node (check `seen:` before giving it a READ) |
 
 Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear.
@@ -153,11 +154,11 @@ Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro com
 | ~200K (every small-tier model) | ~120K (60%) | ~150K (75%) |
 
 - Measure: `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` (window from your env block) — sums input + cache_read + cache_creation off the last assistant turn. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string** — the one safe exception only lowers it: a small-tier (`haiku`) string means 200K, and ctx-fill applies it. (A seat on a ~200K window died at 175,725 tokens with no handover: that is why the small window's marks sit at 120K/150K, not 140K/160K.)
-- At handover: finish only what is already in verify → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — /clear this terminal, then run /orchestration-kit:orchestrate".
+- At handover: finish only what is already in verify → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — close this terminal and relaunch it with `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate` (a bare `/clear` keeps the OLD model; if you must `/clear`, run `/model opus[1m]` first)".
 - Include your measured fill + model in every handover and every roster report.
 
 ## 11 · The human's loop — all approvals through the seat
 
 - Siblings **never** ask the human in their terminal. A permission prompt/denial or design question → the sibling stops and messages the seat → the seat asks the human HERE (batched) → relays the ruling (or runs the action itself). Restate this in every READY ack.
-- Irreducible human work: design forks (surface BEFORE building), on-device checks, secrets, activations, `/clear` when recycling isn't available.
+- Irreducible human work: design forks (surface BEFORE building), on-device checks, secrets, activations, and relaunching a terminal (`claude --name <Name> --model <lane model> …`, never a bare `/clear`) when recycling isn't available.
 - The seat writes: board, briefs, reconciles, deploys, logs. It does **not** write feature code.
