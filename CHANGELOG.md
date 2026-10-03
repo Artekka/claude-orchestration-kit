@@ -2,7 +2,7 @@
 
 Newest first.
 
-## 0.6.0 — unreleased
+## 0.6.0 — 2026-10-02
 
 A model per lane, leaner builder starts, per-window context marks, and optional multi-account
 teams. Ported from a project that ran the same package for a week (its launch flags, briefs,
