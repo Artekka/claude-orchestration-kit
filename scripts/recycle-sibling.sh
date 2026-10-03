@@ -11,27 +11,37 @@
 #
 # Usage:
 #   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
+#                              [--model M] [--effort E]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
 #     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
 #     mode / terminal default to the team block (ORCHESTRATION.md), else normal / auto-detect.
 #     account: the fresh session INHERITS the old one's Claude Code account (its CLAUDE_CONFIG_DIR);
 #     --account N|DIR moves it (1 = default ~/.claude, N = ~/.claude-acctN). docs/MULTI-ACCOUNT.md
+#     model: ALWAYS passed to the fresh session, never inherited from the old one (the account is,
+#     the model is not). --model M = opus[1m] | sonnet[1m] | haiku | a full model id; default = the
+#     team block's `model:`, else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
+#     given. Bad values exit 64. The lane -> model table is in skills/orchestrate ("Model per lane").
 #   scripts/recycle-sibling.sh Orca          # seat self-recycle
+#   scripts/recycle-sibling.sh Sib2 --model 'sonnet[1m]' --effort high
 #
 # Env overrides: REPO_DIR (repo to open in), WT_EXE (full path to wt.exe).
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '12,21p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '12,27p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
-DRY=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; args=()
+DRY=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; MODEL=""; EFFORT=""; args=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
+    --model) shift; MODEL="${1:?--model needs a model id, e.g. opus[1m]}" ;;
+    --model=*) MODEL="${1#--model=}" ;;
+    --effort) shift; EFFORT="${1:?--effort needs low|medium|high|xhigh|max}" ;;
+    --effort=*) EFFORT="${1#--effort=}" ;;
     --terminal) shift; TERM_OPT="${1:?--terminal needs a backend, auto, or list}" ;;
     -h|--help) usage ;;
     *) args+=("$1") ;;
@@ -48,6 +58,7 @@ if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then default_prompt="/orchestration-kit:o
 prompt="${args[1]:-$default_prompt}"
 launch_check_args "$name" "$prompt"
 launch_set_mode "${MODE:-${TEAM_MODE:-normal}}"
+launch_resolve_model "$MODEL" "$EFFORT"
 launch_init "$REPO" "${TERM_OPT:-${TEAM_TERMINAL:-}}"
 
 manual_help() {
@@ -94,5 +105,5 @@ fi
 
 # shellcheck disable=SC2086  # $old may hold several pids, one per line
 if [ -n "$old" ]; then kill -TERM $old; fi
-echo "fresh ${name}: ${LAUNCH_FRESH} · account $(launch_account_label) · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
+echo "fresh ${name}: ${LAUNCH_FRESH} · account $(launch_account_label) · model ${LAUNCH_MODEL} · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
 if [ "$LAUNCH_BACKEND" = tmux-detached ]; then echo "attach with: tmux attach -t $(launch_tmux_session)"; fi

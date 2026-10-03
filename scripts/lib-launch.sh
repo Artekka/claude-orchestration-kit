@@ -4,7 +4,7 @@
 # Written for bash 3.2+ (macOS /bin/bash): no associative arrays, no ${x,,}, no empty-array expansion.
 #
 # Opens a NEW terminal window (or tmux window) running, in the repo's main checkout:
-#     cd <repo> && [. ~/.nvm/nvm.sh &&] claude --name <Name> [mode flags] <prompt>
+#     cd <repo> && [. ~/.nvm/nvm.sh &&] claude --name <Name> [mode flags] --model <M> [--effort <E>] <prompt>
 # The backend is picked per machine. Precedence: --terminal flag > `terminal:` in the team block
 # of docs/orchestration/ORCHESTRATION.md > auto-detect, in this order:
 #
@@ -56,6 +56,32 @@ launch_mode_flags() {
     auto) printf -- '--permission-mode auto ' ;;
     *) printf '' ;;
   esac
+}
+# Model and effort (docs/GETTING-STARTED.md "Model per lane"). The lane decides the model, so --model
+# is ALWAYS passed explicitly: a fresh session must never silently inherit whatever the old terminal,
+# the account default or the last `/model` happened to be. A recycle does NOT read the old session's
+# model either (unlike its account, which is inherited on purpose: that is where the login lives).
+# Default, first found: --model flag > `model:` in the team block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL
+# (below). --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
+# Validated before anything launches: a malformed model or unknown effort is refused, exit 64.
+LAUNCH_DEFAULT_MODEL="opus[1m]"   # the seat and the top-tier lanes; an alias, so it tracks the newest opus
+LAUNCH_MODEL_RE='^[a-z0-9.-]+(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | a full model id; never a shell metacharacter
+LAUNCH_MODEL="$LAUNCH_DEFAULT_MODEL"; LAUNCH_MODEL_SRC="default"
+LAUNCH_EFFORT=""; LAUNCH_EFFORT_SRC=""
+launch_valid_model()  { [[ "$1" =~ $LAUNCH_MODEL_RE ]]; }
+launch_valid_effort() { case "$1" in low|medium|high|xhigh|max) return 0 ;; *) return 1 ;; esac; }
+launch_set_model() {  # <model> <source label>
+  launch_valid_model "$1" || {
+    echo "--model must look like opus[1m], sonnet[1m], haiku or a full model id (lowercase letters, digits . -): '$1'" >&2; exit 64; }
+  LAUNCH_MODEL="$1"; LAUNCH_MODEL_SRC="${2:---model}"
+}
+launch_set_effort() {  # <effort> <source label>
+  launch_valid_effort "$1" || { echo "--effort must be one of low|medium|high|xhigh|max: '$1'" >&2; exit 64; }
+  LAUNCH_EFFORT="$1"; LAUNCH_EFFORT_SRC="${2:---effort}"
+}
+launch_model_flags() {  # <quote-fn> — `--model M ` plus `--effort E ` when given
+  printf -- '--model %s ' "$("$1" "$LAUNCH_MODEL")"
+  if [ -n "$LAUNCH_EFFORT" ]; then printf -- '--effort %s ' "$LAUNCH_EFFORT"; fi
 }
 # Accounts (optional; docs/MULTI-ACCOUNT.md). Each Claude Code account keeps its login and config in
 # its own directory, chosen by CLAUDE_CONFIG_DIR (unset = the default ~/.claude). Convention: account
@@ -340,7 +366,7 @@ launch_init() {
 _launch_core() {  # <name> <prompt> <quote-fn>
   if [ -n "${LAUNCH_CMD_OVERRIDE:-}" ]; then printf '%s%s' "$(_launch_env "$3")" "${LAUNCH_CMD_OVERRIDE//\{name\}/$1}"; return; fi
   # --name stays FIRST: launch_pattern matches "^claude --name <Name>( |$)".
-  printf '%sclaude --name %s %s%s' "$(_launch_env "$3")" "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$("$3" "$2")"
+  printf '%sclaude --name %s %s%s%s' "$(_launch_env "$3")" "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$(launch_model_flags "$3")" "$("$3" "$2")"
 }
 
 # Quoting, one per backend family.
@@ -431,16 +457,19 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 
 # Optional `team:` block in docs/orchestration/ORCHESTRATION.md: an unindented `team:` line,
 # then indented `key: value` lines. Sets TEAM_SEAT TEAM_PREFIX TEAM_N TEAM_MODE TEAM_TERMINAL
-# (empty when absent or invalid — template placeholders like <Orca> are ignored).
+# TEAM_MODEL TEAM_EFFORT (empty when absent or invalid — template placeholders like <Orca> are
+# ignored; an invalid model/effort also warns, since silently launching on the default model is
+# the failure this block exists to prevent).
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
-  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""
+  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""
   [ -f "$conf" ] || return 0
   while IFS='=' read -r k v; do
     case "$k" in
       seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;;
       permission_mode) TEAM_MODE="$v" ;; terminal) TEAM_TERMINAL="$v" ;;
+      model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;;
     esac
   done < <(awk '
     /^team:[[:space:]]*$/ { on=1; next }
@@ -450,7 +479,22 @@ launch_team_conf() {  # <repo>
   launch_valid_name "$TEAM_PREFIX" || TEAM_PREFIX=""
   [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
+  if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
+    echo "team block: model '$TEAM_MODEL' is not valid — ignored, using $LAUNCH_DEFAULT_MODEL" >&2; TEAM_MODEL=""
+  fi
+  if [ -n "$TEAM_EFFORT" ] && ! launch_valid_effort "$TEAM_EFFORT"; then
+    echo "team block: effort '$TEAM_EFFORT' is not valid — ignored" >&2; TEAM_EFFORT=""
+  fi
   if [ "$TEAM_TERMINAL" != auto ] && ! launch_known_backend "$TEAM_TERMINAL"; then TEAM_TERMINAL=""; fi
+}
+
+# launch_resolve_model <flag-model> <flag-effort> — flags > team block > defaults; exit 64 on a bad flag.
+# Call after launch_team_conf. Never reads a running session: nothing is inherited.
+launch_resolve_model() {
+  if [ -n "$1" ]; then launch_set_model "$1" "--model"
+  elif [ -n "${TEAM_MODEL:-}" ]; then launch_set_model "$TEAM_MODEL" "team block"; fi
+  if [ -n "$2" ]; then launch_set_effort "$2" "--effort"
+  elif [ -n "${TEAM_EFFORT:-}" ]; then launch_set_effort "$TEAM_EFFORT" "team block"; fi
 }
 
 # Persist permission_mode in the team block (adding the block if missing) so recycles relaunch
@@ -484,6 +528,8 @@ launch_describe_env() {
   esac
   if [ -n "$LAUNCH_NVM" ]; then echo "nvm        sourced ($HOME/.nvm/nvm.sh)"; else echo "nvm        not sourced"; fi
   echo "account    $(launch_account_label)"
+  echo "model      $LAUNCH_MODEL ($LAUNCH_MODEL_SRC)"
+  if [ -n "$LAUNCH_EFFORT" ]; then echo "effort     $LAUNCH_EFFORT ($LAUNCH_EFFORT_SRC)"; else echo "effort     default (not passed)"; fi
   if [ "$LAUNCH_MODE" = normal ]; then echo "mode       normal (no flag)"; else echo "mode       $LAUNCH_MODE -> $(launch_mode_flags "$LAUNCH_MODE")"; fi
   if [ "$LAUNCH_CAN_VERIFY" != 1 ]; then echo "verify     no pgrep here: launches cannot be confirmed, running sessions cannot be detected"; fi
 }

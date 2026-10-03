@@ -10,9 +10,14 @@
 #
 # Usage:
 #   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX]
-#                         [--mode normal|accept-edits|auto] [--terminal BACKEND|auto|list] [--repo DIR]
+#                         [--mode normal|accept-edits|auto] [--model M] [--effort E]
+#                         [--terminal BACKEND|auto|list] [--repo DIR]
 #   --terminal list   print every backend and whether it is available here, then exit
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
+#   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | a full id). Always
+#                     passed explicitly; default = the team block's `model:`, else opus[1m]. One value
+#                     for the whole team: give each lane its own with `recycle-sibling.sh <Name> --model`.
+#   --effort E        low|medium|high|xhigh|max; passed only when given. Bad values exit 64.
 #
 # Precedence: flags > the optional `team:` block in docs/orchestration/ORCHESTRATION.md > defaults.
 # A --mode flag is saved into that block (permission_mode:) so recycles relaunch in the same mode.
@@ -22,15 +27,17 @@
 #     siblings:         2
 #     permission_mode:  normal
 #     terminal:         auto
+#     model:            opus[1m]      (optional: the default for every launch)
+#     effort:           high          (optional)
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '11,24p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '11,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
@@ -39,6 +46,10 @@ while [ $# -gt 0 ]; do
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
+    --model) shift; f_model="${1:?--model needs a model id, e.g. opus[1m]}" ;;
+    --model=*) f_model="${1#--model=}" ;;
+    --effort) shift; f_effort="${1:?--effort needs low|medium|high|xhigh|max}" ;;
+    --effort=*) f_effort="${1#--effort=}" ;;
     --terminal) shift; f_term="${1:?--terminal needs a backend, auto, or list}" ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     -h|--help) usage ;;
@@ -57,6 +68,7 @@ n="${f_n:-${TEAM_N:-2}}"
 if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 64; fi
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
 launch_set_account "$f_account"
+launch_resolve_model "$f_model" "$f_effort"
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
