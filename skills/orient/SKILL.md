@@ -1,11 +1,24 @@
 ---
 name: orient
-description: Bring a fresh session up to speed on a kit-adopted project — restate the multi-session non-negotiables, read the ground rules, the orchestration overlay, the live board, and recent git history, then summarize state in five bullets and report availability to any active orchestrator. Use at session start ("orient me", "where are we", "catch me up") or when invoked on a project without context. If the project ships its own richer /orient, prefer that one.
+description: Bring a fresh session up to speed on a kit-adopted project — restate the multi-session non-negotiables, read the ground rules, the orchestration overlay, the live board, and recent git history, then summarize state in five bullets and report availability to any active orchestrator. With `--brief <ROW>` it runs a lean mode for a builder who was assigned a row: read the row's brief and the board banner only, then send READY. Use at session start ("orient me", "where are we", "catch me up") or when invoked on a project without context. If the project ships its own richer /orient, prefer that one.
 ---
 
 # orient
 
 Load a fresh session's working memory without the human re-explaining. End state: five bullets + a productive next question (or a report to the orchestrator).
+
+## Lean mode: `/orchestration-kit:orient --brief <ROW>`
+
+For a builder the seat assigned a row that has a brief file (`docs/orchestration/briefs/<ROW>.md`, made from `templates/briefs/_TEMPLATE.md`). A full orient costs ~100K tokens of a fresh context; the brief already holds what this row needs. The full mode below stays for the seat, for a lone session, and for any start without a brief.
+
+| step | do |
+|---|---|
+| 1 | Read `docs/orchestration/briefs/<ROW>.md` — the row's whole contract. Missing file → tell the seat, then fall back to the full mode |
+| 2 | Read the TOP of the board only: the `ORCHESTRATOR ACTIVE` banner and the standing rules, not the rows' history (about the first 60 lines; archives are never read) |
+| 3 | `python3 scripts/ctx-fill.py <uuid> --window <1m\|200k>` as its own command — the window your OWN env block names |
+| 4 | `ListAgents` (first line = your name + ref), then the READY signal of Step 7 |
+
+Skip: the status doc, the log, `git log`, the overlay (unless the brief names no gate command — then read `ORCHESTRATION.md` → Gate only), the test-health check and the five-bullet summary. `CLAUDE.md` loads with the session, so the Step 0 rules (worktree, refresh before claiming, row prefix) still apply: follow them and restate them in one line in READY.
 
 ## Step 0 — The multi-session non-negotiables (restate in your summary)
 
@@ -46,10 +59,12 @@ Load a fresh session's working memory without the human re-explaining. End state
 
 **READY signal** (`SendMessage` to the seat; board note `AVAILABLE <prefix>` under the banner only if SendMessage fails):
 ```
-READY <PREFIX> [<ref>] · fill <current from ctx-fill, verbatim> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
+READY <PREFIX> [<ref>] · model <id> · fill <current from ctx-fill, verbatim> · marks <prompt>/<handover> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
 ```
 - `<ref>` = your own identity line from `ListAgents` (e.g. "This session is Sib1 [57f3ab]") — not your session uuid.
-- Fill = `python3 scripts/ctx-fill.py` run as its own command. If it says the window is UNKNOWN, read your env block and add the window it states.
+- `model <id>` = the exact model id in YOUR env block (e.g. `claude-opus-5-5[1m]`). The seat chose your model by lane at launch; stating it lets the seat check the lane got the model it asked for.
+- Fill = `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` run as its own command, output pasted verbatim; `--window` = what your env block says. `marks` = the `marks` line it printed for that window (1M → 350K/400K, 200K → 120K/150K).
+- If ctx-fill says the window is UNKNOWN, read your env block and re-run with `--window` — a transcript cannot carry the `[1m]` suffix.
 - `seen:` is your independence disclosure — it decides which rows you may later verify.
 - If the banner's era/seat looks stale against the board body, say so in READY.
 

@@ -2,7 +2,67 @@
 
 Newest first.
 
-## Unreleased — multi-account (optional)
+## 0.6.0 — unreleased
+
+A model per lane, leaner builder starts, per-window context marks, and optional multi-account
+teams. Ported from a project that ran the same package for a week (its launch flags, briefs,
+lean orient and window-aware marks), generalized to the kit's backends and file layout.
+
+### A model per lane
+
+- **`--model M` and `--effort E` on `recycle-sibling.sh` and `start-team.sh`**, on every terminal
+  backend (tmux, WSL, macOS, Git Bash/cmd.exe, Linux emulators), implemented once in `lib-launch.sh`
+  (`launch_set_model`, `launch_model_flags`, `launch_resolve_model`). **A model is always passed
+  explicitly**, so a fresh session never silently inherits whatever the old terminal or the account
+  default happened to be; a recycle does not read the old session's model (its account, by contrast,
+  is inherited on purpose). Default `opus[1m]`, configurable with `model:` / `effort:` in the
+  `team:` block of `ORCHESTRATION.md`; flags override it. `--effort` is passed only when given.
+  `--model` must look like `opus[1m]` / `sonnet[1m]` / `haiku` / a full model id and `--effort` is one
+  of `low|medium|high|xhigh|max`; anything else exits 64 like `--account`, before anything launches.
+  A bad value in the team block is ignored with a warning. `--dry-run` prints both.
+  `start-team.sh --model` applies one model to the whole team; per-lane models go through recycle.
+- **`skills/orchestrate` §3a, "Model per lane":** a lane table written by work type (heavy
+  reasoning/verification → top tier, 1M; routine features/UI → mid tier, 1M; docs/mechanical → small
+  tier, never writes facts), and the hybrid subagent policy (bounded jobs → subagents; long builds,
+  every verification and user-facing work → sessions; subagents die with their parent). The recycle
+  and seat-recycle commands in §9/§10 now carry `--model`.
+- **`tests/lean-launch.test.sh`** (88 checks): default, explicit, `--flag=value`, six bad models and
+  four bad efforts refused with exit 64, an `orient --brief <ROW>` prompt accepted on POSIX and WSL, no inheritance on recycle (a stand-in running on a different
+  model), `start-team` reaching every window, all 16 backends and quoting families, team-block
+  default/override/bad value. Mutation-checked: three mutants (default model not passed, validation
+  off, model inherited on recycle) each turn it red.
+
+### Leaner starts
+
+- **`/orchestration-kit:orient --brief <ROW>`:** a lean mode for a builder assigned a row. It reads the
+  row's brief file and the top of the board only, measures its fill, and sends READY. A full orient
+  costs about 100K tokens of a fresh context; the brief already holds what the row needs.
+- **READY now carries `model <id>` and `marks <prompt>/<handover>`** next to the fill, so the seat
+  can see the lane got the model it asked for.
+- **`templates/briefs/`:** `_TEMPLATE.md` (goal, numbered acceptance, fence, seam map, base, gate,
+  model/effort, report protocol) and a README. Installed to `docs/orchestration/briefs/` by
+  `bootstrap.sh` and kit-init. The seat commits and pushes the brief, then sends an assign message
+  that only names the file. `orchestrate` §2 now points at it instead of an inline template.
+- **`templates/CLAUDE-slimness.md`:** why `CLAUDE.md` must stay slim (it is the startup floor, re-read
+  every turn of every session) and how: rules in the file, narrative in a dated, linked archive;
+  compress rationale, never the command, flag or guard. `CLAUDE-section.md` gains a short "Models"
+  note and points at it.
+
+### Per-window context marks
+
+- **`scripts/ctx-fill.py`:** `--window 1m|200k` (a token count still works). Marks: 1M window →
+  350K/400K; **200K window → 120K/150K** (60%/75%; anything in between scales, capped at the 1M
+  marks). A transcript naming a Haiku model proves a 200K window, the one model rule that can only
+  lower it; Opus and Sonnet record the same string at 200K and 1M, so for them the window stays
+  UNKNOWN, both sets of marks are printed, and the verdict is conditional until you pass `--window`.
+- **The 200K marks moved from 140K/160K to 120K/150K** everywhere (ctx-fill, `statusline-ctx.sh`,
+  the orchestrate table, CLAUDE-section, the ORCHESTRATION template, GETTING-STARTED, GLOSSARY,
+  settings-snippets). Why: a seat on a ~200K window died at 175,725 tokens with no handover, so a 160K
+  handover left too little room for the retro itself.
+- **`tests/ctx-fill.test.sh`** (28 checks) and the extended statusline test (9) pin the marks. Mutation-checked:
+  70%/80% marks, the Haiku rule off, and `--window` ignored each turn ctx-fill red.
+
+### Multi-account (optional)
 
 - **`docs/MULTI-ACCOUNT.md`:** run one team across several Claude Code accounts. Each account gets
   its own config dir via `CLAUDE_CONFIG_DIR` (`~/.claude-acctN` convention, a `claudeN` alias).

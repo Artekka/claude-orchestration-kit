@@ -243,19 +243,45 @@ nobody gets pinged.
 Long sessions degrade as their context fills. The kit replaces them cleanly instead of `/compact`.
 
 1. Each session measures itself with `python3 scripts/ctx-fill.py`. On a 1M-token model it
-   self-reports around **350K** and hands over by **400K** (200K model: ~140K / ~160K).
+   self-reports around **350K** and hands over by **400K** (200K model: ~120K / ~150K; tell it which with `--window 1m|200k`).
    Optional: show it permanently in the status bar — add
    `"statusLine": { "type": "command", "command": "bash scripts/statusline-ctx.sh" }` to
    `.claude/settings.json` (or ask Claude: "add the context statusline"). It turns yellow at the
    self-report mark and red at handover.
 2. The seat tells that sibling to retro. The sibling saves lessons, updates the board,
    commits, and replies **"retro complete"**.
-3. The seat runs `bash scripts/recycle-sibling.sh Sib1`: a **new window** opens with a fresh
+3. The seat runs `bash scripts/recycle-sibling.sh Sib1 --model 'sonnet[1m]'` (the model for
+   that lane; see "Model per lane" below): a **new window** opens with a fresh
    Sib1, and only then is the old one closed. It opens the same way `start-team.sh` does on
    your machine (Windows Terminal, Terminal/iTerm2, your Linux emulator, or a tmux window).
 4. The seat recycles itself the same way after writing a handover note on the board. If the
    script can't run, the seat asks you to type `/clear` in that window and then
    `/orchestration-kit:orient` (siblings) or `/orchestration-kit:orchestrate` (seat).
+
+### Model per lane
+
+Not every row needs your strongest model, and a fresh session must never start on whatever model the
+old terminal happened to have. The seat picks a model **by work type** when it launches a session:
+
+| Work | Model |
+|---|---|
+| Heavy reasoning and verification (core logic, migrations, security, money, every READ of those), the seat, the validator | `opus[1m]` |
+| Routine features, UI, plumbing, test-only fixes | `sonnet[1m]` |
+| Docs, board/log edits, mechanical sweeps | `haiku` (the small model never writes facts) |
+
+`scripts/recycle-sibling.sh <Name> --model <m> [--effort <e>]` and `scripts/start-team.sh --model <m>`
+always pass the model explicitly. Change the default for every launch with `model:` in the team block
+of `docs/orchestration/ORCHESTRATION.md`. A bad value exits 64 before anything launches; `--dry-run`
+prints the model and effort. Bounded one-off jobs (a search, a mechanical sweep) can be subagents; long
+builds and every verification are sessions. Details: the orchestrate skill, "Model per lane".
+
+### Lean start for a builder
+
+The seat writes a **brief file** per row (`docs/orchestration/briefs/<ROW>.md`, from
+`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orchestration-kit:orient --brief <ROW>`:
+the brief + the board banner, then READY. A full orient reads a whole project to learn one row; the
+brief is the row. Keep `CLAUDE.md` slim too (`templates/CLAUDE-slimness.md`): it is re-read on every
+turn of every session.
 
 ## 7. Common failure modes
 

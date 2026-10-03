@@ -25,7 +25,7 @@ for every repo, after copying the script somewhere stable):
 ```
 
 On a 200K-window model set `CTX_WINDOW=200000` in the session's environment (marks become
-140K / 160K) unless Claude Code already passes the window size to the statusline. Already
+120K / 150K) unless Claude Code already passes the window size to the statusline. Already
 have a statusline? Have your script call this one with the same stdin and join the outputs.
 
 ## Auto-compact off — the no-/compact house flow

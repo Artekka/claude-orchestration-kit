@@ -33,7 +33,9 @@ The kit's vocabulary, in one place. Skills and lessons use these words without r
 | **Wave train** | Deploying 1–3 reconciled rows together; hotfixes go immediately |
 | **DEPLOY slot / LOG slot** | Board claims that make deploys and log-entry numbering exclusive |
 | **Fill** | A session's measured context size (`scripts/ctx-fill.py`, or the statusline) |
-| **Prompt mark / handover mark** | Fill at which a session self-reports (~350K on a 1M window) / must hand over (~400K). 200K window: 70% / 80% |
+| **Prompt mark / handover mark** | Fill at which a session self-reports (~350K on a 1M window) / must hand over (~400K). 200K window: 120K / 150K (60% / 75%) |
+| **Lane / model per lane** | The kind of work a row is (heavy reasoning, routine, mechanical). The seat launches each session on the model its lane needs (`--model`); a recycle never inherits one |
+| **Brief** | The row's contract as a file (`docs/orchestration/briefs/<ROW>.md`): goal, acceptance, fence, seam map, gate, model. Builders start with `/orchestration-kit:orient --brief <ROW>` |
 | **Retro** | `/orchestration-kit:retro` — save lessons, update board, commit, reply "retro complete" |
 | **Recycle** | Replace a full session with a fresh one: launch the new window first, then close the old |
 | **Status doc / log** | `docs/AI_CONTEXT.md` (read first by every session) / `docs/timeline/build-log.md` (append-only history) |

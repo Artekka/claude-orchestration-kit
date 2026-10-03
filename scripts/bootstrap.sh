@@ -50,6 +50,8 @@ if [ ! -d "$TARGET/.git" ]; then say "INIT  git repository"; run git -C "$TARGET
 # ── 2. Board + overlay + CLAUDE starter ─────────────────────────────────────
 install_if_missing templates/AGENT_BOARD.md docs/orchestration/AGENT_BOARD.md
 install_if_missing templates/ORCHESTRATION.md docs/orchestration/ORCHESTRATION.md
+install_if_missing templates/briefs/README.md docs/orchestration/briefs/README.md
+install_if_missing templates/briefs/_TEMPLATE.md docs/orchestration/briefs/_TEMPLATE.md
 if [ -e "$TARGET/CLAUDE.md" ]; then
   if grep -q "orchestration-kit v" "$TARGET/CLAUDE.md" 2>/dev/null; then
     say "SKIP  CLAUDE.md section (managed marker present — upgrades diff, not clobber)"

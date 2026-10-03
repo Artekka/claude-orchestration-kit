@@ -15,6 +15,8 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    put() { if [ -e "$2" ]; then echo "SKIP   $2 (exists)"; else mkdir -p "$(dirname "$2")" && cp "$1" "$2" && echo "CREATE $2"; fi; }
    put "$K/templates/AGENT_BOARD.md"   docs/orchestration/AGENT_BOARD.md
    put "$K/templates/ORCHESTRATION.md" docs/orchestration/ORCHESTRATION.md
+   put "$K/templates/briefs/README.md" docs/orchestration/briefs/README.md
+   put "$K/templates/briefs/_TEMPLATE.md" docs/orchestration/briefs/_TEMPLATE.md
    put "$K/templates/AI_CONTEXT.md"    docs/AI_CONTEXT.md
    put "$K/templates/build-log.md"     docs/timeline/build-log.md
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
