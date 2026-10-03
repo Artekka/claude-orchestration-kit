@@ -1,15 +1,28 @@
 ---
 name: orient
-description: Bring a fresh session up to speed on a kit-adopted project — restate the multi-session non-negotiables, read the ground rules, the orchestration overlay, the live board, and recent git history, then summarize state in five bullets and report availability to any active orchestrator. Use at session start ("orient me", "where are we", "catch me up") or when invoked on a project without context. If the project ships its own richer /orient, prefer that one.
+description: Bring a fresh session up to speed on a kit-adopted project — restate the multi-session non-negotiables, read the ground rules, the orchestration overlay, the live board, and recent git history, then summarize state in five bullets and report availability to any active orchestrator. With `--brief <ROW>` it runs a lean mode for a builder who was assigned a row: read the row's brief and the board banner only, then send READY. Use at session start ("orient me", "where are we", "catch me up") or when invoked on a project without context. If the project ships its own richer /orient, prefer that one.
 ---
 
 # orient
 
 Load a fresh session's working memory without the human re-explaining. End state: five bullets + a productive next question (or a report to the orchestrator).
 
+## Lean mode: `/orchestration-kit:orient --brief <ROW>`
+
+For a builder the seat assigned a row that has a brief file (`docs/orchestration/briefs/<ROW>.md`, made from `templates/briefs/_TEMPLATE.md`). A full orient costs ~100K tokens of a fresh context; the brief already holds what this row needs. The full mode below stays for the seat, for a lone session, and for any start without a brief.
+
+| step | do |
+|---|---|
+| 1 | `git fetch origin \|\| { sleep 2; git fetch origin; }`, then `git show origin/main:docs/orchestration/briefs/<ROW>.md` — the row's whole contract, as the seat pushed it (substitute your default branch for `main`; a plain `cat` of your own checkout misses a brief it has not rebased onto yet). Not on origin/main → `cat docs/orchestration/briefs/<ROW>.md`; in neither → tell the seat, then fall back to the full mode |
+| 2 | `git show origin/main:docs/orchestration/AGENT_BOARD.md \| awk '/^## /{ if (on) exit; if ($0 ~ /ORCHESTRATOR ACTIVE/ && tolower($0) !~ /superseded/) on=1 } on' \| head -60` — the CURRENT banner's own section, from its `ORCHESTRATOR ACTIVE` heading to the next `## ` (who the seat is, the era's rows, the standing rules it names; a header that says `superseded` is never taken for the live banner, so a board holding only superseded banners prints nothing). Anchored on the banner, not on line counts: the archive table and `---` rulers above it are skipped. No output = no banner = no seat: ask the human |
+| 3 | `python3 scripts/ctx-fill.py <uuid> --window <1m\|200k>` as its own command — the window your OWN env block names |
+| 4 | `ListAgents` (first line = your name + ref), then the READY signal of Step 7 |
+
+Skip: the status doc, the log, `git log`, the overlay (unless the brief names no gate command — then read `ORCHESTRATION.md` → Gate only), the test-health check and the five-bullet summary. `CLAUDE.md` loads with the session, so the Step 0 rules (worktree, refresh before claiming, row prefix) still apply: follow them and restate them in one line in READY.
+
 ## Step 0 — The multi-session non-negotiables (restate in your summary)
 
-1. **ALL edits happen in your own worktree** — the main thread's included (instructed by default; enforced by a hook only if ORCHESTRATION.md says `worktrees: enforced`). Board/docs edits in the shared checkout are committed within seconds via the board-write recipe (`/orchestration-kit:board`). Never `git add -A` / `.` / `git commit -a`; never `git stash` (stash refs are shared across worktrees). A dirty status you didn't cause is a sibling at work — leave it.
+1. **ALL edits happen in your own worktree** — the main thread's included (instructed by default; enforced by a hook only if ORCHESTRATION.md says `worktrees: enforced`). Board/docs edits in the shared checkout are committed within seconds via the board-write recipe (`/orchestration-kit:board`). Never `git add -A` / `.` / `git commit -a`; never `git stash` (stash refs are shared across worktrees) — a hook refuses these if ORCHESTRATION.md says `git_guard: on`. A dirty status you didn't cause is a sibling at work — leave it.
 2. **Refresh before claiming** — `git fetch origin && git rebase origin/main` (NOT `git pull --rebase`: shared FETCH_HEAD race). `cannot lock ref` = a sibling's fetch won; retry: `git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main`. A claim is only real once pushed. OPEN rows and briefs are hypotheses — verify against the CODE.
 3. **New rows carry YOUR session prefix** (`<tag>-1`, `<tag>-2` …) — never the board's highest id + 1 (LESSON 16). State your prefix in the summary.
 4. **Run the gate from INSIDE your own worktree** and check its printed counts against your delta — a script that `cd`s to its own directory gates whichever tree it lives in.
@@ -46,10 +59,13 @@ Load a fresh session's working memory without the human re-explaining. End state
 
 **READY signal** (`SendMessage` to the seat; board note `AVAILABLE <prefix>` under the banner only if SendMessage fails):
 ```
-READY <PREFIX> [<ref>] · fill <current from ctx-fill, verbatim> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
+READY <PREFIX> [<ref>] · model <id> · fill <current from ctx-fill, verbatim> · marks <prompt>/<handover> · saw <seat Name [ref]> era-<N> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
 ```
 - `<ref>` = your own identity line from `ListAgents` (e.g. "This session is Sib1 [57f3ab]") — not your session uuid.
-- Fill = `python3 scripts/ctx-fill.py` run as its own command. If it says the window is UNKNOWN, read your env block and add the window it states.
+- `model <id>` = the exact model id in YOUR env block (e.g. `claude-opus-5-5[1m]`). The seat chose your model by lane at launch; stating it lets the seat check the lane got the model it asked for.
+- Fill = `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` run as its own command, output pasted verbatim; `--window` = what your env block says. `marks` = the `marks` line it printed for that window (1M → 350K/400K, 200K → 120K/150K).
+- If ctx-fill says the window is UNKNOWN, read your env block and re-run with `--window` — a transcript cannot carry the `[1m]` suffix.
+- `saw <seat Name [ref]> era-<N>` = the seat and era named by the banner you read (lean step 2). A builder that cannot name them did not see the banner: re-run step 2, or say "no banner seen".
 - `seen:` is your independence disclosure — it decides which rows you may later verify.
 - If the banner's era/seat looks stale against the board body, say so in READY.
 

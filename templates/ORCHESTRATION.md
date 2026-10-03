@@ -51,10 +51,10 @@ human's explicit sign-off in-context:
 board path:     docs/orchestration/AGENT_BOARD.md
 archive dir:    docs/orchestration/archive/   (BOARD_ARCHIVE_<YYYY-MM-DD>.md; archive past ~60 KB)
 tag scheme:     <Name> [<ref>]  — Name = the terminal's `claude --name`, ref = from ListAgents
-context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~140K / ~160K
-                measure: python3 scripts/ctx-fill.py [--window N]   (never bytes ÷ 4)
+context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~120K / ~150K
+                measure: python3 scripts/ctx-fill.py <uuid> --window 1m|200k   (never bytes ÷ 4)
 start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips names already running)
-recycle:        bash scripts/recycle-sibling.sh <Name> [prompt]         (prints commands + exits 2 where no terminal can be opened)
+recycle:        bash scripts/recycle-sibling.sh <Name> [prompt] [--model M] [--effort E]   (prints commands + exits 2 where no terminal can be opened)
 ```
 
 Team — `scripts/start-team.sh` and `scripts/recycle-sibling.sh` read this block (flags override
@@ -66,6 +66,12 @@ the `team:` line unindented and the keys indented. `permission_mode` is one of `
 blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the main checkout, except
 `docs/orchestration/**`, the log and the status doc — needs the `.kit-hooks` marker). Keep
 `advised` if your workflow deliberately shares one tree or file between agents.
+`git_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's PreToolUse Bash
+hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` without paths,
+`git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
+`off` in solo mode; kit-init sets `on` when it starts a team (seat + siblings). A human can still
+run those in their own terminal.
+`model` / `effort` (both optional) set the default for every launch: `model` is `opus[1m]`, `sonnet[1m]`, `haiku` or a full model id (default `opus[1m]`), `effort` one of `low|medium|high|xhigh|max` (default: not passed). The launch scripts ALWAYS pass `--model` and never inherit the old session's, so a recycled session starts on the model its lane needs, not on whatever the terminal had. `--model` / `--effort` flags override the block; a bad value in the block is ignored with a warning, a bad flag exits 64. Per-lane choices: orchestrate skill, "Model per lane".
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
 `tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
 (e.g. `linux-gnome-terminal`), `manual`. `bash scripts/start-team.sh --terminal list` shows
@@ -79,6 +85,7 @@ team:
   siblings:         2
   permission_mode:  normal
   worktrees:        advised
+  git_guard:        off
   terminal:         auto
 ```
 

@@ -50,6 +50,9 @@ if [ ! -d "$TARGET/.git" ]; then say "INIT  git repository"; run git -C "$TARGET
 # ── 2. Board + overlay + CLAUDE starter ─────────────────────────────────────
 install_if_missing templates/AGENT_BOARD.md docs/orchestration/AGENT_BOARD.md
 install_if_missing templates/ORCHESTRATION.md docs/orchestration/ORCHESTRATION.md
+install_if_missing templates/briefs/README.md docs/orchestration/briefs/README.md
+install_if_missing templates/briefs/_TEMPLATE.md docs/orchestration/briefs/_TEMPLATE.md
+install_if_missing templates/CLAUDE-slimness.md docs/orchestration/CLAUDE-slimness.md
 if [ -e "$TARGET/CLAUDE.md" ]; then
   if grep -q "orchestration-kit v" "$TARGET/CLAUDE.md" 2>/dev/null; then
     say "SKIP  CLAUDE.md section (managed marker present — upgrades diff, not clobber)"
@@ -61,10 +64,10 @@ else
 fi
 
 # ── 2b. Session scripts (context measurement + sibling recycling) ────────────
-for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py; do
+for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh; do
   install_if_missing "scripts/$f" "scripts/$f"
 done
-[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py}
+[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh}
 
 # ── 2c. Institutional-memory docs (status doc + append-only log) ─────────────
 install_if_missing templates/AI_CONTEXT.md docs/AI_CONTEXT.md

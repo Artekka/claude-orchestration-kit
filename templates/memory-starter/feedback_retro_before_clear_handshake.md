@@ -1,6 +1,6 @@
 ---
 name: feedback_retro_before_clear_handshake
-description: /retro MUST complete (confirmed by reply) BEFORE a sibling terminal is cleared or recycled; the orchestrator acts only after the sibling's explicit "retro complete"
+description: /retro MUST complete (confirmed by reply) BEFORE a sibling terminal is recycled (closed and relaunched with an explicit --model); the orchestrator acts only after the sibling's explicit "retro complete"
 metadata:
   type: feedback
 ---
@@ -17,5 +17,6 @@ teaching for the next session. Racing them discards exactly what the lifecycle p
 
 **How to apply (orchestrator-led mode):** a three-step HANDSHAKE — (1) the seat sends "run the
 retro now"; (2) the sibling replies "retro complete" (board synced, commits pushed, deploy
-skipped); (3) ONLY THEN is the terminal recycled or cleared, one at a time. Never pre-announce a
-clear; never batch-announce before confirmations.
+skipped); (3) ONLY THEN is the terminal closed and relaunched, one at a time, with an explicit
+`--model` (a bare `/clear` keeps the old model). Never pre-announce a recycle; never batch-announce
+before confirmations.

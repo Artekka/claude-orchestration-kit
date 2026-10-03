@@ -15,11 +15,14 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    put() { if [ -e "$2" ]; then echo "SKIP   $2 (exists)"; else mkdir -p "$(dirname "$2")" && cp "$1" "$2" && echo "CREATE $2"; fi; }
    put "$K/templates/AGENT_BOARD.md"   docs/orchestration/AGENT_BOARD.md
    put "$K/templates/ORCHESTRATION.md" docs/orchestration/ORCHESTRATION.md
+   put "$K/templates/briefs/README.md" docs/orchestration/briefs/README.md
+   put "$K/templates/briefs/_TEMPLATE.md" docs/orchestration/briefs/_TEMPLATE.md
+   put "$K/templates/CLAUDE-slimness.md" docs/orchestration/CLAUDE-slimness.md
    put "$K/templates/AI_CONTEXT.md"    docs/AI_CONTEXT.md
    put "$K/templates/build-log.md"     docs/timeline/build-log.md
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py; do put "$K/scripts/$f" "scripts/$f"; done
-   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py
+   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh; do put "$K/scripts/$f" "scripts/$f"; done
+   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.
@@ -53,18 +56,21 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
    `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
-   Persist the worktree answer the same way, whatever the start answer (`advised` or `enforced`), then commit that path:
+   Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on`; **Not now** (solo mode) → `git_guard: off`. Then commit that path:
    ```bash
-   C=docs/orchestration/ORCHESTRATION.md; W=<advised|enforced>
-   if grep -Eq '^[[:space:]]+worktrees:' "$C"; then sed -i -E "s/^([[:space:]]+worktrees:[[:space:]]*).*/\1$W/" "$C"
-   elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  worktrees:        $W" "$C"
-   else printf '\nteam:\n  worktrees:        %s\n' "$W" >> "$C"; fi
-   git add "$C" && git commit -m "chore(orchestration): worktrees: $W"
+   C=docs/orchestration/ORCHESTRATION.md
+   setkey() {  # <key> <value>
+     if grep -Eq "^[[:space:]]+$1:" "$C"; then sed -i -E "s/^([[:space:]]+$1:[[:space:]]*).*/\1$2/" "$C"
+     elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $1:        $2" "$C"
+     else printf '\nteam:\n  %s:        %s\n' "$1" "$2" >> "$C"; fi
+   }
+   setkey worktrees <advised|enforced>; setkey git_guard <on if a team was started, else off>
+   git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard settings"
    ```
-   `enforced` takes effect at once: the plugin's PreToolUse hook reads the file on every edit (only in repos with `.kit-hooks`).
-8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
+   Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
+8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked — on by default in team mode/not blocked — off in solo mode; say "turn on the git guard" when you add more sessions] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
 
 ## Rules
 
 - Idempotent: never overwrite; re-running reports SKIP for everything that exists.
-- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) and PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`). Both run only in repos carrying `.kit-hooks`.
+- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`) and PreToolUse `git-guard.sh` on Bash (a no-op unless `git_guard: on`). All run only in repos carrying `.kit-hooks`.

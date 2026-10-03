@@ -5,7 +5,7 @@ description: Run the orchestrated-autonomy loop as the ACTIVE ORCHESTRATOR ("the
 
 # orchestrate
 
-One session (the **seat**) plans, assigns, verifies-by-proxy, lands and ships; 2+ **siblings** build in their own worktrees. Exists because distributed writers minting shared IDs / mutating shared state with no lock collide silently (LESSONS 16–17, 28–41). Project specifics (gate, deploy, validator, board path) come from `docs/orchestration/ORCHESTRATION.md`.
+One session (the **seat**) plans, assigns, verifies-by-proxy, lands and ships; 2+ **siblings** build in their own worktrees. Exists because distributed writers minting shared IDs / mutating shared state with no lock collide silently (LESSONS 16–17, 28–60). Project specifics (gate, deploy, validator, board path) come from `docs/orchestration/ORCHESTRATION.md`.
 
 ## 0 · Take the seat
 
@@ -36,32 +36,54 @@ git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main
 
 Every ask (human plain language, external tracker, issue queue) becomes a row under your prefix. The board line carries **status only**; the **brief goes to the builder by message** (a narrative board briefs its own verifiers).
 
-**Row brief template:**
-```
-<ID> · <title>
-Goal: <one paragraph>
-Acceptance (checkable): 1. … 2. … 3. …
-Fence: <exact files/dirs this row may edit>
-Seam map: <file:line pointers from your own Explore pass — don't make the builder re-explore>
-Gate: <class from ORCHESTRATION.md → command + pass-proof line>
-Release note: <user-language line, or "internal">
-Rules: own worktree · report at phase boundaries · no deploy · no out-of-fence edits ·
-       questions/approvals to the seat, never the human
-```
+**Row brief = a file**, `docs/orchestration/briefs/<ROW>.md`, from `${CLAUDE_PLUGIN_ROOT}/templates/briefs/_TEMPLATE.md` (goal · numbered acceptance · fence · seam map from your own Explore pass · base branch · gate · **model/effort** · report protocol). **Commit + push it BEFORE the assign message**, which then only names the file. The builder starts with `/orchestration-kit:orient --brief <ROW>` (a few reads, not a project orient); the verifier reads the brief + the diff. Keep it contract-only — a brief that narrates your reasoning briefs your own verifiers.
 Every brief is a hypothesis — a builder correcting it upward is expected, not insubordination.
+
+| Brief rule | Why |
+|---|---|
+| **Never illustrate a "find every X" requirement.** Name the enumeration itself as the deliverable ("send me the table, then fix"); the verifier rebuilds it independently | An illustration inside a requirement is read AS the requirement — two rows guarded exactly the 3 named sites of populations of 8 and 13 (LESSON 42) |
+| **"X is broken" rows report the POPULATION COUNT before building.** Say "zero" out loud on the row | Zero is a finding; two rows died that way in one session (LESSON 58) |
 
 ## 3 · DAG + assignment
 
 1. Decompose into a DAG: nodes = fenced rows, edges = verify-gated hand-offs. **Concurrent nodes' fences must be disjoint** — check BEFORE assigning, including each row's acceptance-criteria surface (tests, fixtures, docs it must touch).
-2. Wait for **READY** from each sibling (format in `/orchestration-kit:orient` Step 7): `READY <PREFIX> [<ref>] · fill <current> · <can take> · seen: <rows already read>`. The `seen:` list decides who may later VERIFY what.
+2. Wait for **READY** from each sibling (format in `/orchestration-kit:orient` Step 7): `READY <PREFIX> [<ref>] · model <id> · fill <current> · marks <p>/<h> · saw <seat Name [ref]> era-<N> · <can take> · seen: <rows already read>`. The `seen:` list decides who may later VERIFY what.
 3. **Assignment = SendMessage + the same assignment on the board row** (an undelivered message is silent; the board always works).
 4. First reply confirms receipt. No reply in ~10 min → check the board; still nothing → banner note, reassign when someone frees up.
+
+## 3a · Model per lane
+
+The seat chooses a session's model at launch; a recycled session **never inherits one** (the launch scripts always pass `--model`). Pick by the kind of work. The names are aliases that track the newest model of each tier; `1m` = the 1M-token window, and a 200K-window tier has its own context marks (§10).
+
+| Lane (by work type) | Model |
+|---|---|
+| Heavy reasoning and verification: core logic and math, data migrations, security, money/billing, anything whose bug is silent; **every READ of those**; the seat; the validator | top tier, 1M — `opus[1m]` |
+| Routine work: UI, wire/schema plumbing, ordinary features, test-only fixes | mid tier, 1M — `sonnet[1m]` |
+| Board and log entries, write-ups, anything that states SHAs, counts or verdicts | mid tier, 1M — `sonnet[1m]` (facts need a model that does not fabricate) |
+| Copy changes, mechanical sweeps, searches that only locate code | small tier, 200K window — `haiku` (never writes facts, see below) |
+
+- Launch: `bash scripts/recycle-sibling.sh <Name> [prompt] --model <m> [--effort <e>]`; `start-team.sh --model <m>` gives the whole team one model. The default when you pass nothing is the team block's `model:` in `ORCHESTRATION.md`, else `opus[1m]`.
+- **The small model never writes facts** — log entries, board entries, verdicts, measured numbers, SHAs. Small models invent them. Give it text to move, not claims to make.
+- Put the model on the row's brief so the builder, the verifier and the next seat can see what the lane was given.
+
+**Subagents vs sessions (hybrid policy):**
+
+| Use | When |
+|---|---|
+| **Subagent** (model pinned by its agent type) | A bounded job with a clear output: a seam-map search, a mechanical sweep, a test-only fix, a measurement script, a single-file change. Starts at ~10–25K tokens against a session's orient cost |
+| **Session** | A long builder row with fix rounds; **every verification** (a peer has its own context, a subagent inherits the dispatcher's framing); user-facing work; anything that needs the human |
+
+- A subagent **dies with its parent**: the seat dispatches only SHORT ones (a long row would be lost on recycle). A builder may dispatch its own.
+- Subagents share the same gate/toolchain: they do not add gate parallelism.
+- The `verifier` subagent (`/orchestration-kit:verify-feature`) stays the fallback when no independent sibling is free (§5).
 
 ## 4 · Track
 
 - Siblings report at phase boundaries: claimed → RED → GREEN + self-gate (literal pass line) → blocked/done.
 - Silent >30 min mid-build → `git log origin/main` + board + message. Truly stalled → banner the stall, reassign (never two silent owners on one row).
 - A correction that changes a builder's next hour goes in a **top-of-board banner**, not only a message.
+- **A knob beats etiquette** (LESSON 54). Before telling siblings "don't run X", check whether the toolchain runs X for them; if so the rule is unachievable — ship an env knob and announce it. "I didn't run X" ≠ "X didn't run".
+- **Keep a builder's hedges when you summarise** (LESSON 52). "A small piece of evidence" stays exactly that on the board.
 
 ## 5 · Hand-off verify gate — a SIBLING SESSION verifies
 
@@ -80,13 +102,16 @@ Every hand-off edge (downstream consumes upstream output) and every high-risk cl
 
 **Validator seat (recommended):** one sibling (ORCHESTRATION.md → Validator) that **never builds** — READ, re-read, train/merge verification, falsification, measurement. A terminal that never builds is independent of every row. Others may READ when it's busy. Never hand the validator a build or fix round.
 
-Verdicts: **PASS** → reconcile. **DEVIATES/BROKEN** → findings to the SAME builder (fix-roundtrip) → scoped delta re-read; downstream blocked until PASS (LESSON 18). The subagent `verifier` (`/orchestration-kit:verify-feature`) remains the fallback when no independent sibling is free — say so on the row.
+**The contract also carries** (each omission has produced a wrong verdict): authorized exceptions you approved (fence extensions, bundled work) · "rebuild any enumeration from scratch, don't check the builder's" · for "output unchanged" claims, "compile/build base + head and compare" · the environment's false-signal shapes (killed background run = NON-result; crash after passing summaries ≠ red; pass summary + non-zero exit = REAL failure; never pipe the gate) · reference gate counts for main and the branch's base.
+
+Verdicts: **PASS** → reconcile. **DEVIATES/BROKEN** → findings to the SAME builder (fix-roundtrip) → scoped delta re-read; downstream blocked until PASS (LESSON 18). The subagent `verifier` (`/orchestration-kit:verify-feature`) remains the fallback when no independent sibling is free — say so on the row. **Context independence first, then model:** launch the verifier session on its lane's model (§3a — top tier for the high-risk classes) with `--model`; never trade a fresh context for a model match.
 
 ## 6 · Reconcile + board writes
 
 - **One row at a time** (`/orchestration-kit:reconcile`), never parallel. Before each: no foreign rebase in progress; `git status` in the builder's worktree.
 - After `git merge --no-ff`, **push immediately** (before notes, before the gate) — an unpushed merge gets linearized by the next plain rebase and the builder's SHAs never reach origin. Refresh with `git rebase --rebase-merges origin/main` while a merge is unpushed.
 - Quote **on-main** SHAs only: `git branch -r --contains <sha> | grep -q origin/main`.
+- ⚠ **`git push origin main` from INSIDE a worktree pushes that worktree's stale local `main`** — success line, nothing landed. Merge + push from the shared checkout and **verify every push by re-reading the remote** (the `--contains` check above).
 
 **Board write in the shared checkout (every time):**
 ```bash
@@ -102,6 +127,7 @@ git push origin main                                # never HEAD:main
 
 ## 7 · Wave-train deploys
 
+- **Couple rows into one train when the INTERMEDIATE state is worse than either endpoint** (LESSON 55), not merely because they are related.
 - Deploy after each reconcile wave (1–3 rows finishing together); a hotfix or human-awaited fix ships immediately. Main never sits ahead of live past a working day.
 - Claim DEPLOY slot (written + pushed BEFORE running) → announce the window → run **ORCHESTRATION.md → Deploy `vehicle`** → verify with its `post-deploy` check (a marker from this train in the live artifact + the version string) → release the slot with the verified version.
 - Siblings never deploy while the banner stands; they hand SHAs to the seat.
@@ -115,7 +141,7 @@ Claim LOG slot (number allocated inside the claim text) → append the entry to 
 | Signal | Action |
 |---|---|
 | Sibling self-reports fill at the prompt mark; incoherent status; stale claim | SendMessage **"run /orchestration-kit:retro now"** + board note. A row already in flight finishes first |
-| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name>` (launch fresh → wait → SIGTERM old). Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to /clear, then /orchestration-kit:orient" |
+| Sibling replies **"retro complete"** | ONLY NOW recycle: `bash scripts/recycle-sibling.sh <Name> ["/orchestration-kit:orient --brief <ROW>"] --model <lane model, §3a> [--effort <e>]` (launch fresh → wait → SIGTERM old; no `--model` = the default, never the old session's). Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to close — relaunch it with `claude --name <Name> --model <lane model> "/orchestration-kit:orient"` (a bare `/clear` keeps that terminal's OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`)" |
 | Fresh sibling sends READY | Assign the next DAG node (check `seen:` before giving it a READ) |
 
 Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear.
@@ -125,14 +151,14 @@ Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro com
 | Window (read your OWN env block) | Self-report | Hand over by |
 |---|---|---|
 | ~1M | ~350K | ~400K |
-| ~200K | ~140K (70%) | ~160K (80%) |
+| ~200K (every small-tier model) | ~120K (60%) | ~150K (75%) |
 
-- Measure: `python3 scripts/ctx-fill.py [--window N]` — sums input + cache_read + cache_creation off the last assistant turn. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string.**
-- At handover: finish only what is already in verify → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — /clear this terminal, then run /orchestration-kit:orchestrate".
+- Measure: `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` (window from your env block) — sums input + cache_read + cache_creation off the last assistant turn. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string** — the one safe exception only lowers it: a small-tier (`haiku`) string means 200K, and ctx-fill applies it. (A seat on a ~200K window died at 175,725 tokens with no handover: that is why the small window's marks sit at 120K/150K, not 140K/160K.)
+- At handover: finish only what is already in verify → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — close this terminal and relaunch it with `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate` (a bare `/clear` keeps the OLD model; if you must `/clear`, run `/model opus[1m]` first)".
 - Include your measured fill + model in every handover and every roster report.
 
 ## 11 · The human's loop — all approvals through the seat
 
 - Siblings **never** ask the human in their terminal. A permission prompt/denial or design question → the sibling stops and messages the seat → the seat asks the human HERE (batched) → relays the ruling (or runs the action itself). Restate this in every READY ack.
-- Irreducible human work: design forks (surface BEFORE building), on-device checks, secrets, activations, `/clear` when recycling isn't available.
+- Irreducible human work: design forks (surface BEFORE building), on-device checks, secrets, activations, and relaunching a terminal (`claude --name <Name> --model <lane model> …`, never a bare `/clear`) when recycling isn't available.
 - The seat writes: board, briefs, reconciles, deploys, logs. It does **not** write feature code.

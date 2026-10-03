@@ -1,9 +1,14 @@
-# Getting started — from one Claude session to a seat + siblings
+# Getting started — solo mode first, then a seat + siblings
 
 For someone who today opens a terminal and runs `claude` in one repo — on **Windows (WSL),
-macOS or Linux**. After this page you will run one **seat** (the orchestrator you talk to) and
-two **siblings** (builders) on the same repo, each in its own window, without them stepping on
-each other. No names to type, no settings to edit.
+macOS or Linux**. Two paths, in this order:
+
+1. **Solo mode (start here)** — two Claude sessions on one repo, coordinated by a shared board,
+   each one's work checked by the other. You are the coordinator. ([§3](#3-start-small-solo-mode-two-terminals-no-seat))
+2. **Team mode (Advanced)** — one **seat** (an orchestrator session you talk to) plans, assigns,
+   verifies and merges for two or more **siblings** (builders), each in its own window.
+
+New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](GLOSSARY.md).
 
 ## 0. What you need
 
@@ -67,7 +72,7 @@ collaborators.) Repeat the `install` line inside any other repo you want it in.
 Already inside Claude? The same commands work as `/plugin marketplace add …` and
 `/plugin install …`; restart Claude afterwards.
 
-## 2. Set up your repo and start the team (once per repo)
+## 2. Set up your repo (once per repo)
 
 Open **one** terminal in the repo and start Claude. On Windows, that's one CMD window:
 
@@ -97,7 +102,13 @@ and asks you a few questions:
 
 Last, it asks **three questions** — whether to start the team now (and how many siblings),
 which permission mode the sessions should use, and whether separate worktrees per session are
-advised or enforced. Answer them, approve the one command it runs,
+advised or enforced. The git guard (below) follows your first answer: **on** if you start a
+team, **off** for solo mode.
+
+**Solo mode (recommended first time):** answer **Not now** to starting the team, pick the other
+two, and continue at [§3](#3-start-small-solo-mode-two-terminals-no-seat).
+
+**Team mode (Advanced):** answer with a team size, approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
 says how they open on your machine ("Windows will open via: …"). You can close the setup session.
 
@@ -134,29 +145,78 @@ checkout at once.
 Switch any time by asking Claude ("enforce worktrees", "make worktrees advised again"), or by
 editing `worktrees:` in `docs/orchestration/ORCHESTRATION.md`. It takes effect on the next edit.
 
+**Git guard: on in team mode, off in solo mode** (saved as `git_guard:` in the same `team:`
+block; kit-init sets it from your start answer). Four git habits that
+are harmless alone damage other sessions' work in a shared repo:
+
+| Blocked when on | Why | Claude is told to use |
+|---|---|---|
+| `git stash` (except `list` / `show`) | Stashes are shared by every worktree; a pop can take another session's work | commit WIP on its branch, or copy to a scratch dir |
+| `git add -A` / `--all` / `.` / `-u` with no paths | Stages other sessions' uncommitted files | `git add <explicit paths>` |
+| `git commit -a` / `--all` | Same, at commit time | `git add <paths> && git commit` |
+| `git pull --rebase` | Races on the shared `.git/FETCH_HEAD` | `git fetch origin && git rebase origin/main` |
+
+It only reads Claude's Bash commands (quoted text and commit messages that merely *mention* these
+are fine); you can still run anything yourself in your own terminal. Change it with "turn on the
+git guard" / "turn off the git guard", or `git_guard: on|off`.
+
 Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
-## 3. What you get
+## 3. Start small: solo mode (two terminals, no seat)
+
+The board and independent verification are most of the value; the seat is an add-on. Run two
+sessions yourself and let the board keep them apart:
+
+```bash
+# Terminal 1 (on Windows: `wsl` first)
+cd ~/projects/myapp && claude --name Dev1 /orchestration-kit:orient
+# Terminal 2
+cd ~/projects/myapp && claude --name Dev2 /orchestration-kit:orient
+```
+
+Then type, in plain language:
+
+| Where | You say | What happens |
+|---|---|---|
+| Dev1 | "add rows to the board for: fix the login timeout; add CSV export" | Rows `Dev1-1`, `Dev1-2` appear on `docs/orchestration/AGENT_BOARD.md`, committed + pushed |
+| Dev1 | "claim Dev1-1 and build it in your own worktree" | Claims the row (with a file fence), works on its own branch |
+| Dev2 | "claim Dev1-2 and build it in your own worktree" | Same, with a fence that doesn't overlap |
+| Dev2 (when Dev1 is done) | "verify Dev1-1 against its row — contract only, don't fix anything" | Dev2 never saw Dev1's reasoning, so it checks the work against the row, not against the author's intent. Or run `/orchestration-kit:verify-feature` |
+| Dev1 (after PASS) | "/orchestration-kit:reconcile Dev1-1" | Lands the branch on main, re-runs your gate, closes the row |
+
+Rules that make this safe (the sessions already know them): each session edits in its own git
+worktree, stages explicit paths, never stashes, and verifies the *other* session's rows, never
+its own. When a session's context fills, run `/orchestration-kit:retro` in it, then relaunch it
+with `claude --name <Name> --model <model> /orchestration-kit:orient` (a bare `/clear` keeps the terminal's old model).
+
+**Ready for more?** Move to team mode when you're the bottleneck — relaying between windows,
+deciding who takes what. Say "turn on the git guard" (team mode's default), then
+`bash scripts/start-team.sh` opens a seat + siblings; the rest of this
+page covers it.
+
+## 4. What you get
 
 | Piece | What it is |
 |---|---|
 | `/orchestration-kit:orchestrate` | The seat's loop — plans, assigns, verifies, merges, deploys, recycles |
 | `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
 | `/orchestration-kit:board` | Claiming, updating and archiving board rows |
+| `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
 | `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
 | `/orchestration-kit:retro` | Closing a session: lessons saved, board updated, work committed |
 | `/orchestration-kit:verify-feature` | Subagent verification — fallback when no sibling is free to verify |
 | `/orchestration-kit:post-feature` · `/orchestration-kit:kit-init` · `/orchestration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
 | SessionStart hook (automatic) | Every fresh session in a repo with a board is told to orient and report to the seat. Silent in other repos |
 | Worktree guard (PreToolUse hook) | Only with `worktrees: enforced`: blocks edits in the main checkout except board/log/status files. Silent otherwise |
+| Git guard (PreToolUse hook on Bash) | Only with `git_guard: on`: refuses `git stash`, `git add -A` / `.`, `git commit -a`, `git pull --rebase` and tells Claude the safe command. Silent otherwise |
 | `docs/orchestration/AGENT_BOARD.md` | The shared board: who is doing what, and which files they own |
 | `docs/orchestration/ORCHESTRATION.md` | Your project's settings: gate, deploy, team names, doc paths |
 | `docs/AI_CONTEXT.md` · `docs/timeline/build-log.md` | Status doc (read first by every session) · append-only history |
 | `scripts/start-team.sh` · `scripts/recycle-sibling.sh` · `scripts/ctx-fill.py` | Open the team · replace a full session · measure a session's context |
 | Memory | Automatic: Claude Code keeps per-project memory under `~/.claude/projects/…/memory/`; `retro` saves lessons there |
 
-## 4. Who does what
+## 5. Advanced: team mode — who does what
 
 | Seat (Orca) | Siblings (Sib1, Sib2, …) |
 |---|---|
@@ -178,22 +238,55 @@ still runs — the board file (`docs/orchestration/AGENT_BOARD.md`) is the guara
 siblings post `AVAILABLE` / status lines there and the seat reads it. It's just slower, because
 nobody gets pinged.
 
-## 5. Recycling when a session fills up
+## 6. Recycling when a session fills up
 
 Long sessions degrade as their context fills. The kit replaces them cleanly instead of `/compact`.
 
 1. Each session measures itself with `python3 scripts/ctx-fill.py`. On a 1M-token model it
-   self-reports around **350K** and hands over by **400K** (200K model: ~140K / ~160K).
+   self-reports around **350K** and hands over by **400K** (200K model: ~120K / ~150K; tell it which with `--window 1m|200k`).
+   Optional: show it permanently in the status bar — add
+   `"statusLine": { "type": "command", "command": "bash scripts/statusline-ctx.sh" }` to
+   `.claude/settings.json` (or ask Claude: "add the context statusline"). It turns yellow at the
+   self-report mark and red at handover.
 2. The seat tells that sibling to retro. The sibling saves lessons, updates the board,
    commits, and replies **"retro complete"**.
-3. The seat runs `bash scripts/recycle-sibling.sh Sib1`: a **new window** opens with a fresh
+3. The seat runs `bash scripts/recycle-sibling.sh Sib1 --model 'sonnet[1m]'` (the model for
+   that lane; see "Model per lane" below): a **new window** opens with a fresh
    Sib1, and only then is the old one closed. It opens the same way `start-team.sh` does on
    your machine (Windows Terminal, Terminal/iTerm2, your Linux emulator, or a tmux window).
 4. The seat recycles itself the same way after writing a handover note on the board. If the
-   script can't run, the seat asks you to type `/clear` in that window and then
-   `/orchestration-kit:orient` (siblings) or `/orchestration-kit:orchestrate` (seat).
+   script can't run, the seat asks you to close that window and relaunch it with
+   `claude --name <Name> --model <model> /orchestration-kit:orient` (siblings) or
+   `claude --name <SeatName> --model 'opus[1m]' /orchestration-kit:orchestrate` (seat). A bare `/clear`
+   keeps the terminal's OLD model; if you do `/clear`, run `/model <model>` first.
 
-## 6. Common failure modes
+### Model per lane
+
+Not every row needs your strongest model, and a fresh session must never start on whatever model the
+old terminal happened to have. The seat picks a model **by work type** when it launches a session:
+
+| Work | Model |
+|---|---|
+| Heavy reasoning and verification (core logic, migrations, security, money, every READ of those), the seat, the validator | `opus[1m]` |
+| Routine features, UI, plumbing, test-only fixes | `sonnet[1m]` |
+| Board and log entries, write-ups, anything stating SHAs, counts or verdicts | `sonnet[1m]` (facts need a model that doesn't fabricate) |
+| Copy changes, mechanical sweeps, searches that only locate code | `haiku` (the small model never writes facts) |
+
+`scripts/recycle-sibling.sh <Name> --model <m> [--effort <e>]` and `scripts/start-team.sh --model <m>`
+always pass the model explicitly. Change the default for every launch with `model:` in the team block
+of `docs/orchestration/ORCHESTRATION.md`. A bad value exits 64 before anything launches; `--dry-run`
+prints the model and effort. Bounded one-off jobs (a search, a mechanical sweep) can be subagents; long
+builds and every verification are sessions. Details: the orchestrate skill, "Model per lane".
+
+### Lean start for a builder
+
+The seat writes a **brief file** per row (`docs/orchestration/briefs/<ROW>.md`, from
+`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orchestration-kit:orient --brief <ROW>`:
+the brief + the board banner, then READY. A full orient reads a whole project to learn one row; the
+brief is the row. Keep `CLAUDE.md` slim too (`docs/orchestration/CLAUDE-slimness.md`): it is re-read on every
+turn of every session.
+
+## 7. Common failure modes
 
 | Symptom | Cause → fix |
 |---|---|
@@ -208,7 +301,7 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 | Tests green in a sibling, red on main | The gate ran from the wrong folder. Run it from inside your own worktree |
 | A session gets vague or repeats itself | Context is full. Measure with `ctx-fill.py`; retro and recycle |
 
-## 7. Changing things later
+## 8. Changing things later
 
 Nothing here is fixed. Ask Claude — in the seat's window, or any Claude session in the repo —
 and it will make the change for you. For example:
@@ -219,23 +312,26 @@ and it will make the change for you. For example:
 | "switch the team to normal permissions" | `permission_mode:` in the `team:` block; applies to sessions opened from then on |
 | "open the team in tmux" / "use iTerm" | `terminal:` in the `team:` block (`tmux`, `tmux-detached`, `macos-iterm`, … or `auto`) |
 | "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
+| "turn on the git guard" / "turn off the git guard" | `git_guard:` in the `team:` block; takes effect on the next command |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
 | "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
 | "deploy with `npm run release`" | the Deploy section of `ORCHESTRATION.md` |
 | "add a column for reviewer to the board" | `docs/orchestration/AGENT_BOARD.md` layout |
 | "make orient also read docs/ARCHITECTURE.md" | a project-level copy of the skill in `.claude/skills/` |
 
-## 8. Advanced / customize
+## 9. Advanced / customize
 
 - **Other names, sizes or modes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3 --mode auto`,
   or set them once in the `team:` block of `docs/orchestration/ORCHESTRATION.md`.
 - **Opening a session by hand** (no automatic windows, e.g. native Windows without WSL): one terminal per session,
   in the repo:
   ```
-  claude --name Orca /orchestration-kit:orchestrate        # add --permission-mode auto etc. after the name
-  claude --name Sib1 /orchestration-kit:orient
-  claude --name Sib2 /orchestration-kit:orient
+  claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate    # add --permission-mode auto etc. after the name
+  claude --name Sib1 --model 'sonnet[1m]' /orchestration-kit:orient
+  claude --name Sib2 --model 'sonnet[1m]' /orchestration-kit:orient
   ```
+  Always pass `--model` (the lane's model, "Model per lane" above): a session started without it runs on
+  whatever the account default is, and a bare `/clear` in an old terminal keeps that terminal's model, so relaunch with `--model`.
   `--name` (long form, first) is required: sessions message each other by that name, and the
   scripts find a running session by matching `claude --name <Name>`. Keep names one word.
 - **A dedicated validator:** add a sibling that only verifies and never builds, and name it

@@ -17,11 +17,19 @@ Usage:
     python3 scripts/ctx-fill.py <session-uuid>     # a specific session
     python3 scripts/ctx-fill.py <path/to/x.jsonl>  # a specific transcript file
     python3 scripts/ctx-fill.py --all              # every session of this project, newest first
-    ... --window 200000                            # state the window (from your env block)
+    ... --window 1m|200k|<tokens>                  # state the window (from YOUR env block)
 
 Marks: self-report at the PROMPT mark, hand the terminal over by the HANDOVER mark.
-    window >= ~500K (default assumption: 1M) -> 350,000 / 400,000 (absolute)
-    smaller window (e.g. 200K)               -> 70% / 80% of the window
+    1M window (>= 500K)       -> 350,000 / 400,000 (absolute)
+    200K window (every Haiku) -> 120,000 / 150,000 (60% / 75% of the window)
+    anything in between       -> 60% / 75% of the window, capped at the 1M marks
+Why the small window is not 70% / 80%: a seat on a ~200K window died at 175,725 tokens with no
+handover, so a 160K handover leaves too little margin for the retro itself.
+
+Which window? Never the transcript's model string for Opus or Sonnet: both come in 200K and 1M and
+record the same string. The one safe model rule only ever LOWERS the window: Haiku has no 1M
+variant, so a `haiku` model string means 200K. --window (what your env block says) beats everything;
+with none of those the window is UNKNOWN and BOTH sets of marks are printed.
 Transcripts live at ~/.claude/projects/<slug>/<uuid>.jsonl, where <slug> is the session's
 working directory with every non-alphanumeric character replaced by '-'.
 """
@@ -37,6 +45,10 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 ABS_PROMPT, ABS_HANDOVER = 350_000, 400_000
 SMALL_WINDOW = 200_000
+LARGE_WINDOW = 1_000_000
+LARGE_FROM = 500_000   # a window at or above this uses the absolute marks
+PROMPT_PCT, HANDOVER_PCT = 0.60, 0.75   # of a smaller window: 200K -> 120K / 150K
+WINDOW_ALIASES = {"1m": LARGE_WINDOW, "200k": SMALL_WINDOW}
 TOO_LONG = "Prompt is too long"
 
 
@@ -50,9 +62,29 @@ def project_dir():
 
 
 def marks(window):
-    if window is None:
+    """(prompt, handover) for a window in tokens. Unknown is handled by the caller (both sets)."""
+    if window is None or window >= LARGE_FROM:
         return ABS_PROMPT, ABS_HANDOVER
-    return min(ABS_PROMPT, int(window * 0.70)), min(ABS_HANDOVER, int(window * 0.80))
+    return min(ABS_PROMPT, int(window * PROMPT_PCT)), min(ABS_HANDOVER, int(window * HANDOVER_PCT))
+
+
+def parse_window(text):
+    """`1m`, `200k`, `200000`, `200,000`, `200_000` -> tokens; anything else -> None."""
+    t = text.strip().lower().replace("_", "").replace(",", "")
+    if t in WINDOW_ALIASES:
+        return WINDOW_ALIASES[t]
+    return int(t) if t.isdigit() and int(t) > 0 else None
+
+
+def resolve_window(model, peak, stated):
+    """(window or None, how it was known). Evidence, not a lookup table: see the module docstring."""
+    if stated:
+        return stated, "STATED by you with --window (from your env block, not the transcript)"
+    if peak > SMALL_WINDOW:
+        return LARGE_WINDOW, f"PROVEN: this session already reached {peak:,}"
+    if model and "haiku" in model.lower():
+        return SMALL_WINDOW, "model is Haiku, which has only a 200K window"
+    return None, "UNKNOWN"
 
 
 def find(uuid):
@@ -96,21 +128,24 @@ def measure(path):
     return model, peak, final, turns, too_long, wall_at, recovered
 
 
-def report(path, window):
+def report(path, stated):
     uuid = os.path.basename(path)[:-6]
     model, peak, final, turns, too_long, wall_at, recovered = measure(path)
     if not turns:
         print(f"{uuid}  (no assistant turns with usage yet)")
         return
-    prompt_mark, handover_mark = marks(window)
-
-    if window:
-        window_note = f"{window:,} (as STATED by you -- from your env block, not the transcript)"
-    elif peak > SMALL_WINDOW:
-        window_note = f"at least {peak:,} (PROVEN: this session reached it)"
+    window, how = resolve_window(model, peak, stated)
+    small_prompt, small_handover = marks(SMALL_WINDOW)
+    if window is not None:
+        prompt_mark, handover_mark = marks(window)
+        window_note = f"{window:,}  ({how})"
+        marks_lines = [f"marks     prompt {prompt_mark:,} | handover {handover_mark:,}  ({window:,} window)"]
     else:
-        window_note = (f"UNKNOWN -- not knowable from a transcript. Read your OWN env block; "
-                       f"if it is {SMALL_WINDOW:,}, re-run with --window {SMALL_WINDOW}.")
+        prompt_mark = handover_mark = None
+        window_note = (f"UNKNOWN -- not knowable from a transcript: {model} comes in both sizes. Read your OWN env "
+                       f"block and re-run with --window 1m or --window 200k.")
+        marks_lines = [f"marks     IF 1M:   prompt {ABS_PROMPT:,} | handover {ABS_HANDOVER:,}",
+                       f"marks     IF 200K: prompt {small_prompt:,} | handover {small_handover:,}"]
 
     # A session that already hit its wall must never read "OK" because it sits under a mark
     # calibrated for a larger window.
@@ -118,22 +153,26 @@ def report(path, window):
         verdict = f"!! WALL ALREADY HIT at {peak:,} -- this session is dead, not 'approaching' anything"
     elif too_long:
         verdict = f"~  RECOVERED from a wall at {wall_at:,}; judge it on `current`"
+    elif window is None and final >= small_handover:
+        verdict = f"?  PAST the 200K handover mark ({small_handover:,}) IF this is a 200K window -- read your env block NOW"
+    elif window is None and final >= small_prompt:
+        verdict = f"?  AT the 200K prompt mark ({small_prompt:,}) IF this is a 200K window -- read your env block NOW"
+    elif window is None:
+        verdict = f"OK on either window -- {small_prompt - final:,} to the 200K prompt mark"
     elif final >= handover_mark:
         verdict = "!! PAST HANDOVER -- retro now, then recycle (an in-flight row may finish first)"
     elif final >= prompt_mark:
         verdict = "!  AT PROMPT MARK -- self-report to the seat (or the human, if no seat)"
-    elif window is None and peak <= SMALL_WINDOW and final >= 0.6 * SMALL_WINDOW:
-        verdict = (f"?  {final / SMALL_WINDOW * 100:.0f}% full IF this is a {SMALL_WINDOW:,} window -- "
-                   f"check your env block now")
     else:
         verdict = f"OK -- {prompt_mark - final:,} to the prompt mark"
 
     print(f"session   {uuid}")
-    print(f"model     {model}   (NOT a window indicator)")
+    print(f"model     {model}   (names the window only for Haiku)")
     print(f"window    {window_note}")
     print(f"current   {final:,}")
     print(f"peak      {peak:,}   over {turns} assistant turns")
-    print(f"marks     prompt {prompt_mark:,} | handover {handover_mark:,}")
+    for line in marks_lines:
+        print(line)
     print(f"verdict   {verdict}")
 
 
@@ -156,14 +195,16 @@ def detect():
 def main():
     argv = sys.argv[1:]
     window = None
-    if "--window" in argv:
-        i = argv.index("--window")
-        try:
-            window = int(argv[i + 1].replace("_", "").replace(",", ""))
-        except (IndexError, ValueError):
-            sys.exit("--window needs a token count, e.g. --window 200000")
-        del argv[i:i + 2]
-    window = window or (int(os.environ["CTX_WINDOW"]) if os.environ.get("CTX_WINDOW", "").isdigit() else None)
+    for i, a in enumerate(argv):
+        if a == "--window" or a.startswith("--window="):
+            val = a.split("=", 1)[1] if "=" in a else (argv[i + 1] if i + 1 < len(argv) else "")
+            window = parse_window(val)
+            if window is None:
+                sys.exit(f"--window must be 1m, 200k or a token count (e.g. 200000); got '{val}'")
+            del argv[i:i + (1 if "=" in a else 2)]
+            break
+    if window is None and os.environ.get("CTX_WINDOW"):
+        window = parse_window(os.environ["CTX_WINDOW"])
 
     if "--all" in argv:
         paths = sorted(glob.glob(os.path.join(project_dir(), "*.jsonl")), key=os.path.getmtime, reverse=True)

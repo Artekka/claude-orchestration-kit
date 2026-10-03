@@ -1,12 +1,45 @@
 # orchestration-kit
 
-Run **multiple Claude Code sessions on one repo at the same time** — each dispatching
-parallel isolated-worktree subagents — without file collisions, lost work, or
-confabulated green. Proven on the origin project: three concurrent sessions,
-~15 workstreams, one evening, zero collisions.
+Run **several Claude Code sessions on one repo at the same time** without file collisions,
+lost work, or confabulated green: a shared claimable board, one git worktree per session,
+and every piece of work verified by a session that didn't build it. Proven on the origin
+project: three concurrent sessions, ~15 workstreams, one evening, zero collisions.
 
-**New here? Start with [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)** — one page
-from "I run one Claude session" to a seat + two siblings, on Windows (WSL), macOS or Linux.
+## Quickstart — two terminals, one repo (5 minutes)
+
+```bash
+# 1. Install into your repo (normal shell, not inside Claude; on Windows run `wsl` first)
+cd ~/projects/myapp
+claude plugin marketplace add Artekka/claude-orchestration-kit
+claude plugin install orchestration-kit@artekka-kits --scope project
+
+# 2. Set up the repo — inside Claude; tell it your test command, answer "Not now" to starting a team
+claude
+/orchestration-kit:kit-init
+
+# 3. Open two sessions (two terminals, both in the repo)
+claude --name Dev1 /orchestration-kit:orient
+claude --name Dev2 /orchestration-kit:orient
+```
+
+```text
+Dev1> add rows to the board for: <task A>; <task B>
+Dev1> claim Dev1-1 and build it in your own worktree
+Dev2> claim Dev1-2 and build it in your own worktree
+Dev2> verify Dev1-1 against its row — contract only, don't fix anything
+Dev1> /orchestration-kit:reconcile Dev1-1
+```
+
+That's **solo mode**: board + cross-verification, you coordinate. Walkthrough, Windows/macOS/Linux
+notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**. Terms:
+[`docs/GLOSSARY.md`](docs/GLOSSARY.md).
+
+## Two modes
+
+| Mode | Who coordinates | Start with |
+|---|---|---|
+| **Solo** (start here) | You, via the board. Sessions claim rows, build in their own worktrees, verify each other's rows | the Quickstart above |
+| **Team** (Advanced) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §5](docs/GETTING-STARTED.md#5-advanced-team-mode--who-does-what) |
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -21,19 +54,25 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/orient` | session orientation: multi-session non-negotiables, five-bullet state, READY signal to the seat |
 | `skills/board` | claim/update/close rows, per-session prefixes, the shared-checkout write recipe, status-not-narrative + archiving |
 | `skills/verify-feature` | subagent verification — the fallback when no independent sibling session is free |
+| `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
 | `skills/reconcile` | land one worktree at a time onto main, push merges immediately, re-prove the gate there |
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
 | `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
-| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) |
-| `scripts/start-team.sh` | open the seat + N siblings, each in its own window (terminal auto-detected), default names, skips any already running; `--dry-run`, `--terminal <backend>` / `--terminal list` |
-| `scripts/recycle-sibling.sh` | open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run`, `--terminal` |
+| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) · `git-guard.sh` (PreToolUse on Bash): with `git_guard: on`, blocks `git stash` (except list/show), `git add -A`/`.`/`--all`, `git commit -a`, `git pull --rebase` with the safe alternative; no-op otherwise (default `off`). Tests: `bash tests/run.sh` |
+| `scripts/start-team.sh` | open the seat + N siblings, each in its own window (terminal auto-detected), default names, skips any already running; `--dry-run`, `--terminal <backend>` / `--terminal list`, `--model` / `--effort` (always passed explicitly) |
+| `scripts/recycle-sibling.sh` | open a fresh `claude --name X` window, then SIGTERM the old one; `--dry-run`, `--terminal`, `--account` (keeps each session on its own Claude Code account), `--model` / `--effort` (always passed, never inherited: the lane picks the model) |
 | `scripts/lib-launch.sh` | the shared launcher both scripts source: detects the terminal backend — `tmux` (already inside tmux), `wsl-wt` / `wsl-conhost` (Windows + WSL), `macos-iterm` / `macos-terminal`, `gitbash-cmd`, `linux-<emulator>` (gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, foot, xterm, `$TERMINAL`, x-terminal-emulator), `tmux-detached` (SSH / headless), else `manual` (prints the commands, exits 2). Override: `--terminal` flag > `terminal:` in the team block > auto |
-| `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript |
+| `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript; `--window 1m\|200k` picks the marks (350K/400K on 1M, 120K/150K on 200K); a Haiku transcript implies 200K |
+| `scripts/statusline-ctx.sh` | optional statusline: live context fill vs the 350K/400K marks (120K/150K on a 200K window) (yellow = self-report, red = hand over); enable via `templates/settings-snippets.md` |
 | `scripts/bootstrap.sh` | the mechanical half of `bootstrap-project` (idempotent, `--dry-run`) |
-| `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, settings snippet, optional agents + memory starter |
+| `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, `CLAUDE-slimness.md` (keep the always-loaded file slim), `briefs/` (row brief template + README), settings snippet, optional agents + memory starter |
 | `docs/GETTING-STARTED.md` | first-timer walkthrough: install → kit-init → seat + siblings → recycling → failure modes |
+| `docs/MULTI-ACCOUNT.md` | **optional:** run one team across several Claude Code accounts — `CLAUDE_CONFIG_DIR` per account, the shared session registry that makes cross-account messaging work, `--account` on both launch scripts |
+| `docs/GLOSSARY.md` | the kit's vocabulary (seat, sibling, row, fence, gate, READ, wave train …) |
+| `tests/` | `bash tests/run.sh` — git guard (every awk found), statusline, bootstrap idempotency + dry-run, multi-account launch, model/effort launch flags, ctx-fill marks |
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
+| `docs/EXAMPLE-SESSION.md` | **a real annotated 12-hour session** — one seat, three sibling builders, two deploy trains, and the six things the seat got wrong |
 
 **Generic vs project-specific:** the kit never hardcodes a gate or deploy command.
 Project specifics live in the consuming repo's `docs/orchestration/ORCHESTRATION.md`
@@ -83,7 +122,7 @@ board-format/protocol change = major bump with a migration note. After upgrading
 `/orchestration-kit:kit-init` in a project to be offered the template deltas (managed
 markers keep your customizations safe).
 
-## The workflow in one paragraph
+## The team-mode workflow in one paragraph
 
 The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
 READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
@@ -95,55 +134,14 @@ pass line → update the board, release the fence → deploy only via the exclus
 row claim, in wave trains. Full sessions retro, reply "retro complete", and are recycled.
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
-## v0.4.0 — the seat + siblings upgrade
+## What's new
 
-- **`orchestrate` rewritten** around sibling-SESSION verification (no self-reads, no mutual
-  pairs, report to the seat, DERIVED vs CONSISTENCY-CHECKED), a never-builds validator seat,
-  READY-signal rosters, the shared-checkout board-write recipe, push-merges-immediately,
-  seat context self-check with measured fill, and all human approvals routed through the seat.
-- **Zero-setup team:** kit-init asks two questions (start now? permission mode?) and opens the
-  team; `start-team.sh` opens the seat + siblings with default names (no `--name` typing) in
-  normal / auto / accept-edits mode, remembered for recycles; the plugin's own SessionStart hook points every fresh session at
-  `/orchestration-kit:orient` + READY; all launch prompts and cross-references use the
-  namespaced skill names that actually resolve.
-- **Scripts:** `start-team.sh` + `recycle-sibling.sh` on one shared launcher (`lib-launch.sh`:
-  Windows+WSL, conhost fallback, `--dry-run`), and `ctx-fill.py` (real context fill; refuses to
-  guess the session).
-- **Institutional memory scaffolded:** kit-init creates `docs/AI_CONTEXT.md` and an
-  append-only `docs/timeline/build-log.md`; orient reads them, retro/orchestrate append with
-  Edit (never Write). Lessons go to Claude Code's own auto-memory.
-- **Git hardening across skills/templates:** `fetch && rebase origin/main` instead of
-  `pull --rebase` (shared FETCH_HEAD race), HEAD + index guards for board writes, gate from
-  your own worktree, board = status with dated verbatim archives.
-- **`docs/GETTING-STARTED.md`** and LESSONS 28–41.
-
-## v0.3.0 — the orchestrated-autonomy port
-
-New since v0.2.0 (extracted from the 2026-08-20/21 Orchestrated-Autonomy pilot: 20+ rows,
-8 production releases, 15+ independent verifier runs across a 4-session fleet):
-
-- **`orchestrate`** — the active-orchestrator operating loop: seat-taking via board banner,
-  single-allocator rules (row IDs, LOG slot, DEPLOY slot, versions), briefed-row intake,
-  dependency-DAG assignment, phase-boundary tracking, verify-gated hand-offs, wave-train
-  deploys, doc-agent logging, and the retro-before-clear sibling lifecycle handshake.
-- **`bootstrap-project`** — super-init: bare directory → fully kit-adopted project in one
-  pass, driven by `scripts/bootstrap.sh` (idempotent, `--dry-run`). Offers the settings
-  snippets (SessionStart hook + auto-compact off) as ONE approval-gated step.
-- **`post-feature`** — the coupled log+status-doc close-out checklist.
-- **Refreshed** `orient` / `reconcile` / `retro` / `verify-feature` / `board` with the
-  pilot's protocol: per-session row prefixes, LOG slot, resource-window announcements,
-  count-the-picks, on-main-SHA discipline, banner-aware branches.
-- **`templates/agents/`** — an optional generic team set (orchestrator, architect,
-  backend-dev, frontend-dev, qa-lead, devops, tech-writer). **Precedence note:** user-level
-  agent definitions with the same names WIN day-to-day; project copies exist for machines
-  and collaborators without them, and install only with `--with-team-agents`, only when
-  missing.
-- **`templates/memory-starter/`** — 31 curated agnostic memories (30 ported + 1 canonical merge) (working-style + process;
-  ratified 2026-08-21). Project FACTS and STANDING PERMISSIONS were deliberately excluded —
-  a trust grant never ports to a fresh project by default.
-- **`extras/`** — take-or-leave skills outside the orchestration core (currently
-  `backfill`: guarded, lineage-preserving prod data surgery). Not installed by bootstrap.
-- **LESSONS 16–27** — the pilot's harvest.
+v0.6.0: a model per lane (`--model` / `--effort` on both launch scripts, always passed, never inherited),
+lean builder starts (`/orchestration-kit:orient --brief <ROW>` from a brief file), per-window context marks
+(120K/150K on a 200K window), optional multi-account teams, and a note on keeping `CLAUDE.md` slim.
+v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off solo), the `falsify` skill, a
+context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
+example session. Full history: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Assumed plugins (user-level — documented, never copied)
 
