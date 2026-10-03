@@ -156,22 +156,71 @@ has "orchestrate keeps the 'small model never writes facts' rule" "The small mod
 
 # ---- F5: nowhere is a user told to bare `/clear` (or "clear" a terminal) to recycle ---------------
 # A bare /clear keeps the terminal's OLD model. Scan EVERY shipped .md (templates/memory-starter/ ships
-# into every adopter's memory) for the WORD clear (/clear, clear, cleared, clears, clearing; not
-# "clearly"), not just the `/clear` command: "safe to clear" slipped past a `/clear`-only scan.
-# A line passes if it names the explicit relaunch (`--model` / `/model`) or is a non-recycling mention.
-allow='uptime survives|evaporate on|destroys (unpersisted )?context|[Rr]etro-before-clear|Never pre-announce a clear|Retro should come before a clear|clear output|startup\|clear|startup or /clear|terminals were cleared before|Nowhere does the kit tell a user to bare'
-n_md=0
+# into every adopter's memory) plus the launch scripts' and hook's own comment/usage text for the WORD
+# clear (/clear, clear, cleared, clears, clearing; not "clearly") and for /reset and /new.
+# HOW (ORCA106-5d): each ALLOWED phrase is stripped from the line by OCCURRENCE, then the line fails on
+# any clear-word LEFT. There is deliberately NO line-wide exemption: the orchestrate skill writes whole
+# paragraphs as single ~600-char lines, so a line that is allowed for one phrase must not hide a second,
+# bad one ("Never pre-announce a clear. Tell the human it is safe to clear." was invisible to the 5c guard).
+F5_ALLOW=(
+  'uptime survives `?/clear`?'                    # ListAgents liveness
+  'evaporate on `?/clear`?'                       # what a retro saves
+  '`?/clear`? destroys (unpersisted )?context'    # why the handshake exists
+  '[Rr]etro-before-clear'                         # the handshake's own name
+  'Never pre-announce a clear'
+  'Retro should come before a clear'              # a quoted user line
+  'a clear output'                                # the adjective
+  'startup[|]clear'                               # the SessionStart matcher
+  'startup or /clear'
+  'terminals were cleared before'                 # a past incident, told as history
+  'Nowhere does the kit tell a user to bare `/clear` to recycle'
+  '(a )?bare `/clear`( in an old terminal)? keeps'          # the warning itself
+  'never a bare `/clear`'
+  'if you (do|must) `/clear`, run `/model'                  # the safe way, model first
+  '[Aa] bare `/clear`$'                                     # that warning wrapped at the line end
+)
+# f5_left <line>: what is left of the line after the allowed phrases are removed, if it still holds
+# a clear-word (or /reset, /new). Empty output = the line is fine.
+F5_HIT='(^|[^[:alnum:]_])clear(s|ed|ing)?([^[:alnum:]_]|$)|/(reset|new)([^[:alnum:]_]|$)'
+f5_left() {
+  local rest="$1" ph
+  for ph in "${F5_ALLOW[@]}"; do rest="$(printf '%s' "$rest" | sed -E "s#${ph}##g")"; done
+  printf '%s' "$rest" | grep -Ei -- "$F5_HIT" || true
+}
+n_scan=0
 while IFS= read -r f; do
-  n_md=$((n_md+1))
+  n_scan=$((n_scan+1))
   while IFS= read -r l; do
     [ -z "$l" ] && continue
-    if printf '%s' "$l" | grep -Eq "$allow"; then continue; fi
-    if printf '%s' "$l" | grep -Eq -- '--model|/model'; then continue; fi
-    bad "F5 ${f#"$ROOT"/} says clear without an explicit --model relaunch: $(printf '%s' "$l" | cut -c1-200)"
-  done < <(grep -niwE 'clear(s|ed|ing)?' "$f" | cut -d: -f2-)
-done < <(find "$ROOT" -name '*.md' -not -path '*/.git/*' | LC_ALL=C sort)
-[ "$n_md" -ge 40 ] && ok || bad "F5 scan found only $n_md .md files (the find is broken?)"
+    left="$(f5_left "$l")"
+    [ -z "$left" ] || bad "F5 ${f#"$ROOT"/} still says clear/reset/new after the allowed phrases are removed: $(printf '%s' "$left" | cut -c1-240)"
+  done < <(grep -Ei -- "$F5_HIT" "$f" || true)   # only candidate lines pay for the per-phrase strip
+done < <(find "$ROOT" \( -name '*.md' -o -path "$ROOT/scripts/*.sh" -o -path "$ROOT/hooks/*.sh" \) -not -path '*/.git/*' | LC_ALL=C sort)
+[ "$n_scan" -ge 45 ] && ok || bad "F5 scan found only $n_scan files (the find is broken?)"
 [ -f "$ROOT/templates/memory-starter/feedback_retro_before_clear_handshake.md" ] && ok || bad "F5 scan target templates/memory-starter/ missing"
+# Pinned holes (committed negative fixtures): synthetic one-line paragraphs shaped like the real ones.
+# Each carries ALLOWED phrases AND one bad instruction; the guard must flag exactly the bad one. These were
+# the lines the 5c line-wide exemption let through (K8 from the reader, H1-H3 from the seat).
+for fx in \
+  'Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → tell the human it is safe to `/clear`, one terminal at a time. Never pre-announce a clear.' \
+  'Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear. Once it replies, tell the human the terminal is safe to clear.' \
+  'then relaunch it with `claude --name <Name> --model <m> /orient` (a bare `/clear` keeps the terminal'"'"'s old model), or simply `/clear` the old terminal.' \
+  '(launch fresh → wait → SIGTERM old, or have the human `/clear` it; no `--model` = the default, never the old session'"'"'s) | Script exits 2' \
+  'then relaunch it with `--model` (a bare `/clear` keeps the old model); or `/reset` it.' \
+  'then relaunch it with `--model`, or open a `/new` session.' \
+  'close it with `--model` set, or Clear the terminal.' ; do
+  [ -n "$(f5_left "$fx")" ] && ok || bad "F5 hole not caught (the guard passes this line): $fx"
+done
+# ...and the legitimate phrasings, alone and combined on one long line, are NOT flagged (false-flag control).
+for fx in \
+  'a bare `/clear` keeps that terminal'"'"'s OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`' \
+  'terminal uptime survives `/clear`. Retro-before-clear is a **handshake**. Never pre-announce a clear. A bounded job with a clear output.' \
+  'closed and relaunched with an explicit `--model` (a bare `/clear` keeps the old model).' \
+  'never a bare `/clear`) when recycling isn'"'"'t available.' \
+  'A bare `/clear`' \
+  '(`hooks/hooks.json`, startup|clear): tells a fresh session; (startup or /clear) too.' ; do
+  [ -z "$(f5_left "$fx")" ] && ok || bad "F5 false flag on a legitimate line: $fx => $(f5_left "$fx")"
+done
 # The recycle row's line carries `--model` for the script, so the line check above cannot see its
 # fallback clause; pin the old phrasings directly (a bare /clear keeps the terminal's OLD model).
 hasnt "orchestrate no longer says a terminal is 'safe to /clear'" "safe to /clear" "$(cat "$ORCH")"
