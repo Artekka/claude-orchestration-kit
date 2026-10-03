@@ -122,5 +122,88 @@ has "bad team model warns" "team block: model 'not;a;model' is not valid" "$out"
 has "bad team model falls back to the default" "model      opus[1m] (default)" "$out"
 has "bad team effort warns" "team block: effort 'ultra' is not valid" "$out"
 
+# 8. (ORCA106-5b F1) A model value must look like a model, not a flag. A flag-shaped value would be
+#    spliced into `claude --name N --model <value> ...` and read by claude as ITS OWN flag
+#    (`--model --dangerously-skip-permissions`), so every entry point refuses it with exit 64:
+#    both scripts, both the `--model V` and `--model=V` spellings.
+for bad in '--effort' '--dangerously-skip-permissions' '-x' '.' '-' '--'; do
+  for tool in rs st; do
+    for form in sep eq; do
+      if [ "$form" = sep ]; then margs=(--model "$bad"); else margs=("--model=$bad"); fi
+      # start-team has no positional name; recycle-sibling needs one AFTER the flag, so the value is
+      # not consumed as the name. `--effort high` rides along: the exact shape from the READ.
+      if [ "$tool" = rs ]; then out="$(rs "${margs[@]}" --effort high ZzNone; echo "rc=$?")"
+      else out="$(st "${margs[@]}" --effort high --siblings 1; echo "rc=$?")"; fi
+      has "F1 $tool $form model '$bad' refused rc 64" "rc=64" "$out"
+      hasnt "F1 $tool $form model '$bad' prints no command" "claude --name" "$out"
+    done
+  done
+done
+# The team-block path shares the validator. Documented leniency is kept (a bad block value warns and
+# the built-in default stands, like permission_mode), but a flag-shaped value must NEVER reach the
+# command line, in either script.
+for bad in '--effort' '--dangerously-skip-permissions' '-x' '.'; do
+  printf 'team:\n  model: %s\n' "$bad" > "$R/docs/orchestration/ORCHESTRATION.md"
+  out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
+  has "F1 team block model '$bad' warns" "team block: model '$bad' is not valid" "$out"
+  has "F1 team block model '$bad' falls back to the default" "model      opus[1m] (default)" "$out"
+  hasnt "F1 team block model '$bad' never reaches the command" "--model $bad" "$out"
+  out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1)"
+  has "F1 start-team team block model '$bad' warns" "team block: model '$bad' is not valid" "$out"
+  hasnt "F1 start-team team block model '$bad' never reaches the command" "--model $bad" "$out"
+done
+printf 'team:\n  effort: --dangerously-skip-permissions\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
+has "F1 team block flag-shaped effort warns" "team block: effort '--dangerously-skip-permissions' is not valid" "$out"
+hasnt "F1 team block flag-shaped effort never reaches the command" "--effort --dangerously" "$out"
+
+# Unknown flags and a `-`-led positional (a name or a prompt) are refused, not passed through to
+# claude: `recycle-sibling.sh ZzNone --bogus` used to exit 0 with `--bogus` in argv. A third
+# positional is refused too. (A prompt that starts with `/` is the normal case and stays fine.)
+for badargs in "--bogus ZzNone" "ZzNone --bogus" "ZzNone -x" "-x" "--dangerously-skip-permissions ZzNone" \
+               "ZzNone /orchestration-kit:orient extra"; do
+  # shellcheck disable=SC2086  # word-splitting the case string into argv is the point
+  out="$(rs $badargs; echo "rc=$?")"
+  has "recycle-sibling refuses '$badargs' rc 64" "rc=64" "$out"
+  hasnt "recycle-sibling '$badargs' prints no command" "claude --name" "$out"
+done
+for badargs in "--bogus" "-x" "extra"; do
+  # shellcheck disable=SC2086
+  out="$(st $badargs --siblings 1; echo "rc=$?")"
+  has "start-team refuses '$badargs' rc 64" "rc=64" "$out"
+  hasnt "start-team '$badargs' prints no command" "claude --name" "$out"
+done
+
+# 9. (ORCA106-5b F2) An EMPTY or MISSING value is a refusal (rc 64), for both flags and both scripts:
+#    `--model`, `--model ''`, `--model=`, same for `--effort`. "Given" is tracked apart from "empty":
+#    an empty value used to read as "not given" and silently launched on the default model.
+for flag in model effort; do
+  for tool in rs st; do
+    for form in missing emptyarg emptyeq; do
+      case "$form" in
+        missing)  fargs=("--$flag") ;;
+        emptyarg) fargs=("--$flag" "") ;;
+        emptyeq)  fargs=("--$flag=") ;;
+      esac
+      if [ "$tool" = rs ]; then
+        # A missing value is the LAST argument: nothing for the flag to consume.
+        out="$(rs ZzNone "${fargs[@]}"; echo "rc=$?")"
+      else out="$(st --siblings 1 "${fargs[@]}"; echo "rc=$?")"; fi
+      has "F2 $tool --$flag ($form) refused rc 64" "rc=64" "$out"
+      hasnt "F2 $tool --$flag ($form) prints no command" "claude --name" "$out"
+    done
+  done
+done
+# An empty value is refused even when the team block would have supplied one (flags override the
+# block, so "given and empty" must not fall through to it).
+printf 'team:\n  model: sonnet[1m]\n  effort: medium\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+for tool in rs st; do
+  for flag in model effort; do
+    if [ "$tool" = rs ]; then out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" "--$flag=" ZzNone 2>&1; echo "rc=$?")"
+    else out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 "--$flag=" 2>&1; echo "rc=$?")"; fi
+    has "F2 $tool empty --$flag does not fall through to the team block" "rc=64" "$out"
+  done
+done
+
 echo "lean-launch: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
