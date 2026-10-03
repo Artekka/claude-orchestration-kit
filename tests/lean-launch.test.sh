@@ -206,6 +206,16 @@ done
 out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args ZzNone /orchestration-kit:orient; echo ok' _ "$ROOT" 2>&1; echo "rc=$?")"
 has "launch_check_args accepts a normal name + slash prompt" "ok" "$out"
 
+# -h/--help prints the usage and is NOT reported as an unknown flag (the `-*)` arm would otherwise
+# swallow it with a misleading "unknown flag: --help").
+for tool in "$RS" "$ST"; do
+  for h in -h --help; do
+    out="$(HOME="$TMP" bash "$tool" "$h" 2>&1; echo "rc=$?")"
+    has "$(basename "$tool") $h prints the usage" "Usage:" "$out"
+    hasnt "$(basename "$tool") $h is not an unknown flag" "unknown" "$out"
+  done
+done
+
 # 9. (ORCA106-5b F2) An EMPTY or MISSING value is a refusal (rc 64), for both flags and both scripts:
 #    `--model`, `--model ''`, `--model=`, same for `--effort`. "Given" is tracked apart from "empty":
 #    an empty value used to read as "not given" and silently launched on the default model.
