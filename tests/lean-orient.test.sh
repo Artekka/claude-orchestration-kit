@@ -187,9 +187,9 @@ f5_left() {
   for ph in "${F5_ALLOW[@]}"; do rest="$(printf '%s' "$rest" | sed -E "s#${ph}##g")"; done
   printf '%s' "$rest" | grep -Ei -- "$F5_HIT" || true
 }
-n_scan=0
+n_scan=0; scanned=""
 while IFS= read -r f; do
-  n_scan=$((n_scan+1))
+  n_scan=$((n_scan+1)); scanned="$scanned ${f#"$ROOT"/}"
   while IFS= read -r l; do
     [ -z "$l" ] && continue
     left="$(f5_left "$l")"
@@ -197,7 +197,11 @@ while IFS= read -r f; do
   done < <(grep -Ei -- "$F5_HIT" "$f" || true)   # only candidate lines pay for the per-phrase strip
 done < <(find "$ROOT" \( -name '*.md' -o -path "$ROOT/scripts/*.sh" -o -path "$ROOT/hooks/*.sh" \) -not -path '*/.git/*' | LC_ALL=C sort)
 [ "$n_scan" -ge 45 ] && ok || bad "F5 scan found only $n_scan files (the find is broken?)"
-[ -f "$ROOT/templates/memory-starter/feedback_retro_before_clear_handshake.md" ] && ok || bad "F5 scan target templates/memory-starter/ missing"
+# The scan must REACH the files that matter most, by name (a bare count floor would let one drop out).
+for must in templates/memory-starter/feedback_retro_before_clear_handshake.md skills/orchestrate/SKILL.md \
+            docs/GETTING-STARTED.md docs/LESSONS.md templates/CLAUDE-section.md scripts/recycle-sibling.sh hooks/session-start.sh; do
+  case " $scanned " in *" $must "*) ok ;; *) bad "F5 scan does not reach $must" ;; esac
+done
 # Pinned holes (committed negative fixtures): synthetic one-line paragraphs shaped like the real ones.
 # Each carries ALLOWED phrases AND one bad instruction; the guard must flag exactly the bad one. These were
 # the lines the 5c line-wide exemption let through (K8 from the reader, H1-H3 from the seat).
