@@ -19,7 +19,9 @@
 # HAND-OFF FILE  ${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}/<Name>.next
 #   model=opus[1m]        required: the model is always explicit, never inherited
 #   effort=high           optional; empty = no --effort flag
-#   mode=auto             optional permission mode; absent = keep the current one
+#   mode=auto             optional permission mode. recycle-sibling.sh always writes it (its --mode, else the
+#                         team block's permission_mode:, else normal), never the old session's mode. Absent
+#                         (a hand-written file only) = the wrapper keeps the mode it was started with
 #   account_dir=/home/x/.claude-acctN   CLAUDE_CONFIG_DIR for this launch; empty = the default account (unset)
 #   prompt_b64=<base64>   the prompt, base64 on ONE line, so spaces, quotes, `;`, `$`, backticks and
 #                         newlines survive with no shell parsing of the file at all

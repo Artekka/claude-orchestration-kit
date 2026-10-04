@@ -42,8 +42,9 @@ account writer, ancestor guard and the seat's detached self-recycle), generalize
   claims it with an atomic `mv` and the recycler revokes an unclaimed one the same way, so exactly one
   of them wins (a plain `rm` would let a tab open after the wrapper had already started a session, and
   leave two sessions under one name). A same-name `claude` that is not a child of the wrapper never counts
-  as the fresh one. A wrapper started for a different name is never taken for yours. The permission mode
-  and the account travel in the hand-off, so a recycle keeps both.
+  as the fresh one. A wrapper started for a different name is never taken for yours. The account is
+  kept from the old session; the permission mode is NOT: a recycle uses the mode you give it with `--mode`,
+  else the team block's `permission_mode:`, else normal, and writes that into the hand-off.
 - **Every tab the kit opens now runs the wrapper** (`start-team.sh` and the recycle's new-tab path), on
   tmux, WSL, macOS, and Linux emulators, so a team started by the kit recycles in place from its first
   recycle. A session started by hand moves over at its next recycle. Git Bash (cmd.exe windows, no
