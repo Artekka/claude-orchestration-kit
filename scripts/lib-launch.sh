@@ -372,6 +372,14 @@ launch_init() {
 # The part identified by pgrep: `claude --name N [flags] prompt` (or the test override).
 _launch_core() {  # <name> <prompt> <quote-fn>
   if [ -n "${LAUNCH_CMD_OVERRIDE:-}" ]; then printf '%s%s' "$(_launch_env "$3")" "${LAUNCH_CMD_OVERRIDE//\{name\}/$1}"; return; fi
+  if launch_use_wrapper; then
+    # The tab runs the respawn wrapper (sibling-shell.sh), which runs `claude --name <Name> ...` as its
+    # child: same pgrep pattern, and the next recycle of this session can happen in this very tab.
+    local mflag=""
+    [ "$LAUNCH_MODE" = normal ] || mflag="--mode $LAUNCH_MODE "
+    printf '%sbash %s %s %s%s%s' "$(_launch_env "$3")" "$("$3" "$(launch_wrapper)")" "$1" "$mflag" "$(launch_model_flags "$3")" "$("$3" "$2")"
+    return
+  fi
   # --name stays FIRST: launch_pattern matches "^claude --name <Name>( |$)".
   printf '%sclaude --name %s %s%s%s' "$(_launch_env "$3")" "$1" "$(launch_mode_flags "$LAUNCH_MODE")" "$(launch_model_flags "$3")" "$("$3" "$2")"
 }
@@ -459,6 +467,128 @@ _launch_ps_cmd() {
 }
 
 _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_ARGV[@]:1}"; echo; }
+
+# ---------------------------------------------------------------- in-place recycle (v0.7.0)
+
+# Every tab the kit opens runs scripts/sibling-shell.sh, a respawn loop around `claude`. A recycle of a
+# session that runs under it needs no new tab: recycle-sibling.sh leaves the wrapper a hand-off file
+# (model, effort, mode, account, prompt), SIGTERMs only the old claude, and the wrapper starts the fresh
+# one in the SAME tab. Anything else (no old process, an old one started by hand, --new-tab, a timeout)
+# opens a new tab that runs the wrapper, so a hand-started session moves over at its next recycle.
+launch_state_dir() { printf '%s' "${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}"; }
+launch_wrapper() { printf '%s/sibling-shell.sh' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; }
+
+# True when a tab's command should run the wrapper rather than a bare claude. Not for: the test
+# override, a missing wrapper, LAUNCH_NO_WRAPPER (an escape hatch), Git Bash (cmd.exe windows run the
+# native claude and have no bash to run the wrapper) or the manual backend (a command for a human to
+# type). On WSL the wrapper path must also be free of spaces and ; " ' (the wt.exe / conhost line).
+launch_use_wrapper() {
+  [ -z "${LAUNCH_CMD_OVERRIDE:-}" ] || return 1
+  [ -z "${LAUNCH_NO_WRAPPER:-}" ] || return 1
+  [ -f "$(launch_wrapper)" ] || return 1
+  case "${LAUNCH_BACKEND:-}" in
+    gitbash-cmd|manual|"") return 1 ;;
+    wsl-*) case "$(launch_wrapper)" in *[\;\"\'\ ]*) return 1 ;; esac ;;
+  esac
+  return 0
+}
+
+# Process facts, from /proc when the kernel has it (exact argv), else from ps (macOS, BSD).
+# LAUNCH_NO_PROC=1 forces the ps branch: tests use it to cover macOS on a Linux box.
+_launch_use_proc() { [ -z "${LAUNCH_NO_PROC:-}" ] && [ -r "/proc/$1/status" ]; }
+launch_ppid_of() {  # <pid>
+  if _launch_use_proc "$1"; then awk '/^PPid:/{print $2}' "/proc/$1/status" 2>/dev/null || true
+  else ps -o ppid= -p "$1" 2>/dev/null | tr -d ' ' || true; fi
+}
+# The sibling-shell.sh wrapper that is <pid>'s PARENT and was started for <name>, else nothing: the
+# Name must match, or a session whose parent is another sibling's wrapper would take its hand-off.
+launch_wrapper_pid_of() {  # <pid> <name>
+  local par prev="" arg; par="$(launch_ppid_of "$1")"
+  [ -n "$par" ] && [ "$par" -gt 1 ] 2>/dev/null || return 0
+  if _launch_use_proc "$par" && [ -r "/proc/$par/cmdline" ]; then
+    while IFS= read -r arg || [ -n "$arg" ]; do
+      if [ "$prev" = sibling-shell.sh ] && [ "$arg" = "$2" ]; then echo "$par"; return 0; fi
+      prev="${arg##*/}"
+    done < <(tr '\0' '\n' < "/proc/$par/cmdline" 2>/dev/null)
+  elif ps -o command= -p "$par" 2>/dev/null | grep -Eq "(^|[ /])sibling-shell\.sh $2( |\$)"; then
+    echo "$par"
+  fi
+  return 0
+}
+# True iff <pid> is on THIS shell's own parent chain (the seat recycling itself runs the script from
+# inside the claude it targets: an in-place SIGTERM would cut the chain the wait loop runs in).
+launch_is_ancestor() {  # <pid>
+  local anc=$$
+  while [ -n "$anc" ] && [ "$anc" -gt 1 ] 2>/dev/null; do
+    [ "$anc" != "$1" ] || return 0
+    anc="$(launch_ppid_of "$anc")"
+  done
+  return 1
+}
+
+# The hand-off, written tmp + mv so the wrapper never reads half of it. The prompt travels as base64 on
+# one line, so no quote, `;`, `$` or newline needs escaping between here and claude's argv.
+launch_write_handoff() {  # <name> <prompt> — model/effort/mode/account come from the LAUNCH_* globals
+  local dir next tmp; dir="$(launch_state_dir)"; next="$dir/$1.next"; tmp="$next.tmp.$$"
+  mkdir -p "$dir" || return 1
+  {
+    printf 'model=%s\n' "$LAUNCH_MODEL"
+    printf 'effort=%s\n' "$LAUNCH_EFFORT"
+    printf 'mode=%s\n' "$LAUNCH_MODE"
+    printf 'account_dir=%s\n' "$LAUNCH_ACCOUNT_DIR"
+    printf 'prompt_b64=%s\n' "$(printf '%s' "$2" | base64 | tr -d '\n')"
+  } > "$tmp" || return 1
+  mv -f -- "$tmp" "$next"
+}
+
+# launch_wait_inplace <name> <old-pid> <wrapper-pid> <seconds> — sets LAUNCH_FRESH; true iff a
+# `claude --name <name>` that is a CHILD OF THAT WRAPPER showed up. A same-name process elsewhere does
+# not count, or a decoy would report a recycle that never happened.
+launch_wait_inplace() {
+  local end=$((SECONDS + $4)) pid; LAUNCH_FRESH=""
+  while [ "$SECONDS" -lt "$end" ]; do
+    for pid in $(launch_pids "$1"); do
+      [ "$pid" = "$2" ] && continue
+      if [ "$(launch_ppid_of "$pid")" = "$3" ]; then LAUNCH_FRESH="$pid"; break; fi
+    done
+    [ -n "$LAUNCH_FRESH" ] && break
+    # A dead wrapper will never relaunch; do not wait out the timeout for it.
+    kill -0 "$3" 2>/dev/null || break
+    sleep "${RECYCLE_POLL_SECS:-1}"
+  done
+  [ -n "$LAUNCH_FRESH" ]
+}
+
+# launch_recycle_inplace <name> <prompt> <old-pid> <wrapper-pid>
+#   0  done: LAUNCH_FRESH is the fresh claude, started by the SAME wrapper
+#   1  fell back: nothing will relaunch it and the hand-off is gone; the caller opens a new tab
+#   2  STOP: the wrapper owns the hand-off and is alive but no claude appeared; a new tab now would
+#      run two sessions under one name, so the caller must not open one
+launch_recycle_inplace() {
+  local name="$1" prompt="$2" old="$3" wpid="$4" next revoked
+  local t="${RECYCLE_INPLACE_TIMEOUT:-60}" g="${RECYCLE_CLAIMED_GRACE:-30}"
+  next="$(launch_state_dir)/$name.next"; revoked="$next.revoked.$$"
+  launch_write_handoff "$name" "$prompt" || { echo "cannot write the hand-off file in $(launch_state_dir); using a new tab" >&2; return 1; }
+  # SIGTERM the old claude ONLY: signalling the wrapper would end the very loop that starts the next one.
+  kill -TERM "$old" 2>/dev/null || true
+  if launch_wait_inplace "$name" "$old" "$wpid" "$t"; then
+    return 0
+  # No fresh child yet. REVOKE the hand-off the way the wrapper claims it: an atomic mv, so exactly one
+  # of us wins. A plain `rm -f` succeeds whether or not the wrapper already took the file, and opening
+  # a tab after the wrapper has claimed it leaves TWO live sessions under one name.
+  elif mv -- "$next" "$revoked" 2>/dev/null; then
+    rm -f -- "$revoked"
+    echo "no fresh '${name}' appeared under wrapper ${wpid} within ${t}s; removed the unclaimed hand-off, falling back to a new tab" >&2
+    return 1
+  elif ! kill -0 "$wpid" 2>/dev/null; then
+    echo "wrapper ${wpid} claimed the hand-off for '${name}' and then exited; nothing will relaunch it, falling back to a new tab" >&2
+    return 1
+  elif launch_wait_inplace "$name" "$old" "$wpid" "$g"; then
+    return 0
+  fi
+  echo "wrapper ${wpid} claimed the hand-off for '${name}' but no fresh claude appeared within a further ${g}s; NOT opening a tab (that would run two '${name}'). Check the session's tab." >&2
+  return 2
+}
 
 # ---------------------------------------------------------------- team block
 

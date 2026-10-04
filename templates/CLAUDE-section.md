@@ -1,4 +1,4 @@
-<!-- orchestration-kit v0.6.0 — managed section; upgrades diff against this marker -->
+<!-- orchestration-kit v0.7.0 — managed section; upgrades diff against this marker -->
 ## Multi-session orchestration (orchestration-kit)
 
 This project runs the multi-session claimable-board workflow from the `orchestration-kit`.
@@ -48,7 +48,7 @@ Never `/compact`. Measure fill with `python3 scripts/ctx-fill.py` (never `bytes 
 window comes from your own env block, not the transcript: `ctx-fill.py <uuid> --window 1m|200k`).
 1M window: self-report at ~350K, hand over by ~400K; 200K window: ~120K / ~150K. Report your
 fill AND your model with every hand-off. Then the handshake: seat orders `/orchestration-kit:retro` →
-you reply "retro complete" → the seat recycles your terminal (`scripts/recycle-sibling.sh`)
+you reply "retro complete" → the seat recycles your terminal in place, in the same tab (`scripts/recycle-sibling.sh`)
 or the human relaunches it with an explicit `--model` (a bare `/clear` keeps the old model). A row already in flight finishes first.
 
 ### Models

@@ -2,6 +2,62 @@
 
 Newest first.
 
+## 0.7.0 — unreleased
+
+Recycling in place. A recycled session now restarts in the SAME terminal tab instead of opening a new
+one. Ported from a project that has run this daily (its respawn wrapper, hand-off file, atomic revoke,
+account writer and ancestor guard), generalized to the kit's backends and file layout.
+
+### Recycle in the same tab
+
+- **`scripts/sibling-shell.sh <Name> [--mode M] --model M [--effort E] [prompt]` (new):** the respawn
+  loop a team tab runs. It starts `claude --name <Name> ...` as a child; when the child exits it looks
+  for a hand-off file and, if `recycle-sibling.sh` left one, starts the next session in the same tab.
+  No file = a plain `/exit`, and the tab closes as it always did. A crash-loop guard stops it when
+  `claude` dies within 5 s twice in a row (a bad model id or a logged-out account), instead of
+  respinning forever. The whole loop is parsed up front, so a plugin update that rewrites the file
+  under a days-long wrapper cannot make bash resume in the middle of new text.
+- **`recycle-sibling.sh` has two modes**, and `--dry-run` (or `DRY_RUN=1`) prints which one with a
+  `mode:` line, and the final summary repeats it:
+  - **in-place** when exactly one old `claude` exists and its parent is a `sibling-shell.sh` wrapper for
+    the SAME name: write the hand-off file (model, effort, permission mode, account, and the prompt as
+    one line of base64 so quotes, `;`, `$` and newlines survive), SIGTERM only the old `claude`, and
+    wait for a fresh one that is a child of that very wrapper. No terminal is needed.
+  - **new-tab** (the old behaviour, now starting the wrapper) when there is no old process, the old one
+    was started by hand, several match, `--new-tab` is passed, the seat is recycling itself from its own
+    shell (the target is an ancestor of the script, so an in-place SIGTERM would cut its own process
+    chain), or an in-place attempt times out after 60 s (`RECYCLE_INPLACE_TIMEOUT`).
+- **Safe by construction:** the hand-off is written to a temp file and moved into place; the wrapper
+  claims it with an atomic `mv` and the recycler revokes an unclaimed one the same way, so exactly one
+  of them wins (a plain `rm` would let a tab open after the wrapper had already started a session, and
+  leave two sessions under one name). A same-name `claude` that is not a child of the wrapper never counts
+  as the fresh one. A wrapper started for a different name is never taken for yours. The permission mode
+  and the account travel in the hand-off, so a recycle keeps both.
+- **Every tab the kit opens now runs the wrapper** (`start-team.sh` and the recycle's new-tab path), on
+  tmux, WSL, macOS, and Linux emulators, so a team started by the kit recycles in place from its first
+  recycle. A session started by hand moves over at its next recycle. Git Bash (cmd.exe windows, no
+  `pgrep`) and the `manual` backend keep a bare `claude`. `LAUNCH_NO_WRAPPER=1` turns it off.
+- New env: `SIBLING_STATE_DIR` (hand-off dir, default `~/.orchestration-kit/sessions`),
+  `RECYCLE_INPLACE_TIMEOUT`, `RECYCLE_CLAIMED_GRACE` (extra wait once the wrapper has claimed the
+  hand-off, 30 s), `RECYCLE_POLL_SECS`, `LAUNCH_NO_PROC=1` (use `ps` instead of `/proc`; tests only).
+
+### What is tested where
+
+In-place recycling reads the process tree (`/proc`, else `ps`) and needs `pgrep`. The new suites run on
+Linux (and WSL) and say SKIP elsewhere; the `ps` code path macOS would use is exercised by forcing it
+(`LAUNCH_NO_PROC=1`), but it has **not been run on a real Mac or in Git Bash**. On WSL, a kit install path
+containing a space cannot cross the `wt.exe` command line, so those tabs fall back to a bare `claude`.
+
+### Tests
+
+- `tests/sibling-shell.test.sh` (wrapper: argv order, hand-off relaunch and consumption, byte-exact
+  prompt round trip, account per launch, permission mode, crash-loop guard incl. the no-`EPOCHREALTIME`
+  clock, refusal of malformed hand-offs, bad arguments exit 64, survives being rewritten mid-run) and
+  `tests/recycle-inplace.test.sh` (mode decision, end-to-end in-place, timeout fallback, decoy and
+  wrong-name wrappers, the claimed-hand-off race, account inheritance, the ancestor guard at depth 1 and
+  2, the `ps` parity path, the wrapper in every backend's tab command). Shared helpers in
+  `tests/inplace-harness.sh`; every `claude` is a stub and cleanup kills only recorded pids.
+
 ## 0.6.0 — 2026-10-02
 
 A model per lane, leaner builder starts, per-window context marks, and optional multi-account
