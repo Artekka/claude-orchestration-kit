@@ -46,6 +46,7 @@ wait_for() {  # <what> <command...> — polls up to 20 s
 sandbox() {
   SB="$(mktemp -d)"; SANDBOXES+=("$SB")
   mkdir -p "$SB/home" "$SB/bin" "$SB/stub" "$SB/state" "$SB/repo"
+  : > "$SB/fake-wt.exe"   # exists so a WSL DRY-RUN finds a wt.exe; nothing ever executes it
   cat > "$SB/bin/claude" <<'STUB'
 #!/usr/bin/env bash
 d=$STUB_DIR
@@ -71,12 +72,12 @@ STUB
   chmod +x "$SB/bin/claude"
   # term-trap records the SIGTERM it receives; ignore-term never exits; term-decoy spawns a
   # `claude --name <Name>` that is NOT a child of the wrapper (setsid: parent = init) and ignores TERM.
-  printf '%s\n' "trap 'echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" 'while :; do sleep 0.2; done' > "$SB/stub/holder-term.sh"
+  printf '%s\n' "trap 'date +%s.%N > \$STUB_DIR/sigterm-at.\$\$; echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" 'while :; do sleep 0.2; done' > "$SB/stub/holder-term.sh"
   printf '%s\n' "trap '' TERM" 'while :; do sleep 0.2; done' > "$SB/stub/holder-ignore.sh"
   # self-recycle is the seat: it runs the recycle script the way the seat's shell tool does (one
   # `bash -c` layer; the trailing `; true` keeps that layer from exec-ing the script), then holds like
   # term-trap so the SIGTERM it receives is recorded. SELF_RECYCLE_CMD is the full command line.
-  printf '%s\n' "trap 'echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" \
+  printf '%s\n' "trap 'date +%s.%N > \$STUB_DIR/sigterm-at.\$\$; echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" \
     'bash -c "$SELF_RECYCLE_CMD > $STUB_DIR/self.out 2> $STUB_DIR/self.err; true"' \
     'while :; do sleep 0.2; done' > "$SB/stub/holder-self.sh"
   cat > "$SB/stub/holder-decoy.sh" <<'HOLD'
@@ -100,8 +101,15 @@ TERM
 sbenv() {  # prints NAME=VALUE words for `env`; extra pairs may follow as arguments
   printf '%s\n' "PATH=$SB/bin:$PATH" "HOME=$SB/home" "SIBLING_STATE_DIR=$SB/state" "STUB_DIR=$SB/stub" \
     "SIBLING_MIN_RUN_SECS=0" "FAKE_TERM_DIR=$SB" "DISPLAY=:0" "RECYCLE_POLL_SECS=0.2" "RECYCLE_INPLACE_TIMEOUT=20" \
-    "FAKE_TERM_MODE=run" "$@"
+    "FAKE_TERM_MODE=run" \
+    "WSL_DISTRO_NAME=" "WSL_INTEROP=" "TMUX=" "WT_EXE=$SB/no-such-wt.exe" "$@"
 }
+# ISOLATION (the m7 incident, 2026-10-03): lib-launch auto-detects the terminal. On a WSL box that is the
+# REAL wt.exe (derived from cmd.exe's %USERNAME% when WT_EXE is unset), so any run that reaches the
+# auto-detect path (e.g. a mutant that drops --terminal) opened a real Windows Terminal tab on the
+# user's screen. The defaults above make the sandbox non-WSL, non-tmux and point WT_EXE at a path that
+# does not exist; a case that needs the WSL dry-run text passes SB_WSL_ENV (a fake wt.exe FILE, never run).
+sb_wsl_env() { printf '%s\n' "WSL_DISTRO_NAME=TestDistro" "WT_EXE=$SB/fake-wt.exe"; }
 # env -u CLAUDE_CONFIG_DIR (this session may run under one); a case that wants it passes it explicitly.
 run_in_sb() {  # <env pairs...> -- <command...>   (sets RC OUT ERR)
   local pairs=() cmd=() seen=0 a

@@ -7,6 +7,22 @@ SUITE=recycle-inplace
 FORBID=(FAKE_TERM_MODE=forbid)          # a terminal that must never run: it leaves a marker if called
 ORIENT="/orchestration-kit:orient"
 
+# R0. ISOLATION tripwire (the m7 incident, 2026-10-03: a mutant made a detached copy lose --terminal, it
+#     auto-detected the terminal, and on this WSL box that was the REAL wt.exe: a Windows Terminal tab opened
+#     on the user's screen). With NO --terminal the sandbox must resolve to the stub xterm, and the wt.exe path
+#     the WSL probe would use must be empty (WT_EXE points nowhere and the probe's %USERNAME% derivation is
+#     skipped), so no path from a test can reach a real terminal. DRY-RUN only: nothing is launched here.
+#     tests/falsify-driver preflight runs exactly this block and refuses to mutate unless it is green.
+sandbox; n=$(nameFor R0)
+run_in_sb -- bash "$RECYCLE" --repo "$SB/repo" --dry-run "$n"
+eq "R0 dry run exit 0" 0 "$RC"
+rematch "R0 no --terminal: auto-detect picks the stub xterm" '^backend +linux-xterm$' "$OUT"
+renomatch "R0 ...never a WSL backend" '^backend +wsl' "$OUT"
+words=(); while IFS= read -r w; do words+=("$w"); done < <(sbenv)
+wtpath="$(env -u CLAUDE_CONFIG_DIR "${words[@]}" bash -c '. "$1"; _launch_wsl_probe >/dev/null 2>&1; printf %s "${LAUNCH_WT:-}"' _ "$ROOT/scripts/lib-launch.sh")"
+eq "R0 the wt.exe the WSL probe would use is empty (no path can reach the real one)" "" "$wtpath"
+[ -z "$wtpath" ] || [ ! -e "$wtpath" ] && ok || bad "R0 the resolved wt.exe path exists: $wtpath"
+
 # R1. --dry-run / DRY_RUN=1 name the mode they WOULD use: in-place only for a lone claude whose parent is
 #     the wrapper; --new-tab forces the old behaviour; a dry run changes nothing.
 sandbox; n=$(nameFor R1)
@@ -147,7 +163,7 @@ sandbox; n=$(nameFor R9)
 cmds() { recycle -- --dry-run --terminal "$1" "$n" go --model haiku --mode auto; }
 tabline() { printf '%s\n' "$OUT" | grep -E '^[[:space:]]*(command|by hand) '; }   # the command, not the pgrep note beside it
 for b in tmux tmux-detached linux-xterm linux-kitty macos-terminal macos-iterm wsl-wt wsl-conhost; do
-  run_in_sb -- bash "$RECYCLE" --repo "$SB/repo" --dry-run --terminal "$b" "$n" go --model haiku --mode auto
+  run_in_sb $(sb_wsl_env) -- bash "$RECYCLE" --repo "$SB/repo" --dry-run --terminal "$b" "$n" go --model haiku --mode auto
   has "R9 $b runs the wrapper" "sibling-shell.sh $n --mode auto --model haiku go" "$(tabline)"
   hasnt "R9 $b has no bare claude --name" "claude --name" "$(tabline)"
 done
@@ -159,12 +175,12 @@ done
 run_in_sb LAUNCH_NO_WRAPPER=1 -- bash "$RECYCLE" --repo "$SB/repo" --dry-run --terminal tmux "$n" go --model haiku
 has "R9 LAUNCH_NO_WRAPPER=1 keeps a bare claude" "claude --name $n --model haiku go" "$(tabline)"; hasnt "R9 ...and no wrapper" "sibling-shell.sh" "$(tabline)"
 # the tab command carries no bare `;` and no quote on WSL (wt.exe splits on `;`, quotes cross Windows argv)
-run_in_sb -- bash "$RECYCLE" --repo "$SB/repo" --dry-run --terminal wsl-wt "$n" go --model 'sonnet[1m]'
+run_in_sb $(sb_wsl_env) -- bash "$RECYCLE" --repo "$SB/repo" --dry-run --terminal wsl-wt "$n" go --model 'sonnet[1m]'
 line="$(tabline)"
 renomatch "R9 wsl command has no bare ;" '(^|[^\\]);' "$line"; hasnt "R9 wsl command has no double quote" '"' "$line"
 # a wrapper path with a space cannot cross the WSL command line: bare claude, and the user is told
 mkdir -p "$SB/with space"; cp -R "$ROOT/scripts" "$SB/with space/scripts"
-run_in_sb -- bash "$SB/with space/scripts/recycle-sibling.sh" --repo "$SB/repo" --dry-run --terminal wsl-wt "$n" go --model haiku
+run_in_sb $(sb_wsl_env) -- bash "$SB/with space/scripts/recycle-sibling.sh" --repo "$SB/repo" --dry-run --terminal wsl-wt "$n" go --model haiku
 has "R9 spaced wrapper path on WSL: bare claude" "claude --name $n --model haiku go" "$(tabline)"; hasnt "R9 ...no wrapper" "sibling-shell.sh" "$(tabline)"
 run_in_sb -- bash "$SB/with space/scripts/recycle-sibling.sh" --repo "$SB/repo" --dry-run --terminal tmux "$n" go --model haiku
 has "R9 spaced wrapper path elsewhere is fine (quoted)" "sibling-shell.sh $n --model haiku go" "$(tabline)"
@@ -219,6 +235,7 @@ start_wrapper "$n" "SELF_RECYCLE_CMD=bash $RECYCLE --repo $SB/repo --terminal li
   FAKE_TERM_MODE=forbid RECYCLE_DETACH_DELAY=4 CLAUDE_CONFIG_DIR="$acct"
 W11=$WPID; OLD="$(launch_pid 1)"
 wait_for "the seat's recycle call to return" file_has "$SB/stub/self.out" 'log:'
+t_returned="$(date +%s.%N)"
 logp="$(sed -n 's/.*log: //p' "$SB/stub/self.out" | head -1)"
 has "R11 the printed log is in the state dir" "$SB/state" "$logp"
 wait_for "the detached copy" have_copy "$n"
@@ -230,6 +247,10 @@ wait_for "the fresh claude" launches_ge 2
 eq "R11 the fresh claude is a child of the SAME wrapper" "$W11" "$(launch_ppid 2)"
 wait_for "old claude gone" not_alive "$OLD"
 eq "R11 the old claude was SIGTERMed" "TERM" "$(cat "$SB/stub/sigterm.$OLD" 2>/dev/null)"
+# RECYCLE_DETACH_DELAY=4: the SIGTERM lands about 4 s after the seat's call returned, so its own tool call
+# can reach the transcript first. 3 s of slack for the poll; a copy with no delay lands it in well under 1 s.
+awk -v a="$(cat "$SB/stub/sigterm-at.$OLD" 2>/dev/null || echo 0)" -v b="$t_returned" 'BEGIN{exit !(a-b>=3.0)}' \
+  && ok || bad "R11 the SIGTERM landed $(awk -v a="$(cat "$SB/stub/sigterm-at.$OLD" 2>/dev/null || echo 0)" -v b="$t_returned" 'BEGIN{printf "%.2f", a-b}') s after the seat's call returned; want >= 3 (RECYCLE_DETACH_DELAY=4)"
 alive "$W11" && ok || bad "R11 the wrapper was never signalled"
 last_arg_is 2 go && ok || bad "R11 the prompt reached the fresh claude"
 absent "R11 hand-off consumed" "$SB/state/$n.next"; absent "R11 no tab" "$SB/TERM-WAS-CALLED"
