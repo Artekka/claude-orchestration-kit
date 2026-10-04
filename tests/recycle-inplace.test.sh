@@ -226,10 +226,10 @@ file_has() { grep -Eq -- "$2" "$1" 2>/dev/null; }
 #      from inside itself (a tab would be a failure: the terminal is forbidden). The call returns at once
 #      and PRINTS the log path; a detached copy outside the old claude's tree and session then does the
 #      in-place hand-off, SIGTERMs only the old claude, and the fresh one starts under the SAME wrapper.
-#      The seat runs on account 2: the copy must hand that account on (a dropped account would launch the
+#      The seat runs on a non-default account: the copy must hand that account on (a dropped account would launch the
 #      fresh seat on the default account with CLAUDE_CONFIG_DIR unset).
 sandbox; n=$(nameFor R11)
-acct="$SB/home/.claude-acct2"; mkdir -p "$acct"; echo '{}' > "$acct/.credentials.json"
+acct="$SB/home/.claude-acct4"; mkdir -p "$acct"; echo '{}' > "$acct/.credentials.json"
 printf self-recycle > "$SB/stub/mode.1"; printf term-trap > "$SB/stub/mode.2"
 start_wrapper "$n" "SELF_RECYCLE_CMD=bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n go --model haiku" \
   FAKE_TERM_MODE=forbid RECYCLE_DETACH_DELAY=4 CLAUDE_CONFIG_DIR="$acct"
