@@ -2,7 +2,7 @@
 
 Newest first.
 
-## 0.7.0 — unreleased
+## 0.7.0 — 2026-10-03
 
 Recycling in place. A recycled session now restarts in the SAME terminal tab instead of opening a new
 one. Ported from a project that has run this daily (its respawn wrapper, hand-off file, atomic revoke,
