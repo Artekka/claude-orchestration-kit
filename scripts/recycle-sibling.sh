@@ -8,9 +8,13 @@
 #             claude (never the wrapper), and wait for a fresh `claude --name <Name>` under the SAME
 #             wrapper. Same tab, fresh context, explicit model. Kill-then-launch: safe because the
 #             session already said "retro complete". No terminal is needed for this path.
+#             SELF-RECYCLE (the target claude is an ancestor of this script, i.e. the seat runs it
+#             from its own shell tool): the script first re-runs a copy of itself detached
+#             (`setsid -f`, log path printed), exits, and the copy does the in-place hand-off from
+#             outside the old claude's process tree. No `setsid` (macOS) = new-tab, as before.
 #   new-tab   No old process, an old one NOT under a wrapper (started by hand), --new-tab, several
-#             old processes, the target is an ancestor of this script (the seat recycling itself from
-#             its own shell), or an in-place attempt that timed out: open a NEW window running the
+#             old processes, a self-recycle that cannot detach (no `setsid`, or the old claude adopts
+#             its orphans), or an in-place attempt that timed out: open a NEW window running the
 #             wrapper (so that session recycles in place from then on), wait until the fresh process
 #             exists, THEN SIGTERM the old one — launch-first-then-kill, so no seat is ever empty.
 # Terminal detection, quoting, nvm: see lib-launch.sh. Where no fresh process can be confirmed (Git
@@ -38,8 +42,11 @@
 # Env overrides: REPO_DIR (repo to open in), WT_EXE (full path to wt.exe), SIBLING_STATE_DIR (hand-off
 # dir, default ~/.orchestration-kit/sessions), RECYCLE_INPLACE_TIMEOUT (seconds to wait for the in-place
 # child, default 60), RECYCLE_CLAIMED_GRACE (extra seconds once the wrapper has claimed the hand-off,
-# default 30), RECYCLE_POLL_SECS (default 1), LAUNCH_NO_WRAPPER=1 (open tabs with a bare claude).
+# default 30), RECYCLE_POLL_SECS (default 1), RECYCLE_DETACH_DELAY (seconds the detached copy of a
+# self-recycle waits before the SIGTERM, default 2), RECYCLE_DETACH_WAIT (seconds it waits to leave the
+# old claude's process tree, default 10), LAUNCH_NO_WRAPPER=1 (open tabs with a bare claude).
 set -euo pipefail
+orig_args=("$@")   # the detached copy of a self-recycle re-runs with exactly these
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
@@ -103,11 +110,28 @@ mode=new-tab; wrapper_pid=""
 if [ "$FORCE_NEW_TAB" = 0 ] && [ "${LAUNCH_CAN_VERIFY:-0}" = 1 ] && [ -n "$old" ] \
    && [ "$(printf '%s\n' "$old" | wc -l | tr -d ' ')" = 1 ]; then
   wrapper_pid="$(launch_wrapper_pid_of "$old" "$name")"
-  # Seat safety: when the target claude is an ANCESTOR of this very script (the seat recycling itself
-  # from its own shell), an in-place SIGTERM would cut our own parent chain before the wait loop could
-  # finish. The new-tab path's launch-first-then-kill order survives that.
-  if [ -n "$wrapper_pid" ] && launch_is_ancestor "$old"; then
-    echo "target claude ${old} is an ancestor of this script (self-recycle): in-place would SIGTERM our own parent chain; using a new tab" >&2
+fi
+# Seat self-recycle: when the target claude is an ANCESTOR of this very script (the seat recycling
+# itself from its own shell), the in-place SIGTERM would cut our own parent chain before the wait loop
+# could finish. v0.7.0 answered with a new tab; now we DETACH instead: re-run a copy of ourselves in a
+# new session (`setsid -f`, so it is reparented to init at once) and exit; the copy does the normal
+# in-place hand-off from outside the old claude's tree. The copy re-checks the walk (RECYCLE_DETACHED
+# is set) and, if the old claude adopts its orphans (a child subreaper) so the copy is still inside,
+# falls back to the new tab, whose launch-first-then-kill order survives that.
+detach=no
+if [ -n "$wrapper_pid" ] && launch_is_ancestor "$old"; then
+  if [ -n "${RECYCLE_DETACHED:-}" ]; then
+    end=$((SECONDS + ${RECYCLE_DETACH_WAIT:-10}))
+    while launch_is_ancestor "$old" && [ "$SECONDS" -lt "$end" ]; do sleep 0.2; done
+    if launch_is_ancestor "$old"; then
+      echo "detached copy is still inside claude ${old}'s process tree (it adopts its orphans); in-place would SIGTERM our own parent chain, falling back to a new tab" >&2
+      wrapper_pid=""
+    fi
+  elif command -v setsid >/dev/null 2>&1; then
+    echo "target claude ${old} is an ancestor of this script (self-recycle): detaching a copy out of its process tree, then recycling in place" >&2
+    detach=yes
+  else
+    echo "target claude ${old} is an ancestor of this script (self-recycle) and setsid is missing: in-place would SIGTERM our own parent chain; using a new tab" >&2
     wrapper_pid=""
   fi
 fi
@@ -118,6 +142,7 @@ if [ "$DRY" -eq 1 ]; then
   launch_describe_env
   launch_describe "$name" "$prompt"
   echo "mode: ${mode}"
+  echo "detach: ${detach}"
   if [ "$LAUNCH_CAN_VERIFY" = 1 ]; then
     echo "old pids   ${old:-none} (matched: pgrep -f '$(launch_pattern "$name")') -> SIGTERM after the fresh one appears"
   else
@@ -126,7 +151,23 @@ if [ "$DRY" -eq 1 ]; then
   exit 0
 fi
 
+if [ "$detach" = yes ]; then
+  # The copy's stdout/stderr go to a log, because this process (and the seat's tool call that holds it)
+  # is gone by the time the copy fails or finishes. Print the path BEFORE detaching so a failure after
+  # the old claude dies is still diagnosable. The copy reads the same flags back from $orig_args.
+  mkdir -p "$(launch_state_dir)"
+  detach_log="$(launch_state_dir)/$name.recycle.log"
+  : > "$detach_log"
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  echo "detaching: a copy will SIGTERM claude ${old} in ${RECYCLE_DETACH_DELAY:-2}s and restart '${name}' in place under wrapper ${wrapper_pid}; log: ${detach_log}"
+  RECYCLE_DETACHED=1 setsid -f bash "$self" "${orig_args[@]}" > "$detach_log" 2>&1 < /dev/null
+  exit 0
+fi
+
 if [ "$mode" = in-place ]; then
+  # A detached copy waits a beat first, so the seat's own tool call (which printed the log path and
+  # returned) can reach its transcript before the SIGTERM below ends that session.
+  [ -z "${RECYCLE_DETACHED:-}" ] || sleep "${RECYCLE_DETACH_DELAY:-2}"
   rc=0; launch_recycle_inplace "$name" "$prompt" "$old" "$wrapper_pid" || rc=$?
   case "$rc" in
     0) echo "fresh ${name}: ${LAUNCH_FRESH} · mode: in-place · account $(launch_account_label) · model ${LAUNCH_MODEL} · SIGTERM old: ${old} · $(date '+%H:%M:%S %Z')"

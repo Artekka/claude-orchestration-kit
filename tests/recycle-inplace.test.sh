@@ -108,24 +108,29 @@ A2="$SB/home/.claude-acct$((1+1))"; A3="$SB/home/.claude-acct$((1+2))"
 eq "R7 account per launch: inherited, inherited, account 2, default" "$A3,$A3,$A2,unset" "$(cfgs)"
 absent "R7 the terminal was never called" "$SB/TERM-WAS-CALLED"
 
-# R8. Seat safety: a target claude that is an ANCESTOR of the running recycle never takes the in-place
-#     path. Same process shape run from outside is in-place (the control), so the ancestry walk is the only
-#     difference. R8d adds a shell layer: the walk is deeper than the direct parent.
+# R8. Seat self-recycle: a target claude that is an ANCESTOR of the running recycle is still in-place, but
+#     DETACHES first (v0.7.0 took a new tab here). Same process shape run from outside is in-place with
+#     detach: no (the control), so the ancestry walk is the only difference. R8d adds a shell layer: the
+#     walk is deeper than the direct parent, and a direct-parent-only walk would report detach: no and let
+#     the in-place SIGTERM cut the script's own parent chain.
 sandbox; n=$(nameFor R8); control=$(nameFor R8c)
 RUNIN="bash $RECYCLE --repo $SB/repo --terminal linux-xterm --dry-run"
 stand_in_wrapper "$n" "$n" "$RUNIN $n > $SB/inside.out 2> $SB/inside.err
 sleep 120" "${FORBID[@]}"
 wait_for "recycle output from inside the old claude" grep -q '^mode:' "$SB/inside.out"
-rematch "R8 from inside: new-tab" '^mode: new-tab$' "$(cat "$SB/inside.out")"
+rematch "R8 from inside: in-place" '^mode: in-place$' "$(cat "$SB/inside.out")"
+rematch "R8 from inside: detach" '^detach: yes$' "$(cat "$SB/inside.out")"
 rematch "R8 says why" 'ancestor' "$(cat "$SB/inside.err")"
 stand_in_wrapper "$control" "$control" ""
 recycle "${FORBID[@]}" -- --dry-run "$control"
 rematch "R8 control from outside: in-place" '^mode: in-place$' "$OUT"; renomatch "R8 control: no ancestor note" 'ancestor' "$ERR"
+rematch "R8 control from outside: no detach" '^detach: no$' "$OUT"
 sandbox; n=$(nameFor R8d)
 stand_in_wrapper "$n" "$n" "bash -c \"$RUNIN $n > $SB/d2.out 2> $SB/d2.err; true\"
 sleep 120" "${FORBID[@]}"
 wait_for "recycle output from two shells below the old claude" grep -q '^mode:' "$SB/d2.out"
-rematch "R8d depth 2: new-tab" '^mode: new-tab$' "$(cat "$SB/d2.out")"; rematch "R8d says why" 'ancestor' "$(cat "$SB/d2.err")"
+rematch "R8d depth 2: in-place" '^mode: in-place$' "$(cat "$SB/d2.out")"; rematch "R8d depth 2: detach" '^detach: yes$' "$(cat "$SB/d2.out")"
+rematch "R8d says why" 'ancestor' "$(cat "$SB/d2.err")"
 
 # R4. No old process: the new tab runs the WRAPPER with an explicit model, so every session moves over at
 #     its next recycle. (Runs the real command through the stand-in terminal.)
@@ -185,6 +190,136 @@ sandbox; n=$(nameFor RAe)
 stand_in_wrapper "$n" "$n" "bash $RECYCLE --repo $SB/repo --terminal linux-xterm --dry-run $n > $SB/inside.out 2> $SB/inside.err
 sleep 120" "${FORBID[@]}" LAUNCH_NO_PROC=1
 wait_for "recycle output from inside (ps path)" grep -q '^mode:' "$SB/inside.out"
-rematch "R10 [ps] ancestor guard: new-tab" '^mode: new-tab$' "$(cat "$SB/inside.out")"
+rematch "R10 [ps] ancestor guard: detach, in-place" '^detach: yes$' "$(cat "$SB/inside.out")"
+rematch "R10 [ps] ancestor guard: in-place" '^mode: in-place$' "$(cat "$SB/inside.out")"
+
+# ---- self-recycle: the seat detaches a copy of the script out of the old claude's process tree ----
+# pids of detached recycle copies for <Name>: recycle-sibling.sh processes that carry RECYCLE_DETACHED.
+detached_copies() {  # <Name>
+  local p; for p in $(pgrep -f "recycle-sibling\.sh .*$1" 2>/dev/null || true); do
+    if tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -q '^RECYCLE_DETACHED='; then echo "$p"; fi
+  done
+}
+have_copy() { [ -n "$(detached_copies "$1")" ]; }
+ppid_chain() { local p; p="$(ppid_of "$1")"; while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do echo "$p"; p="$(ppid_of "$p")"; done; }
+sid_of() { sed 's/^.*) //' "/proc/$1/stat" | awk '{print $4}'; }
+launches_ge() { [ "$(nlaunch)" -ge "$1" ]; }
+file_has() { grep -Eq -- "$2" "$1" 2>/dev/null; }
+
+# R11. The REAL seat self-recycle under the wrapper: launch 1 is the seat and runs the real recycle script
+#      from inside itself (a tab would be a failure: the terminal is forbidden). The call returns at once
+#      and PRINTS the log path; a detached copy outside the old claude's tree and session then does the
+#      in-place hand-off, SIGTERMs only the old claude, and the fresh one starts under the SAME wrapper.
+#      The seat runs on account 2: the copy must hand that account on (a dropped account would launch the
+#      fresh seat on the default account with CLAUDE_CONFIG_DIR unset).
+sandbox; n=$(nameFor R11)
+acct="$SB/home/.claude-acct2"; mkdir -p "$acct"; echo '{}' > "$acct/.credentials.json"
+printf self-recycle > "$SB/stub/mode.1"; printf term-trap > "$SB/stub/mode.2"
+start_wrapper "$n" "SELF_RECYCLE_CMD=bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n go --model haiku" \
+  FAKE_TERM_MODE=forbid RECYCLE_DETACH_DELAY=4 CLAUDE_CONFIG_DIR="$acct"
+W11=$WPID; OLD="$(launch_pid 1)"
+wait_for "the seat's recycle call to return" file_has "$SB/stub/self.out" 'log:'
+logp="$(sed -n 's/.*log: //p' "$SB/stub/self.out" | head -1)"
+has "R11 the printed log is in the state dir" "$SB/state" "$logp"
+wait_for "the detached copy" have_copy "$n"
+copy="$(detached_copies "$n" | head -1)"
+hasnt "R11 the copy is not below the old claude" " $OLD " " $(ppid_chain "$copy" | tr '\n' ' ') "
+ne "R11 the copy has its own session" "$(sid_of "$OLD")" "$(sid_of "$copy")"
+alive "$OLD" && ok || bad "R11 the delay has not run out: the old claude is still up"
+wait_for "the fresh claude" launches_ge 2
+eq "R11 the fresh claude is a child of the SAME wrapper" "$W11" "$(launch_ppid 2)"
+wait_for "old claude gone" not_alive "$OLD"
+eq "R11 the old claude was SIGTERMed" "TERM" "$(cat "$SB/stub/sigterm.$OLD" 2>/dev/null)"
+alive "$W11" && ok || bad "R11 the wrapper was never signalled"
+last_arg_is 2 go && ok || bad "R11 the prompt reached the fresh claude"
+absent "R11 hand-off consumed" "$SB/state/$n.next"; absent "R11 no tab" "$SB/TERM-WAS-CALLED"
+eq "R11 the seat itself runs on the account" "$acct" "$(launch_cfg 1)"
+eq "R11 the fresh launch carries the seat's account" "$acct" "$(launch_cfg 2)"
+wait_for "the copy's summary in the printed log" file_has "$logp" 'fresh .*mode: in-place'
+has "R11 the copy's summary names the inherited account" "$acct" "$(cat "$logp")"
+
+# R12. A copy that cannot leave the old claude's tree falls back to the new tab. The old claude is a child
+#      SUBREAPER (it adopts every orphan below it), so the detached copy is reparented INTO its tree. After
+#      RECYCLE_DETACH_WAIT the copy gives up on in-place and uses launch-first-then-kill, which survives
+#      losing the parent chain. The outcome alone cannot tell the paths apart (an in-place attempt kills
+#      the old claude first, then falls back to a tab anyway), so the old claude records whether the tab
+#      already existed when its SIGTERM landed.
+sandbox; n=$(nameFor R12); d="$SB/subreaper"; mkdir -p "$d"
+cat > "$d/subreaper.py" <<EOF_PY
+import ctypes, os
+ctypes.CDLL(None).prctl(36, 1, 0, 0, 0)
+os.execv("/bin/bash", ["claude --name $n x", "$d/child.sh"])
+EOF_PY
+cat > "$d/child.sh" <<EOF_SH
+trap 'if [ -e $SB/fake-term.args ]; then echo tab-first; else echo term-first; fi > $SB/sub.term; exit 0' TERM
+bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n go --model haiku > $SB/sub.out 2>&1
+sleep 120 & wait \$!
+EOF_SH
+stand_in_wrapper "$n" "$n" "exec python3 $d/subreaper.py" STUB_MODE=term-trap RECYCLE_DETACH_WAIT=2 RECYCLE_DETACH_DELAY=0
+wait_for "the old claude's SIGTERM record" test -f "$SB/sub.term"
+eq "R12 the tab existed before the old claude was signalled" "tab-first" "$(cat "$SB/sub.term")"
+has "R12 the new tab runs the WRAPPER" "sibling-shell.sh" "$(cat "$SB/fake-term.args")"
+logp="$(sed -n 's/.*log: //p' "$SB/sub.out" | head -1)"
+wait_for "the copy's note" file_has "$logp" 'still inside .*falling back to a new tab'
+rematch "R12 the copy says it fell back" 'still inside .*falling back to a new tab' "$(cat "$logp")"
+rematch "R12 the copy's summary says new-tab" 'mode: new-tab' "$(cat "$logp")"
+
+# R13. The copy waits out the window in which its launcher is still alive, then stays in place (no spurious
+#      new tab). `setsid -f` normally orphans the copy within milliseconds, but until the launching script
+#      has exited the copy IS inside the old claude's tree. A setsid shim that keeps the script alive for
+#      1.5 s widens that window: a copy that checked once and gave up would open a tab here.
+sandbox; n=$(nameFor R13)
+printf '%s\n' '#!/usr/bin/env bash' '[ "${1:-}" != -f ] || shift' '"$@" &' 'sleep 1.5' > "$SB/bin/setsid"; chmod +x "$SB/bin/setsid"
+printf self-recycle > "$SB/stub/mode.1"; printf term-trap > "$SB/stub/mode.2"
+start_wrapper "$n" "SELF_RECYCLE_CMD=bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n go --model haiku" \
+  FAKE_TERM_MODE=forbid RECYCLE_DETACH_DELAY=0
+W13=$WPID
+wait_for "the fresh claude" launches_ge 2
+eq "R13 the fresh claude is a child of the SAME wrapper" "$W13" "$(launch_ppid 2)"
+absent "R13 no spurious tab" "$SB/TERM-WAS-CALLED"
+logp="$(sed -n 's/.*log: //p' "$SB/stub/self.out" | head -1)"
+wait_for "the copy's summary" file_has "$logp" 'fresh .*mode: in-place'
+renomatch "R13 the copy never fell back" 'falling back' "$(cat "$logp")"
+
+# R14. No `setsid` (macOS): a self-recycle uses the new tab, not a half-detach, and says why. A PATH holding
+#      every tool the script needs EXCEPT setsid; the old claude is under the wrapper and the script runs
+#      inside it, so the missing setsid alone separates detach from new-tab.
+sandbox; n=$(nameFor R14); tools="$SB/tools-no-setsid"; mkdir -p "$tools"
+for t in bash env sleep pgrep awk tr sed head wc dirname basename mkdir cat date sort grep uname id cut readlink ps base64 mv rm; do
+  tp="$(command -v "$t" 2>/dev/null || true)"; [ -z "$tp" ] || ln -s "$tp" "$tools/$t"
+done
+ln -s "$SB/bin/xterm" "$tools/xterm"
+[ ! -e "$tools/setsid" ] && ok || bad "R14 setsid must be absent from the test PATH"
+stand_in_wrapper "$n" "$n" "bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n > $SB/nosetsid.out 2> $SB/nosetsid.err
+sleep 120" DRY_RUN=1 FAKE_TERM_MODE=forbid PATH="$tools"
+wait_for "recycle output without setsid" file_has "$SB/nosetsid.out" '^mode:'
+rematch "R14 new-tab" '^mode: new-tab$' "$(cat "$SB/nosetsid.out")"
+rematch "R14 no detach" '^detach: no$' "$(cat "$SB/nosetsid.out")"
+rematch "R14 says setsid is missing" 'setsid is missing' "$(cat "$SB/nosetsid.err")"
+
+# R15. Fork guard: a detached copy (RECYCLE_DETACHED set) never detaches again. One still inside the old
+#      claude's tree and detaching AGAIN would respawn itself without end; DRY_RUN never forks, so the
+#      decision is read without risking that: the copy must say detach: no and fall back to new-tab.
+sandbox; n=$(nameFor R15)
+stand_in_wrapper "$n" "$n" "bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n > $SB/copy.out 2> $SB/copy.err
+sleep 120" DRY_RUN=1 FAKE_TERM_MODE=forbid RECYCLE_DETACHED=1 RECYCLE_DETACH_WAIT=1
+wait_for "the copy's decision" file_has "$SB/copy.out" '^mode:'
+rematch "R15 new-tab" '^mode: new-tab$' "$(cat "$SB/copy.out")"
+rematch "R15 no detach" '^detach: no$' "$(cat "$SB/copy.out")"
+rematch "R15 says it is still inside" 'still inside' "$(cat "$SB/copy.err")"
+renomatch "R15 did not detach again" 'detaching a copy' "$(cat "$SB/copy.err")"
+
+# R16. A self-recycle whose old claude is NOT under the wrapper stays new-tab with no detach: nothing would
+#      relaunch it in place. Same ancestry as R8 (the script runs inside the claude it targets), but the
+#      claude's parent is an ordinary shell, not a sibling-shell.sh <Name>.
+sandbox; n=$(nameFor R16); d="$SB/no-wrapper"; mkdir -p "$d"
+printf '%s\n' "bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n > $SB/nw.out 2> $SB/nw.err" "sleep 120" > "$d/child.sh"
+words=(); while IFS= read -r w; do words+=("$w"); done < <(sbenv DRY_RUN=1 FAKE_TERM_MODE=forbid)
+env -u CLAUDE_CONFIG_DIR "${words[@]}" bash -c "exec -a 'claude --name $n x' bash $d/child.sh" </dev/null >/dev/null 2>&1 &
+LP=$!; disown "$LP"; PIDS+=("$LP")
+wait_for "recycle output from an unwrapped claude" file_has "$SB/nw.out" '^mode:'
+rematch "R16 new-tab" '^mode: new-tab$' "$(cat "$SB/nw.out")"
+rematch "R16 no detach" '^detach: no$' "$(cat "$SB/nw.out")"
+renomatch "R16 no detach note" 'detach' "$(cat "$SB/nw.err")"
 
 finish

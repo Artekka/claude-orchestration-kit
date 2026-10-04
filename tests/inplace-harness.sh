@@ -59,11 +59,13 @@ stage() { mkdir -p $SIBLING_STATE_DIR; cp $1 $SIBLING_STATE_DIR/$2.next.tmp && m
 # goes back to the file after `main` returns would find EOF and look immune.
 [ -n "${STUB_REWRITE:-}" ] && { yes "" | head -n 20000; echo "echo HIJACKED >&2"; } > $STUB_REWRITE
 case " ${STUB_SLOW:-} " in *" $n "*) sleep ${STUB_SLOW_SECS:-1.3} ;; esac
+[ -f $d/mode.$n ] && STUB_MODE=$(cat $d/mode.$n)   # a per-launch mode beats STUB_MODE
 case "${STUB_MODE:-exit}" in
   exit) exit "${STUB_EXIT:-0}" ;;
   term-trap) exec -a "claude $*" bash $d/holder-term.sh ;;
   ignore-term) exec -a "claude $*" bash $d/holder-ignore.sh ;;
   term-decoy) exec -a "claude $*" bash $d/holder-decoy.sh "$2" ;;
+  self-recycle) exec -a "claude $*" bash $d/holder-self.sh ;;
 esac
 STUB
   chmod +x "$SB/bin/claude"
@@ -71,6 +73,12 @@ STUB
   # `claude --name <Name>` that is NOT a child of the wrapper (setsid: parent = init) and ignores TERM.
   printf '%s\n' "trap 'echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" 'while :; do sleep 0.2; done' > "$SB/stub/holder-term.sh"
   printf '%s\n' "trap '' TERM" 'while :; do sleep 0.2; done' > "$SB/stub/holder-ignore.sh"
+  # self-recycle is the seat: it runs the recycle script the way the seat's shell tool does (one
+  # `bash -c` layer; the trailing `; true` keeps that layer from exec-ing the script), then holds like
+  # term-trap so the SIGTERM it receives is recorded. SELF_RECYCLE_CMD is the full command line.
+  printf '%s\n' "trap 'echo TERM >> \$STUB_DIR/sigterm.\$\$; exit 0' TERM" \
+    'bash -c "$SELF_RECYCLE_CMD > $STUB_DIR/self.out 2> $STUB_DIR/self.err; true"' \
+    'while :; do sleep 0.2; done' > "$SB/stub/holder-self.sh"
   cat > "$SB/stub/holder-decoy.sh" <<'HOLD'
 trap 'setsid bash -c "exec -a \"claude --name \$0 decoy\" sleep 120" $1 </dev/null >/dev/null 2>&1 & echo $! >> $STUB_DIR/decoy.pids' TERM
 while :; do sleep 0.2; done
