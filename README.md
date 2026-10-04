@@ -154,8 +154,10 @@ recycle, `recycle-sibling.sh <Name>` leaves the wrapper a small hand-off file (m
 `~/.orchestration-kit/sessions/`, SIGTERMs only the old `claude`, and the wrapper starts the fresh one in the same tab. Same tab, no
 stray windows, and nothing the old context held is lost, because a recycle only runs after the session replied "retro complete".
 It opens a new tab instead (running the wrapper, so that session recycles in place next time) when there is no old process, the old
-one was started by hand, you pass `--new-tab`, the seat is recycling itself from its own shell, or the in-place attempt times out
-(60 s; `RECYCLE_INPLACE_TIMEOUT`). `--dry-run` prints `mode: in-place` or `mode: new-tab`. `LAUNCH_NO_WRAPPER=1` opens tabs with a bare
+one was started by hand, you pass `--new-tab`, the machine has no `setsid` (macOS) and the seat is recycling itself, or the in-place
+attempt times out (60 s; `RECYCLE_INPLACE_TIMEOUT`). The seat can recycle itself in place: the script prints a log path
+(`~/.orchestration-kit/sessions/<Name>.recycle.log`), hands the work to a detached copy of itself and exits, and the copy ends the seat's
+session about 2 s later (`RECYCLE_DETACH_DELAY`) so the seat's last command finishes first. `--dry-run` prints `mode: in-place` or `mode: new-tab`, and `detach: yes|no` for a self-recycle. `LAUNCH_NO_WRAPPER=1` opens tabs with a bare
 `claude` as before.
 
 **What is tested where.** The in-place path reads the process tree, so it needs `pgrep`: it is tested on Linux (and WSL), including
