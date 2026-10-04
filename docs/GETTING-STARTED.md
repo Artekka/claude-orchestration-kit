@@ -251,9 +251,12 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
 2. The seat tells that sibling to retro. The sibling saves lessons, updates the board,
    commits, and replies **"retro complete"**.
 3. The seat runs `bash scripts/recycle-sibling.sh Sib1 --model 'sonnet[1m]'` (the model for
-   that lane; see "Model per lane" below): a **new window** opens with a fresh
-   Sib1, and only then is the old one closed. It opens the same way `start-team.sh` does on
-   your machine (Windows Terminal, Terminal/iTerm2, your Linux emulator, or a tmux window).
+   that lane; see "Model per lane" below): the fresh session starts **in the same tab**, because every
+   tab the kit opens runs a small respawn wrapper (`scripts/sibling-shell.sh`). A session you
+   started by hand has no wrapper, so its first recycle opens a **new window** (the way
+   `start-team.sh` does on your machine: Windows Terminal, Terminal/iTerm2, your Linux emulator or a
+   tmux window) running one, and closes the old one only after the fresh one is up. `--dry-run`
+   prints `mode: in-place` or `mode: new-tab`; `--new-tab` forces the new window.
 4. The seat recycles itself the same way after writing a handover note on the board. If the
    script can't run, the seat asks you to close that window and relaunch it with
    `claude --name <Name> --model <model> /orchestration-kit:orient` (siblings) or

@@ -19,10 +19,39 @@ count() {  # <label> <want N> <needle> <got> — occurrences of a fixed string
   local n; n="$(printf '%s\n' "$4" | grep -oF -- "$3" | wc -l | tr -d ' ')"
   if [ "$n" = "$2" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL $1: want $2x '$3', got ${n}x in: $4"; fi
 }
-rs() { HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$ROOT" "$@" 2>&1; }
+# Every invocation of the scripts under test goes through lrun, and nothing else (the R0 census below
+# fails if a call site bypasses it). lrun is a SANDBOX: HOME is the temp dir; the host is made to look like
+# WSL with a wt.exe that is an empty FILE we own (WT_EXE), not the Windows Terminal the probe would find
+# through cmd.exe's %USERNAME%; and every real Windows/macOS/tmux tool the launcher could execute is
+# shadowed on PATH by a stand-in that records REAL-TOOL-CALLED and exits 99 (R0 (d) fails if one ran).
+FAKE_WT="$TMP/fake-wt.exe"; : > "$FAKE_WT"
+STUBS="$TMP/real-tool-stubs"; mkdir -p "$STUBS"
+for t in wt.exe powershell.exe cmd.exe osascript tmux; do
+  printf '#!/usr/bin/env bash\necho "%s $*" >> "%s"\nexit 99\n' "$t" "$TMP/REAL-TOOL-CALLED" > "$STUBS/$t"; chmod +x "$STUBS/$t"
+done
+lrun() { env HOME="$TMP" WSL_DISTRO_NAME=TestDistro WSL_INTEROP= TMUX= "WT_EXE=$FAKE_WT" "PATH=$STUBS:$PATH" "$@"; }
+rs() { lrun bash "$RS" --dry-run --terminal manual --repo "$ROOT" "$@" 2>&1; }
 # Unique names: start-team SKIPS a name that is already running, and a developer running this suite
 # is usually inside a session called Orca / Sib1.
-st() { HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$ROOT" --seat ZzSeat --prefix ZzSib "$@" 2>&1; }
+st() { lrun bash "$ST" --dry-run --terminal manual --repo "$ROOT" --seat ZzSeat --prefix ZzSib "$@" 2>&1; }
+
+# R0. ISOLATION tripwire (the same hole as tests/recycle-inplace.test.sh R0, 2026-10-03). The WSL backends
+#     probe the host for wt.exe / powershell.exe / cmd.exe, so run with the REAL environment a case reaches
+#     the real Windows tools; only --dry-run stood between this file and a real window. Everything runs
+#     through lrun, which must give the scripts a sandbox, and this block proves it. DRY-RUN only.
+SELF="${LEAN_LAUNCH_SELF:-$0}"
+# (a) census: no call site of the scripts under test bypasses lrun (a guard that lists its call sites is
+#     blind to a new one, so this reads the file's own text for the pattern instead of naming cases)
+bypass="$(grep -nE 'bash "\$(RS|ST|tool)"' "$SELF" | grep -v 'lrun bash' | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
+if [ -z "$bypass" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL R0 census: call sites that bypass lrun: $bypass"; fi
+# (b) a forced wsl-wt dry run resolves to the sandbox's fake wt.exe and distro, and names no Windows path
+wt_out="$(lrun bash "$RS" --dry-run --terminal wsl-wt --repo "$ROOT" ZzNone 2>&1)"
+has "R0 wsl-wt dry run: the wt.exe is the sandbox's fake file" "wt.exe     $FAKE_WT" "$wt_out"
+has "R0 wsl-wt dry run: the sandbox distro" "distro     TestDistro" "$wt_out"
+hasnt "R0 wsl-wt dry run: no real Windows path (/mnt/c)" "/mnt/c/" "$wt_out"
+# (c) the path the WSL probe itself resolves is the fake file, not one derived from cmd.exe's %USERNAME%
+probe="$(lrun bash -c '. "$1"; _launch_wsl_probe >/dev/null 2>&1; printf %s "${LAUNCH_WT:-}"' _ "$ROOT/scripts/lib-launch.sh")"
+if [ "$probe" = "$FAKE_WT" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL R0 the WSL probe resolved '$probe', want the fake $FAKE_WT"; fi
 
 # 1. Default: a model is ALWAYS passed; effort only when given.
 out="$(rs ZzNone)"
@@ -45,7 +74,7 @@ has "mode flag and model flag coexist" '--permission-mode auto --model sonnet\[1
 # A lean-start prompt (`orient --brief <ROW>`) passes launch validation on a POSIX and a WSL backend
 # and reaches the command intact.
 for b in manual wsl-wt; do
-  out="$(HOME="$TMP" bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' ZzNone "/orchestration-kit:orient --brief ROW-12" 2>&1; echo "rc=$?")"
+  out="$(lrun bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' ZzNone "/orchestration-kit:orient --brief ROW-12" 2>&1; echo "rc=$?")"
   has "brief prompt accepted on $b" "orient\\ --brief\\ ROW-12" "$out"
   has "brief prompt exits 0 on $b" "rc=0" "$out"
 done
@@ -97,8 +126,8 @@ count "start-team default: 3 windows carry the default model" 3 '--model opus\[1
 backends="tmux tmux-detached wsl-wt wsl-conhost macos-iterm macos-terminal gitbash-cmd linux-gnome-terminal linux-konsole linux-xfce4-terminal linux-kitty linux-alacritty linux-wezterm linux-foot linux-xterm linux-x-terminal-emulator"
 for b in $backends; do
   for tool in rs st; do
-    if [ "$tool" = rs ]; then out="$(HOME="$TMP" bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' --effort high ZzNone 2>&1)"
-    else out="$(HOME="$TMP" bash "$ST" --dry-run --terminal "$b" --repo "$ROOT" --seat ZzSeat --prefix ZzSib --siblings 1 --model 'sonnet[1m]' --effort high 2>&1)"; fi
+    if [ "$tool" = rs ]; then out="$(lrun bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' --effort high ZzNone 2>&1)"
+    else out="$(lrun bash "$ST" --dry-run --terminal "$b" --repo "$ROOT" --seat ZzSeat --prefix ZzSib --siblings 1 --model 'sonnet[1m]' --effort high 2>&1)"; fi
     case "$out" in
       *'--model sonnet\[1m\] --effort high'*|*'--model sonnet[1m] --effort high'*) pass=$((pass+1)) ;;  # posix-quoted | cmd.exe (unquoted)
       *) fail=$((fail+1)); echo "FAIL backend $b ($tool): model/effort missing from the launch command: $out" ;;
@@ -110,26 +139,26 @@ done
 #    ignored with a warning (the same leniency as permission_mode) and the built-in default stands.
 R="$TMP/repo"; mkdir -p "$R/docs/orchestration"
 printf 'team:\n  seat: Orca\n  model: sonnet[1m]\n  effort: medium\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
 has "team block model" "model      sonnet[1m] (team block)" "$out"
 has "team block effort" "effort     medium (team block)" "$out"
 has "team block reaches the command" '--model sonnet\[1m\] --effort medium' "$out"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1)"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1)"
 has "flag beats the team block" "model      haiku (--model)" "$out"
 # (ORCA106-5b, seat ruling) A bad block value is REFUSED, exit 64, not ignored: warning and quietly
 # launching on the default model is the silent-wrong-model failure the block exists to prevent.
 printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
 has "bad team model refused rc 64" "rc=64" "$out"
 has "bad team model says why" "team block: model 'not;a;model' is not valid" "$out"
 hasnt "bad team model prints no command" "claude --name" "$out"
 printf 'team:\n  effort: ultra\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
 has "bad team effort refused rc 64" "rc=64" "$out"
 has "bad team effort says why" "team block: effort 'ultra' is not valid" "$out"
 # The block is read (and refused) before flags apply, so a broken file is fixed, not routed around.
 printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
-out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1; echo "rc=$?")"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1; echo "rc=$?")"
 has "a valid --model does not route around a broken team block" "rc=64" "$out"
 
 # 8. (ORCA106-5b F1) A model value must look like a model, not a flag. A flag-shaped value would be
@@ -154,19 +183,19 @@ done
 # swallowed into a warning plus a silent default either. Both scripts.
 for bad in '--effort' '--dangerously-skip-permissions' '-x' '.'; do
   printf 'team:\n  model: %s\n' "$bad" > "$R/docs/orchestration/ORCHESTRATION.md"
-  out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+  out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
   has "F1 recycle-sibling team block model '$bad' refused rc 64" "rc=64" "$out"
   has "F1 recycle-sibling team block model '$bad' says why" "team block: model '$bad' is not valid" "$out"
   hasnt "F1 recycle-sibling team block model '$bad' prints no command" "claude --name" "$out"
-  out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"
+  out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"
   has "F1 start-team team block model '$bad' refused rc 64" "rc=64" "$out"
   has "F1 start-team team block model '$bad' says why" "team block: model '$bad' is not valid" "$out"
   hasnt "F1 start-team team block model '$bad' prints no command" "claude --name" "$out"
 done
 printf 'team:\n  effort: --dangerously-skip-permissions\n' > "$R/docs/orchestration/ORCHESTRATION.md"
 for tool in rs st; do
-  if [ "$tool" = rs ]; then out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
-  else out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"; fi
+  if [ "$tool" = rs ]; then out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+  else out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 2>&1; echo "rc=$?")"; fi
   has "F1 $tool team block flag-shaped effort refused rc 64" "rc=64" "$out"
   has "F1 $tool team block flag-shaped effort says why" "team block: effort '--dangerously-skip-permissions' is not valid" "$out"
   hasnt "F1 $tool team block flag-shaped effort prints no command" "claude --name" "$out"
@@ -210,7 +239,7 @@ has "launch_check_args accepts a normal name + slash prompt" "ok" "$out"
 # swallow it with a misleading "unknown flag: --help").
 for tool in "$RS" "$ST"; do
   for h in -h --help; do
-    out="$(HOME="$TMP" bash "$tool" "$h" 2>&1; echo "rc=$?")"
+    out="$(lrun bash "$tool" "$h" 2>&1; echo "rc=$?")"
     has "$(basename "$tool") $h prints the usage" "Usage:" "$out"
     hasnt "$(basename "$tool") $h is not an unknown flag" "unknown" "$out"
   done
@@ -241,11 +270,14 @@ done
 printf 'team:\n  model: sonnet[1m]\n  effort: medium\n' > "$R/docs/orchestration/ORCHESTRATION.md"
 for tool in rs st; do
   for flag in model effort; do
-    if [ "$tool" = rs ]; then out="$(HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$R" "--$flag=" ZzNone 2>&1; echo "rc=$?")"
-    else out="$(HOME="$TMP" bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 "--$flag=" 2>&1; echo "rc=$?")"; fi
+    if [ "$tool" = rs ]; then out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" "--$flag=" ZzNone 2>&1; echo "rc=$?")"
+    else out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --seat ZzSeat --prefix ZzSib --siblings 1 "--$flag=" 2>&1; echo "rc=$?")"; fi
     has "F2 $tool empty --$flag does not fall through to the team block" "rc=64" "$out"
   done
 done
+
+# R0 (d): no stand-in for a real tool (wt.exe, powershell.exe, cmd.exe, osascript, tmux) was ever executed
+if [ -e "$TMP/REAL-TOOL-CALLED" ]; then fail=$((fail+1)); echo "FAIL R0 a real-tool stand-in was executed: $(cat "$TMP/REAL-TOOL-CALLED")"; else pass=$((pass+1)); fi
 
 echo "lean-launch: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
