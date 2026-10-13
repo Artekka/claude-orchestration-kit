@@ -32,6 +32,9 @@ SECTIONS=(
 )
 # Paths a "verify at merge" section may name before the parallel items land (remove entries at reconcile).
 PENDING=(
+  skills/assemble-train/SKILL.md
+  skills/audit-train/SKILL.md
+  extras/status-hud/README.md
 )
 # Team-block keys the guide must explain AND templates/ORCHESTRATION.md must define.
 KEYS=(worktrees git_guard ctx_guard context_window gate_slots permission_mode model effort terminal)
@@ -47,7 +50,7 @@ if [ -f "$MD" ] && [ -f "$HTML" ]; then
   hits="$(grep -n -i -E "$priv" "$MD" "$HTML" | head -5)"
   [ -z "$hits" ] && ok || bad "private strings in the guide: $hits"
   # US English (the kit's own text is US): the usual British spellings, none allowed.
-  brit="$(grep -n -i -E '\b(colour|behaviour|favour|centre|grey|defence|honour|licence|organis|analys(e|ing)\b|cancelled|labelled|modelled|catalogue)' "$MD" "$HTML" | head -3)"
+  brit="$(sed 's/aria-labelledby//g' "$MD" "$HTML" | grep -n -i -E '\b(colour|behaviour|favour|centre|grey|defence|honour|licence|organis|analys(e|ing)\b|cancelled|labelled|modelled|catalogue)' | head -3)"
   [ -z "$brit" ] && ok || bad "British spelling: $brit"
 fi
 [ -f "$MD" ] && [ -f "$HTML" ] || { echo "RESULT pass=$pass fail=$fail"; exit 1; }
@@ -143,6 +146,14 @@ for tok in re.findall(r"`([^`\n]+)`", t):
     m = re.match(r"^((?:scripts|skills|hooks|templates|docs|tests|extras|agents)/[A-Za-z0-9_./-]+)$", tok)
     if not m or "<" in tok: continue
     p = m.group(1).rstrip("/.")
+    if p.startswith("docs/orchestration/"):
+        # the CONSUMING repo's layout: not a kit file, but the kit must install/name it
+        base = os.path.basename(p)
+        found = any(base in open(os.path.join(d, f), encoding="utf8", errors="ignore").read()
+                    for top in ("skills", "scripts", "templates", "hooks")
+                    for d, _, fs in os.walk(os.path.join(root, top)) for f in fs)
+        if not found: print("UNKNOWN-CONSUMER-PATH " + p)
+        continue
     if p in seen: continue
     seen.add(p)
     if not os.path.exists(os.path.join(root, p)) and p not in pending:
@@ -153,10 +164,10 @@ for l in re.findall(r"\]\(([^)#\s]+)(?:#[^)]*)?\)", t):
 print(f"PATHS {len(seen)}")
 PY
 )"
-echo "$drift" | grep -q '^MISSING-PATH\|^BROKEN-LINK' && bad "$(echo "$drift" | grep '^MISSING-PATH\|^BROKEN-LINK' | tr '\n' ' ')" || ok
+echo "$drift" | grep -q '^MISSING-PATH\|^BROKEN-LINK\|^UNKNOWN-CONSUMER' && bad "$(echo "$drift" | grep '^MISSING-PATH\|^BROKEN-LINK\|^UNKNOWN-CONSUMER' | tr '\n' ' ')" || ok
 n="$(echo "$drift" | sed -n 's/^PATHS //p')"; [ "${n:-0}" -ge 12 ] && ok || bad "doc-drift scan saw only ${n:-0} paths (expected 12+): the guide names too few kit files, or the scan is blind"
 for k in "${KEYS[@]}"; do
-  grep -q -E "^[[:space:]]+$k:" "$ROOT/templates/ORCHESTRATION.md" && ok || bad "key '$k' is not in templates/ORCHESTRATION.md's team block"
+  grep -q -E "^[[:space:]]+$k:|\`$k\`" "$ROOT/templates/ORCHESTRATION.md" && ok || bad "key '$k' is not defined in templates/ORCHESTRATION.md"
   grep -q -F "\`$k\`" "$MD" && ok || bad "HOW-IT-WORKS.md never names the knob \`$k\`"
 done
 
@@ -172,6 +183,30 @@ else
 fi
 # the worked example's hook is opt-in (the .kit-hooks marker), never a default
 grep -q '\.kit-hooks' "$MD" && ok || bad "the guide never mentions the opt-in .kit-hooks marker"
+
+# ---- (g) the worked example hook really works: deny a push to main, silent otherwise, opt-in -----
+ex="$(python3 - "$MD" <<'PY'
+import re, sys
+t = open(sys.argv[1], encoding="utf8").read()
+m = re.search(r"^### Add your own rule, skill or hook\n(.*?)(?=^##|\Z)", t, re.S | re.M)
+b = re.search(r"```bash\n(.*?)```", m.group(1), re.S) if m else None
+print(b.group(1) if b else "", end="")
+PY
+)"
+if [ -z "$ex" ]; then bad "(g) no bash example found"; else
+  TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+  printf '%s\n' "$ex" > "$TMP/hook.sh"
+  git -C "$TMP" init -q repo 2>/dev/null
+  runhook() { printf '{"tool_input":{"command":"%s"}}' "$1" | (cd "$TMP/repo" && bash "$TMP/hook.sh") 2>&1; }
+  out="$(runhook 'git push origin main')"; echo "$out" | grep -q '"permissionDecision":"deny"' && bad "(g) denied without the opt-in marker" || ok
+  mkdir -p "$TMP/repo/docs/orchestration" && : > "$TMP/repo/docs/orchestration/.kit-hooks"
+  for c in 'git push origin main' 'git push -u origin main' 'git push origin HEAD:main'; do
+    out="$(runhook "$c")"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) did not deny: $c"
+  done
+  for c in 'git push origin feature-x' 'git push origin feat/main-menu' 'git status' 'echo maintain'; do
+    out="$(runhook "$c")"; [ -z "$out" ] && ok || bad "(g) blocked a harmless command: $c -> $out"
+  done
+fi
 
 echo "RESULT pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
