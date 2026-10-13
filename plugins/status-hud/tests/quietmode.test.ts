@@ -85,3 +85,10 @@ test('the press notes say plainly what quiet mode does and how to undo it', () =
   expect(on).toContain('Press again')
   expect(quietNote(false)).toContain('start normally')
 })
+
+test('with nothing on stdout the detail falls back to the first stderr line (a missing script says so on stderr)', async () => {
+  const f = fakeIo({ runs: () => ({ exitCode: 127, stdout: '', stderr: '\nbash: scripts/quiet-mode.sh: No such file or directory\nmore' }) })
+  expect((await toggleQuietMode(f.io, withCmds, false)).detail).toBe('exit 127: bash: scripts/quiet-mode.sh: No such file or directory')
+  const both = fakeIo({ runs: () => ({ exitCode: 2, stdout: 'out line', stderr: 'err line' }) })
+  expect((await toggleQuietMode(both.io, withCmds, false)).detail).toBe('exit 2: out line')
+})

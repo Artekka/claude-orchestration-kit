@@ -31,6 +31,9 @@ print("ondefault=" + str(u.get("quietModeOnCmd", {}).get("default")))
 PY
 )"
 has "manifest: author is the kit owner" "author=Artekka" "$man"
+S="If you use your own on/off commands, set \`quietModeRequiresFile\` to an empty value to keep the chip."
+has "README: own-commands users are told how to keep the chip" "$S" "$(cat "$HUD/README.md")"
+has "CHANGELOG: own-commands users are told how to keep the chip" "$S" "$(cat "$ROOT/CHANGELOG.md")"
 for k in quietModeFlagFile quietModeStatusCmd quietModeOnCmd quietModeOffCmd quietModeRequiresFile showForNames; do has "manifest: key $k" "$k" "$man"; done
 hasnt "manifest: no gameMode keys" "gameMode" "$man"
 has "manifest: showForNames defaults to the kit's default seat" "seatdefault=Orca" "$man"
@@ -43,6 +46,7 @@ for f in "$HUD/README.md" "$ROOT/README.md" "$ROOT/HOW-IT-WORKS.md" "$ROOT/docs/
   has "$(basename "$f"): chip paragraph heading" "What the WORK/QUIET chip does and when you'll see it" "$t"
   has "$(basename "$f"): chip paragraph says it needs the throttle script" "quiet-mode.sh" "$t"
   has "$(basename "$f"): chip paragraph says a failed press shows" "failed" "$t"
+  has "$(basename "$f"): chip paragraph says no throttle means no chip" "No throttle, no chip" "$t"
 done
 
 # game mode is gone everywhere except the one README line that names the rename

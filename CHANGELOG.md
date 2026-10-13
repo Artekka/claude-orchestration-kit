@@ -6,7 +6,7 @@ Newest first.
 
 The status HUD's WORK/QUIET chip now shows only where it can work, says what it does, and no longer fails silently.
 
-- **Changed: the chip is hidden without the toggle script.** New `quietModeRequiresFile` (default `scripts/quiet-mode.sh`, resolved against the session's directory). A project with no throttle script shows no chip; a chip whose quiet mode is already ON stays so you can turn it off. An empty value always shows the chip.
+- **Changed: the chip is hidden without the toggle script.** New `quietModeRequiresFile` (default `scripts/quiet-mode.sh`, resolved against the session's directory). A project with no throttle script shows no chip; a chip whose quiet mode is already ON stays so you can turn it off. An empty value always shows the chip. If you use your own on/off commands, set `quietModeRequiresFile` to an empty value to keep the chip.
 - **Fixed: a failed press was invisible.** The chip turns red and reads `failed` for 60 seconds (still pressable to retry), and the toast carries `exit N: first output line`.
 - **Added: explanations.** Press toasts say what QUIET/WORK did, the pane shows a caption under the chips, `/hud help` prints it, and README, GETTING-STARTED and the guide page have a paragraph "What the WORK/QUIET chip does and when you'll see it".
 

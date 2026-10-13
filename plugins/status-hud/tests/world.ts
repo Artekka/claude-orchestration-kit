@@ -28,6 +28,8 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
     return { value: { isPlaced: true } }
   })
   const toasts: string[] = []
+  /** Commands (the `sh -c` text) that exit 1 with a stderr line, switchable mid-test. */
+  const failing = new Set<string>()
   on('ui.toast', async (_$, e) => (toasts.push(JSON.stringify(e)), { value: undefined }))
   on('ui.status', async () => ({ value: undefined }))
   on('ui.close', async () => ({ value: undefined }))
@@ -66,9 +68,10 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
       return out('')
     }
     if (script === 'false') return out('', 1)
+    if (failing.has(script)) return { value: { exitCode: 127, stdout: '', stderr: 'bash: g.sh: No such file or directory\nmore', isStdoutTruncated: false, isStderrTruncated: false } }
     if (script.includes('/proc/loadavg')) return out(SAMPLE_OUT)
     if (script.includes('ps -o args=')) return out(`claude --name ${o.name ?? 'Orca'} --model opus::\nCLAUDE_CONFIG_DIR=${o.acct ?? '/home/u/.claude-acct2'}`)
     return out('')
   })
-  return { files, ran, usage, clock, stored, opened, toasts }
+  return { files, ran, usage, clock, stored, opened, toasts, failing }
 }

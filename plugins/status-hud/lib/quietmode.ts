@@ -33,11 +33,13 @@ export async function toggleQuietMode(io: Io, c: Config, current: boolean | null
   if (!canToggle(c)) return { ran: false, wanted, ok: false }
   const r = await io.run(sh(wanted ? c.quietOnCmd : c.quietOffCmd), 30_000)
   if (r.exitCode === 0) return { ran: true, wanted, ok: true }
-  const first = r.stdout.split('\n').map(l => l.trim()).find(l => l !== '')
+  // A missing script or a shell error speaks on stderr; stdout wins when both have something.
+  const firstLine = (t: string): string | undefined => t.split('\n').map(l => l.trim()).find(l => l !== '')
+  const first = firstLine(r.stdout) ?? firstLine(r.stderr ?? '')
   return { ran: true, wanted, ok: false, detail: `exit ${r.exitCode}${first ? `: ${first}` : ''}` }
 }
 
-/** What the chip does, in plain words (the pane caption and /hud help reuse the first sentence). */
+/** What the chip does, in plain words (the pane caption prints all of it, wrapped; /hud help starts with it). */
 export const QUIET_EXPLAIN = 'QUIET holds NEW test/gate runs while you use the machine; running ones finish. WORK lets them start normally. Click the chip to switch.'
 
 /** The toast after a good press. */

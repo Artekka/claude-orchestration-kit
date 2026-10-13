@@ -1,5 +1,5 @@
 /** The few engine calls the HUD makes, behind an interface so tests can run the logic with fakes. */
-export type RunResult = { exitCode: number; stdout: string }
+export type RunResult = { exitCode: number; stdout: string; stderr?: string }
 export type Io = {
   read(path: string): Promise<string | null>
   /** Write via tmp + mv so a reader never sees half a file. */

@@ -69,7 +69,7 @@ function makeIo($: Dollar): Io {
     },
     list: p => $.fs.list(p).then(es => es.filter(x => x.kind === 'file').map(x => ({ name: x.name, mtimeMs: x.mtimeMs })), () => []),
     remove: async p => void (await $.process.run(['rm', '-f', p]).catch(() => undefined)),
-    run: (argv, timeoutMs) => $.process.run(argv, timeoutMs ? { timeoutMs } : {}).then(r => ({ exitCode: r.exitCode, stdout: r.stdout }), () => ({ exitCode: 127, stdout: '' })),
+    run: (argv, timeoutMs) => $.process.run(argv, timeoutMs ? { timeoutMs } : {}).then(r => ({ exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr }), () => ({ exitCode: 127, stdout: '' })),
     now: () => $.clock.now(),
   }
 }
