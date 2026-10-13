@@ -1,4 +1,4 @@
-<!-- orchestration-kit v0.7.0 — managed section; upgrades diff against this marker -->
+<!-- orchestration-kit v0.8.0 — managed section; upgrades diff against this marker -->
 ## Multi-session orchestration (orchestration-kit)
 
 This project runs the multi-session claimable-board workflow from the `orchestration-kit`.

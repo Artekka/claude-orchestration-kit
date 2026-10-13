@@ -31,7 +31,7 @@ Dev1> /orchestration-kit:reconcile Dev1-1
 ```
 
 That's **solo mode**: board + cross-verification, you coordinate. Walkthrough, Windows/macOS/Linux
-notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**. Terms:
+notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**. How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Terms:
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 
 ## Two modes
@@ -54,6 +54,12 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/orient` | session orientation: multi-session non-negotiables, five-bullet state, READY signal to the seat |
 | `skills/board` | claim/update/close rows, per-session prefixes, the shared-checkout write recipe, status-not-narrative + archiving |
 | `skills/verify-feature` | subagent verification — the fallback when no independent sibling session is free |
+| `skills/orient-brief` | `/orchestration-kit:orient-brief <ROW>`: the lean start for a builder: the row's brief and the live seat banner arrive already loaded, then one READY line to the seat |
+| `skills/assemble-train` · `skills/audit-train` | release trains: the seat lands approved rows one merge at a time with a dry run (`trial.sh`, `cptrial.sh`, `gsum.sh`) · a validator sweeps the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error) |
+| `deploy_policy: ask \| auto-when-green` | the Deploy block of `ORCHESTRATION.md`: whether the seat asks you before every deploy (default) or deploys a green, audited train on its own and tells you after |
+| `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`) · quiet mode holds every new run while you use the machine |
+| `plugins/status-hud` | **optional** second plugin (`status-hud@artekka-kits`): a band or pane that shows every session's context fill, model and activity; `kit-init` asks (default: no), `/hud band\|pane\|off\|quiet` switches it. Host meters work on Linux and WSL only |
+| `HOW-IT-WORKS.md` · `docs/how-it-works.html` | the guide to the whole loop: one diagram, one short section per system (what it does, why it exists, which setting changes it), and how to make it your own |
 | `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
 | `skills/reconcile` | land one worktree at a time onto main, push merges immediately, re-prove the gate there |
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
@@ -137,6 +143,10 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.8.0: release trains (`assemble-train`, `audit-train`) and a `deploy_policy` setting (ask or auto-when-green),
+the gate throttle and quiet mode, a session cap (`max_sessions`), non-blocking questions, the lean
+`orient-brief` start, a recycle that refuses while the old session still has live shells, the optional
+status HUD plugin, and a guide to the whole loop: [`HOW-IT-WORKS.md`](HOW-IT-WORKS.md). Details in `CHANGELOG.md`.
 v0.7.0: recycling in place. A recycled session now restarts in the SAME terminal tab (a respawn wrapper, `scripts/sibling-shell.sh`, runs
 every tab the kit opens), with a fresh context, an explicit model and its own account. A session started by hand moves over at
 its next recycle. See "Recycling in place" below.

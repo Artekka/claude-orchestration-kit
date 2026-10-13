@@ -9,6 +9,7 @@ macOS or Linux**. Two paths, in this order:
    verifies and merges for two or more **siblings** (builders), each in its own window.
 
 New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](GLOSSARY.md).
+Want the big picture first? [`HOW-IT-WORKS.md`](../HOW-IT-WORKS.md) explains the whole loop in one diagram (`kit-init` offers it at the end of setup).
 
 ## 0. What you need
 
@@ -207,6 +208,9 @@ page covers it.
 | `/orchestration-kit:orchestrate` | The seat's loop — plans, assigns, verifies, merges, deploys, recycles |
 | `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
 | `/orchestration-kit:board` | Claiming, updating and archiving board rows |
+| `/orchestration-kit:orient-brief` | Lean start for a builder: the row's brief and the seat banner arrive already loaded (`/orchestration-kit:orient-brief <ROW>`) |
+| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Team mode: land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
+| Status HUD (optional plugin) | A band above the prompt showing every session's context fill, model and activity. `kit-init` asks once (default: no); `/hud band`, `/hud pane`, `/hud off`, `/hud quiet` switch it. Host load meters work on Linux and WSL only |
 | `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
 | `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
 | `/orchestration-kit:retro` | Closing a session: lessons saved, board updated, work committed |
@@ -230,11 +234,18 @@ page covers it.
 | Assigns rows so fences never overlap | Report at milestones: claimed → failing test → passing → done |
 | Picks a **different** sibling to verify each finished row | Verify each other's rows when asked (never their own) |
 | Merges rows onto main **one at a time**, runs the gate | Never merge to main, never deploy |
-| Deploys in batches ("wave trains"), keeps the log | Send any question or permission prompt to the seat |
+| Deploys in batches ("wave trains"; `assemble-train` builds one, a validator runs `audit-train` on it), keeps the log | Send any question or permission prompt to the seat |
 | Asks you for decisions and approvals — all in its window | — |
 
 Your job: talk to the seat window. You can ignore the sibling windows — if a sibling needs
 you, the seat says so.
+
+**Deploys:** by default (`deploy_policy: ask` in the Deploy block of `ORCHESTRATION.md`) the seat asks you before
+every deploy. Say "deploy on your own when green" to switch to `auto-when-green`: a train whose rows all passed
+their independent check and whose gate is green ships without a question, and the seat tells you what shipped.
+**Questions:** with `questions: non-blocking` the seat asks in plain text, keeps everything else moving and
+re-asks when you next type; the default `blocking` waits at the prompt. **Session cap:** `max_sessions` in the
+team block warns before a launch would pass the number of sessions your machine can carry.
 
 **Check the sessions can hear each other** (once, after the windows open): in the seat window ask
 *"list the other Claude sessions"*. If it names Sib1, Sib2 … messaging works. If it doesn't,
@@ -331,6 +342,10 @@ and it will make the change for you. For example:
 | "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
 | "turn on the git guard" / "turn off the git guard" | `git_guard:` in the `team:` block; takes effect on the next command |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
+| "deploy on your own when the train is green" / "ask me before deploying" | `deploy_policy: auto-when-green` / `ask` in the Deploy section of `ORCHESTRATION.md` |
+| "ask me questions without blocking" / "go back to blocking questions" | `questions: non-blocking` / `blocking` in `ORCHESTRATION.md` |
+| "cap the team at 6 sessions" | `max_sessions: 6` in the `team:` block |
+| "install the status HUD" / "turn the HUD off" | `claude plugin install status-hud@artekka-kits`, then `/hud off` to hide it |
 | "our tests run with `make check` now" | the Gate section of `docs/orchestration/ORCHESTRATION.md` |
 | "deploy with `npm run release`" | the Deploy section of `ORCHESTRATION.md` |
 | "add a column for reviewer to the board" | `docs/orchestration/AGENT_BOARD.md` layout |

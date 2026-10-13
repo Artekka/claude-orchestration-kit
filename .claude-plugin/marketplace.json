@@ -3,7 +3,7 @@
   "owner": {
     "name": "Artekka"
   },
-  "description": "Artekka's reusable Claude Code kits. This repo is both the marketplace and (currently) its single plugin.",
+  "description": "Artekka's reusable Claude Code kits. This repo is both the marketplace and two plugins: the orchestration kit and the optional status HUD.",
   "plugins": [
     {
       "name": "orchestration-kit",
@@ -15,7 +15,7 @@
         "multi-session",
         "worktree"
       ],
-      "version": "0.7.1"
+      "version": "0.8.0"
     },
     {
       "name": "status-hud",

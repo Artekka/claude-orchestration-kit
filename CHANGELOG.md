@@ -2,6 +2,24 @@
 
 Newest first.
 
+## 0.8.0 — 2026-10-13
+
+The catch-up release: ten days of practice from the project that runs this kit daily, in generic form.
+
+- **New: release trains.** `assemble-train` lands approved rows onto a train branch one merge at a time, with a dry run before each and a full gate per row. `audit-train` is a validator's independent sweep of the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error).
+- **New: `deploy_policy: ask | auto-when-green`** in the Deploy block of `ORCHESTRATION.md` (default `ask`). The seat's deploy step follows it.
+- **New: gate throttle and quiet mode.** `scripts/gate-throttle.sh` runs heavy commands through `gate_slots` machine-wide slots plus a priority slot; `scripts/quiet-mode.sh on|off|status` holds new runs while you use the machine. Tickets carry the waiter's start time, so a reused process id no longer blocks the line.
+- **New: one full gate per tree** and "whole-suite runs go through the throttle", written into the overlay template.
+- **New: session cap.** `max_sessions` in the team block; `start-team.sh` and `recycle-sibling.sh` warn before a launch passes it. It counts processes named `claude`.
+- **New: non-blocking questions.** `questions: blocking | non-blocking`; a permission request is one copy-pastable shell command, never a prose "please approve".
+- **New: `/orchestration-kit:orient-brief <ROW>`**, the lean start: the row's brief and the live seat banner arrive already loaded.
+- **New: evidence dir** (`~/.orchestration-kit/scratch/…`): scratch and READ evidence never live in `/tmp`.
+- **Changed: `recycle-sibling.sh` refuses (exit 3) while the old session still has live shells**; `--force` overrides. The retro reply says `background: none` when it is safe.
+- **Changed: skills load `SendMessage` and `ListAgents` through ToolSearch first**, and the docs gain a requirements list, a platform check and troubleshooting rows.
+- **New, optional: the status HUD** as a second plugin in this marketplace (`status-hud@artekka-kits`): a band or pane above the prompt with every session's context fill, model and activity. `kit-init` asks (default: no); `/hud band|pane|off|quiet` switches it. Host meters work on Linux and WSL only.
+- **New: `HOW-IT-WORKS.md`** (and a self-contained `docs/how-it-works.html`): one diagram of the whole loop, one short section per system, how to make it your own. `kit-init` offers it at the end.
+- **Fixed: the `kit-init` HUD step** no longer says "nothing else was changed" when the install worked and the configure step failed; it says the plugin is installed with defaults and how to configure it.
+
 ## 0.7.1 — 2026-10-13
 
 A bug fix and the first piece of the 0.8.0 catch-up, released early.
