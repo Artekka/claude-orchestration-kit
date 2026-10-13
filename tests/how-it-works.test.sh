@@ -255,7 +255,8 @@ fi
 def="$(sed -n 's/.*LAUNCH_LIVE_RECHECK:-\([0-9.]*\)}.*/\1/p' "$ROOT/scripts/lib-launch.sh" | head -1)"
 [ -n "$def" ] && ok || bad "(j) could not read the LAUNCH_LIVE_RECHECK default from scripts/lib-launch.sh"
 for f in "$MD" "$HTML"; do
-  grep -q 'LAUNCH_LIVE_RECHECK' "$f" && grep -q "default $def)" "$f" && ok || bad "(j) $f must name LAUNCH_LIVE_RECHECK with 'default $def)' (the code's default)"
+  # the knob name and its default in ONE sentence (no period between them), so neither can drift apart
+  grep -qE "LAUNCH_LIVE_RECHECK[^.]*default ${def//./\\.}\)" "$f" && ok || bad "(j) $f must say LAUNCH_LIVE_RECHECK ... (default $def) in one sentence (the code's default)"
 done
 
 # ---- (k) the loop diagram: a stacked variant for narrow screens, and no label sitting on an arrow --
