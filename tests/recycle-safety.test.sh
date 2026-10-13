@@ -81,4 +81,23 @@ wait_for "old claude gone" not_alive "$OLD"
 eq "S5 the old seat was SIGTERMed" "TERM" "$(cat "$SB/stub/sigterm.$OLD" 2>/dev/null)"
 hasnt "S5 the detached copy did not refuse" "still has live shells" "$(cat "$logp" 2>/dev/null)"
 
+# S6. An IDLE session: Claude Code runs the statusline as a short-lived `sh -c` child of claude every few
+#     seconds, so a single look catches one now and then and refused an idle session (exit 3). Here the stand-in
+#     claude keeps a fresh short `sh -c` child alive almost all the time; each lives well under the re-check
+#     interval, so no single shell is there at both looks. `; true` keeps sh from exec'ing sleep (it stays sh).
+sandbox; n=$(nameFor S6)
+( exec -a "claude --name $n x" bash -c 'while :; do sh -c "sleep 0.3; true"; done' ) </dev/null >/dev/null 2>&1 &
+FC=$!; disown "$FC"; PIDS+=("$FC")
+wait_for "fake claude $n" pgrep -f "^claude --name ${n}( |\$)"
+wait_for "its first transient sh" pgrep -P "$FC"
+recycle "${FORBID[@]}" -- --dry-run "$n"
+rematch "S6 transient sh children: live work none" '^live work +none$' "$OUT"
+recycle "${FORBID[@]}" -- "$n"
+ne "S6 a real run does not refuse an idle session" 3 "$RC"
+hasnt "S6 no refusal text" "still has live shells" "$ERR"
+# no bare `pid N` line (a child that exited mid-check printed one, with empty etime and args)
+if printf '%s\n' "$OUT" "$ERR" | grep -Eq '^ *(pid +)?[0-9]+ *$'; then bad "S6 a bare pid line: $(printf '%s\n' "$OUT" "$ERR" | grep -E '^ *(pid +)?[0-9]+ *$')"; else ok; fi
+kill -KILL "$FC" 2>/dev/null; pkill -KILL -P "$FC" 2>/dev/null
+wait_for "fake claude gone" bash -c "! pgrep -f '^claude --name ${n}( |\$)'"
+
 finish
