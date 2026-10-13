@@ -90,17 +90,19 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
        case "$PD" in *status-hud*)
          echo "SKIP status HUD for $WHO: a status HUD already loads there through CLAUDE_CODE_PLUGIN_DIRS (${PD# }); two copies would both draw and the configure step fails. Remove that entry from the settings env, then ask again."
          continue ;; esac
-       if claude plugin install status-hud@artekka-kits --scope project \
-         && printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin; then
-         echo "status HUD installed for $WHO (shown in: ${SEAT:-Orca})"
+       if ! claude plugin install status-hud@artekka-kits --scope project; then
+         echo "status HUD install FAILED for $WHO (claude's own message is above; tell the human)"
+       elif ! printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin; then
+         echo "status HUD installed for $WHO, but configuring it FAILED (claude's own message is above): the plugin is installed and runs with its defaults (shown in every session). Tell the human, and offer to retry: printf '%s' '$VALS' | claude plugin configure status-hud@artekka-kits --values-stdin${CLAUDE_CONFIG_DIR:+ (with CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR)}"
        else
-         echo "status HUD install FAILED for $WHO (claude's own message is above; tell the human, nothing else was changed)"
+         echo "status HUD installed for $WHO (shown in: ${SEAT:-Orca})"
        fi
      done
      unset CLAUDE_CONFIG_DIR
    fi
    ```
    On Yes, commit `.claude/settings.json` if the install changed it (explicit path), and tell the human: "The HUD appears in the seat's window from its next start; `/hud band`, `/hud pane` or `/hud off` switch it, `/hud quiet` toggles quiet mode."
+10. **Offer the tour (last thing, whatever the HUD answer was)** — ask in plain text, one line: "Want the tour? `HOW-IT-WORKS.md` explains the whole loop in one diagram: the seat, the board, builders in their own worktrees, independent checks, trains, and every setting you can change." On Yes, give the link `https://github.com/Artekka/claude-orchestration-kit/blob/main/HOW-IT-WORKS.md` (the same page ships as `docs/how-it-works.html` in the plugin) and summarize the loop in five lines. On No, say it stays linked from the README and `docs/GETTING-STARTED.md`.
 
 ## Rules
 

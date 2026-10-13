@@ -125,6 +125,7 @@ cat > "$TMP/bin/claude" <<'STUB'
 { printf 'CALL dir=%s args=%s\n' "${CLAUDE_CONFIG_DIR:-default}" "$*"
   case "$*" in *--values-stdin*) printf 'STDIN %s\n' "$(cat)";; esac; } >> "$STUB_LOG"
 [ -z "${STUB_FAIL:-}" ] || { echo "stub: refused" >&2; exit 1; }
+case "$*" in *configure*) [ -z "${STUB_FAIL_CONF:-}" ] || { echo "stub: configure refused" >&2; exit 1; };; esac
 STUB
 chmod +x "$TMP/bin/claude"
 runhud() {  # HUD answer → output; the stub's log is in $LOG
@@ -162,6 +163,12 @@ has "HUD Yes: reports what it did" "status HUD" "$out"
 out="$(STUB_FAIL=1 runhud yes)"
 has "HUD Yes, claude fails: says it failed" "FAILED" "$out"
 hasnt "HUD Yes, claude fails: no success line" "status HUD installed" "$out"
+# READ 4b LOW: install ok + configure fails must not claim "nothing was changed": the plugin IS installed
+out="$(STUB_FAIL_CONF=1 runhud yes)"
+has "HUD Yes, configure fails: says configuring failed" "configuring it FAILED" "$out"
+has "HUD Yes, configure fails: says the plugin is installed with defaults" "installed and runs with its defaults" "$out"
+has "HUD Yes, configure fails: says how to retry" "claude plugin configure status-hud@artekka-kits --values-stdin" "$out"
+hasnt "HUD Yes, configure fails: never says nothing was changed" "nothing else was changed" "$out"
 # READ LOW-2: an account that already loads a status HUD through CLAUDE_CODE_PLUGIN_DIRS is explained and skipped
 printf '{ "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/opt/x/claude-status-hud" } }\n' > "$H/.claude-acct2/settings.json"
 out="$(runhud yes)"; calls="$(cat "$LOG")"
