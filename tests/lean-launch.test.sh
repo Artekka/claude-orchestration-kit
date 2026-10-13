@@ -149,7 +149,7 @@ has "team block effort" "effort     medium (team block)" "$out"
 has "team block reaches the command" '--model sonnet\[1m\] --effort medium' "$out"
 out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1)"
 has "flag beats the team block" "model      haiku (--model)" "$out"
-# (ORCA106-5b, seat ruling) A bad block value is REFUSED, exit 64, not ignored: warning and quietly
+# A bad block value is REFUSED, exit 64, not ignored: warning and quietly
 # launching on the default model is the silent-wrong-model failure the block exists to prevent.
 printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
 out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
@@ -165,7 +165,7 @@ printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md
 out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1; echo "rc=$?")"
 has "a valid --model does not route around a broken team block" "rc=64" "$out"
 
-# 8. (ORCA106-5b F1) A model value must look like a model, not a flag. A flag-shaped value would be
+# 8. A model value must look like a model, not a flag. A flag-shaped value would be
 #    spliced into `claude --name N --model <value> ...` and read by claude as ITS OWN flag
 #    (`--model --dangerously-skip-permissions`), so every entry point refuses it with exit 64:
 #    both scripts, both the `--model V` and `--model=V` spellings.
@@ -249,7 +249,7 @@ for tool in "$RS" "$ST"; do
   done
 done
 
-# 9. (ORCA106-5b F2) An EMPTY or MISSING value is a refusal (rc 64), for both flags and both scripts:
+# 9. An EMPTY or MISSING value is a refusal (rc 64), for both flags and both scripts:
 #    `--model`, `--model ''`, `--model=`, same for `--effort`. "Given" is tracked apart from "empty":
 #    an empty value used to read as "not given" and silently launched on the default model.
 for flag in model effort; do

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HOW-IT-WORKS.md and docs/how-it-works.html: the "tour" guide (ORCA171-4c, kit v0.8 item 14).
+# HOW-IT-WORKS.md and docs/how-it-works.html: the "tour" guide (kit v0.8).
 # A guide that drifts from the kit is worse than none, so this pins:
 #   (1) both files exist and are private-free (no project, person, path or account that is not the kit's);
 #   (2) the MD carries ONE Mermaid flowchart of the whole loop;

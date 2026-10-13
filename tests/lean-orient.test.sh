@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for the lean `/orchestration-kit:orient --brief <ROW>` steps and the model-per-lane / recycle
-# wording (ORCA106-5b F3-F5). The lean steps are COMMANDS in a table in skills/orient/SKILL.md; this
+# wording. The lean steps are COMMANDS in a table in skills/orient/SKILL.md; this
 # suite EXTRACTS them from the skill file and runs them against a real fixture, so editing the skill to
 # something broken turns it red (a copy of the command in this file would stay green).
 # Run: bash tests/lean-orient.test.sh      (needs bash, git, awk, python3; no network)
@@ -102,7 +102,7 @@ $board")"
   [ -z "$none" ] && ok || bad "a board without a banner must print nothing: $none"
 fi
 
-# ORCA107-1(b) port: a heading that says `superseded` is never taken for the current banner, so a board
+# a heading that says `superseded` is never taken for the current banner, so a board
 # left with ONLY superseded banner headings prints nothing (no seat), not a stale era's section.
 if [ -n "$board" ]; then
   pipeline="${board#git show origin/main:docs/orchestration/AGENT_BOARD.md | }"
@@ -158,7 +158,7 @@ has "orchestrate keeps the 'small model never writes facts' rule" "The small mod
 # A bare /clear keeps the terminal's OLD model. Scan EVERY shipped .md (templates/memory-starter/ ships
 # into every adopter's memory) plus the launch scripts' and hook's own comment/usage text for the WORD
 # clear (/clear, clear, cleared, clears, clearing; not "clearly") and for /reset and /new.
-# HOW (ORCA106-5d): each ALLOWED phrase is stripped from the line by OCCURRENCE, then the line fails on
+# HOW: each ALLOWED phrase is stripped from the line by OCCURRENCE, then the line fails on
 # any clear-word LEFT. There is deliberately NO line-wide exemption: the orchestrate skill writes whole
 # paragraphs as single ~600-char lines, so a line that is allowed for one phrase must not hide a second,
 # bad one ("Never pre-announce a clear. Tell the human it is safe to clear." was invisible to the 5c guard).
