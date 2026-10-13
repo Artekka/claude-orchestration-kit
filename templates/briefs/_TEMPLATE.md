@@ -43,4 +43,5 @@ The class and command from `ORCHESTRATION.md` → Gate, run from INSIDE the work
 - At RED (the failing guard, with numbers) and at GREEN-FINAL (sha · per-stage counts · falsify
   record · fill from `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>`, window from YOUR env block).
 - Questions and permission prompts → stop and message the seat. No deploy, no merge to main.
+- Blocked (waiting on the seat or on an answer) → also run `bash scripts/hud-flag.sh <YourName> "blocked: <why, a few words>"` so the HUD shows you STUCK; your next tool call lifts it.
 - Scratch and evidence (probes, logs, mutant outputs) → the evidence dir (ORCHESTRATION.md), never `/tmp`.

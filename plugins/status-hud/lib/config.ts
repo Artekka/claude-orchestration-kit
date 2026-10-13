@@ -10,6 +10,16 @@ export type Config = {
   handoverMark: number
   /** Draw a face per session row: 😀 when fresh to 💀 at the hand-over mark. */
   faces: boolean
+  /** What a session row's dot shows: its Claude account (blue/purple) or its project's tab color. */
+  dotMode: 'account' | 'project'
+  /** Items switched off, by id (see README "Items"). */
+  hide: Set<string>
+  /** A shell command whose output lines each become a chip; '' = none. */
+  extraChipsCmd: string
+  /** Busy with no progress for this long = shown as quiet (amber); 0 = off. */
+  quietMs: number
+  /** The kit's runtime dir: the test-run limiter's queue and slots live there. */
+  kitRuntimeDir: string
   flashMs: number
   commitWarnPct: number
   commitCritPct: number
@@ -33,6 +43,11 @@ const num = (v: unknown, d: number, min = 0): number =>
   typeof v === 'number' && Number.isFinite(v) && v >= min ? v : d
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d)
 
+/** Whether a session draws the HUD: listed by name, or by a prefix ending in * ("Atlas*" matches Atlas-BS). */
+export function nameShown(names: readonly string[], name: string): boolean {
+  return names.length === 0 || names.some(n => (n.endsWith('*') ? name.startsWith(n.slice(0, -1)) : n === name))
+}
+
 /** Options arrive typed by the manifest, but a hand-edited settings file can hold anything: clamp, never throw. */
 export function parseConfig(o: PluginOptions, home: string): Config {
   const variant = str(o.variant, 'band')
@@ -43,7 +58,12 @@ export function parseConfig(o: PluginOptions, home: string): Config {
     amberMark: num(o.contextAmberMark, 300_000),
     reportMark: num(o.contextReportMark, 350_000),
     handoverMark: num(o.contextHandoverMark, 400_000, 1),
-    faces: str(o.sessionFaces, 'on') !== 'off',
+    faces: str(o.sessionFaces, 'off') === 'on',
+    dotMode: str(o.dotMode, 'account') === 'project' ? 'project' : 'account',
+    hide: new Set(str(o.hideItems).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)),
+    extraChipsCmd: str(o.extraChipsCmd).trim(),
+    quietMs: num(o.quietMinutes, 20) * 60_000,
+    kitRuntimeDir: (str(o.kitRuntimeDir).trim() || '~/.orchestration-kit/runtime').replace(/^~(?=\/|$)/, home),
     flashMs: num(o.flashSeconds, 6) * 1000,
     commitWarnPct: num(o.commitWarnPct, 85),
     commitCritPct: num(o.commitCritPct, 95),

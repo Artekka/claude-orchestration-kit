@@ -1,7 +1,7 @@
 import type { Host } from '../types'
 import type { Config } from './config'
 import { type Io, sh } from './io'
-import { parseCommit, parseDf, parseGpu, parseHost, parseLoadavg, parseMeminfo, pushHist, sampleScript, sections } from './host'
+import { parseCommit, parseDf, pickDisks, parseGpu, parseHost, parseLoadavg, parseMeminfo, pushHist, sampleScript, sections } from './host'
 
 /** Host readings older than this are re-taken by whichever session notices first. */
 export const HOST_MAX_AGE_MS = 5000
@@ -39,7 +39,7 @@ export async function refreshHost(io: Io, c: Config): Promise<{ ran: boolean; ho
   const token = `${now}-${Math.random().toString(36).slice(2, 10)}`
   await io.writeAtomic(`${lock}/owner`, `${token} ${now}`)
   try {
-    const out = await io.run(sh(sampleScript(c.mounts)), SAMPLER_TIMEOUT_MS)
+    const out = await io.run(sh(sampleScript(c.mounts, c.extraChipsCmd, c.kitRuntimeDir)), SAMPLER_TIMEOUT_MS)
     const s = sections(out.stdout)
     const load = parseLoadavg(s.load ?? [])
     const mem = parseMeminfo(s.mem ?? [])
@@ -58,7 +58,10 @@ export async function refreshHost(io: Io, c: Config): Promise<{ ran: boolean; ho
       load,
       ramUsedGb: mem.usedGb,
       ramTotalGb: mem.totalGb,
-      disks: parseDf(s.df ?? []),
+      disks: pickDisks(parseDf(s.df ?? []), c.mounts.includes('auto'), (s.os ?? [])[0] === 'wsl'),
+      wsl: (s.os ?? [])[0] === 'wsl',
+      ...(s.gates ? { gates: ((p: number[]) => ({ running: p[0] ?? 0, waiting: p[1] ?? 0 }))((s.gates[0] ?? '').split(/\s+/).map(Number)) } : {}),
+      extra: (s.extra ?? []).map(l => l.trim().slice(0, 40)).filter(Boolean),
       gpu,
       commit,
       hist: {

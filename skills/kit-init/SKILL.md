@@ -25,8 +25,8 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      SRC="$K/${p%%:*}" DST="${p#*:}" put
    done
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
-   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh
+   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh hud-flag.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
+   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/hud-flag.sh
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.

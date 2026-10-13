@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseConfig } from '../lib/config'
-import { parseCommit, parseDf, parseGpu, parseLoadavg, parseMeminfo, pushHist, sections } from '../lib/host'
+import { parseCommit, parseDf, parseGpu, pickDisks, parseLoadavg, parseMeminfo, pushHist, sections } from '../lib/host'
 import { refreshHost, HOLD_MAX_MS, HOST_MAX_AGE_MS, LOCK_STALE_MS, hostPath } from '../lib/hostRefresh'
 import { SAMPLE_OUT, fakeIo } from './fakeio'
 
@@ -22,6 +22,28 @@ test('parsers read /proc, df and nvidia-smi output', async () => {
   expect(parseGpu(s.gpu ?? [])).toEqual({ util: 9, vramUsedGb: 12100 / 1024, vramTotalGb: 32607 / 1024, tempC: 44 })
   expect(parseGpu([])).toBe(null)
   expect(parseLoadavg(['garbage'])).toBe(null)
+})
+
+test('auto disks: the root plus other real drives only', async () => {
+  const wslDf = parseDf([
+    'Filesystem Type 1024-blocks Used Available Capacity Mounted on',
+    '/dev/sdc ext4 1056858112 228000000 780000000 23% /',
+    'none tmpfs 4000000 1 4000000 1% /mnt/wsl',
+    'C:\\ 9p 1000000000 228000000 772000000 23% /mnt/c',
+    'D:\\ 9p 2000000000 400000000 1600000000 20% /mnt/d',
+    'none overlay 1000 1 999 1% /usr/lib/wsl/drivers',
+  ])
+  expect(pickDisks(wslDf, true, true).map(d => d.mount)).toEqual(['/', '/mnt/d'])
+  // one internal drive (only C:): the root alone
+  expect(pickDisks(wslDf.filter(r => r.mount !== '/mnt/d'), true, true).map(d => d.mount)).toEqual(['/'])
+  const linuxDf = parseDf([
+    'Filesystem Type 1024-blocks Used Available Capacity Mounted on',
+    '/dev/nvme0n1p2 ext4 500000000 1 1 1% /', '/dev/nvme0n1p1 vfat 500000 1 1 1% /boot/efi',
+    '/dev/sdb1 ext4 2000000000 1 1 1% /data', 'tmpfs tmpfs 100 1 1 1% /run',
+  ])
+  expect(pickDisks(linuxDf, true, false).map(d => d.mount)).toEqual(['/', '/data'])
+  // a configured list is shown as df printed it
+  expect(pickDisks(linuxDf, false, false).length).toBe(4)
 })
 
 test('commit parse: used percent of the Windows limit', async () => {

@@ -22,7 +22,9 @@ Switch while running with `/hud band`, `/hud pane` or `/hud off`. The choice is 
   A session that crosses the report mark **flashes red** for `flashSeconds`.
 - **Host**: CPU load against the thread count (with sparkline), RAM, disks, GPU utilization and temperature, VRAM.
 - **Windows commit limit** (WSL): amber at `commitWarnPct`, red at `commitCritPct`. This is a real failure mode: Windows hits its commit limit and stops the WSL VM while the Linux side looks fine, with nothing logged inside Linux.
-- **Chips**: Quiet Mode (clickable when both commands are configured), commit warning, sessions over the report mark, load high, session count.
+- **Chips**: Quiet Mode (clickable when both commands are configured); the permission mode the viewing session started in (`auto mode on`); the kit's test-run limiter (`gates N+1 slots`, `queue N waiting`, and `holding: load X ≥ Y` while the next run waits for the load to drop); your own chips from `extraChipsCmd` (e.g. `blender 0/2`); the viewing project's `live` and `next` versions (`live_version:` / `next_version:` in its `ORCHESTRATION.md`); warnings (commit, sessions over the report mark, STUCK sessions, load high); the session count.
+- **STUCK**: a session's activity turns red, `STUCK · <reason>`, while it waits on you (a permission prompt or a question), or while a flag set by `scripts/hud-flag.sh` stands (a sibling that reported itself blocked, or one the seat pinged with no reply). The flag lifts itself at the session's next progress. A busy session with no progress for `quietMinutes` shows `no progress N min` in amber.
+- **Dots**: by Claude account (default), or by project (`dotMode: project`): the project's tab color, so one HUD tells several projects' teams apart.
 
 ## How it works
 
@@ -102,8 +104,15 @@ The quiet-mode values above are the defaults: the flag file the kit's `scripts/q
 | `commitWarnPct` / `commitCritPct` | 85 / 95 | Windows commit amber and red levels. |
 | `commitCmd` | PowerShell one-liner | Prints `<limitKB> <freeKB>`. Empty disables the commit reading (not on WSL). |
 | `commitSeconds` | 30 | Minimum seconds between commit readings. |
-| `mounts` | `/` | Comma-separated mount points for the disk meters. |
-| `showForNames` | `Orca` | Comma-separated session names that draw the HUD (exact, case-sensitive). Empty shows it in every session. kit-init sets your seat. |
+| `mounts` | `/` | Comma-separated mount points for the disk meters, or `auto`: the Linux root plus each other real drive in use. |
+| `showForNames` | `Orca` | Comma-separated session names that draw the HUD (exact, case-sensitive); a name ending in `*` is a prefix (`Orca*` matches `Orca-myapp`). Empty shows it in every session. kit-init sets your seat. |
+| `headerIcon` | `helm` | The pane's header picture: `helm`, `astronaut` or `saturn`. |
+| `sessionFaces` | `off` | `on` draws a face per row, 😀 when fresh to 💀 at `contextHandoverMark` (400000). |
+| `dotMode` | `account` | `account` or `project` (see Dots above). |
+| `hideItems` | (none) | Comma-separated item ids to switch off; see Items below. |
+| `quietMinutes` | 20 | Minutes of no progress before a busy session shows amber. 0 turns it off. |
+| `extraChipsCmd` | (none) | A command whose output lines (up to 6) each become a chip. Runs with the host reading, 3 s limit. |
+| `kitRuntimeDir` | `~/.orchestration-kit/runtime` | Where the test-run limiter keeps its queue. |
 | `statusDir` | `~/.claude-status-hud` | Shared directory. All sessions must use the same one. |
 | `sessionName` | (detected) | Override the detected session name. |
 | `refreshSeconds` | 3 | Heartbeat and redraw interval. |
@@ -114,6 +123,16 @@ The quiet-mode values above are the defaults: the flag file the kit's `scripts/q
 | `quietModeOnCmd` / `quietModeOffCmd` | `bash scripts/quiet-mode.sh on` / `off` | Run by the Quiet Mode chip and `/hud quiet`. Both are needed for the chip to be clickable. |
 
 The Quiet Mode chip is hidden unless a flag file or status command is configured. It is a button: click it while the band has focus (click the band, or ctrl+x then tab), or use `/hud quiet`.
+
+## Items
+
+Every drawn item has an id for `hideItems`. The field guide (`docs/status-hud-guide.html` in the kit) shows each one numbered on a picture, so a user can pick what to keep.
+
+| Area | Ids |
+|---|---|
+| Host | `host-title`, `cpu`, `cpu-mark`, `history`, `ram`, `disk`, `disk2`, `gpu`, `vram`, `win` |
+| Sessions | `sessions-title`, `context-key`, `dot-key`, `state-key`, `dot`, `face`, `model`, `bar`, `tokens`, `state`, `activity`, `column2`, `frame-title` |
+| Chips | `work-mode`, `perm-mode`, `gates`, `queue`, `holding`, `extra`, `live`, `next`, `warnings`, `count` |
 
 ## Develop
 

@@ -84,6 +84,7 @@ The seat chooses a session's model at launch; a recycled session **never inherit
 
 - Siblings report at phase boundaries: claimed → RED → GREEN + self-gate (literal pass line) → blocked/done.
 - Silent >30 min mid-build → `git log origin/main` + board + message. Truly stalled → banner the stall, reassign (never two silent owners on one row).
+- **Ping, then flag.** A sibling the HUD shows as "no progress N min", or that has not reported in 30 min: SendMessage it `ping: reply with your row and state`. No reply within 10 min → `bash scripts/hud-flag.sh <Name> "no reply to ping (<N> min)"`, so its HUD row reads STUCK in red for the human, then act as above. A sibling that answers lifts its own flag by making progress.
 - A correction that changes a builder's next hour goes in a **top-of-board banner**, not only a message.
 - **A knob beats etiquette** (LESSON 54). Before telling siblings "don't run X", check whether the toolchain runs X for them; if so the rule is unachievable — ship an env knob and announce it. "I didn't run X" ≠ "X didn't run".
 - **Keep a builder's hedges when you summarize** (LESSON 52). "A small piece of evidence" stays exactly that on the board.

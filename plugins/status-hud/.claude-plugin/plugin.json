@@ -51,11 +51,45 @@
       "type": "string",
       "title": "Session faces",
       "description": "on draws a face per session row, 😀 when fresh to 💀 at the hand-over mark; off hides it.",
-      "default": "on",
+      "default": "off",
       "options": [
         "on",
         "off"
       ]
+    },
+    "dotMode": {
+      "type": "string",
+      "title": "Session dot",
+      "description": "What each session row's dot shows: account (blue = Claude account 1, purple = account 2) or project (the project's tab color, so several projects' teams are told apart).",
+      "default": "account",
+      "options": [
+        "account",
+        "project"
+      ]
+    },
+    "hideItems": {
+      "type": "string",
+      "title": "Hidden items",
+      "description": "Comma-separated ids of items to switch off, e.g. dot-key,cpu-mark (README: Items).",
+      "default": ""
+    },
+    "quietMinutes": {
+      "type": "number",
+      "title": "No-progress minutes",
+      "description": "A busy session with no tool call or reply for this long shows 'no progress N min' in amber. 0 turns it off.",
+      "default": 20
+    },
+    "extraChipsCmd": {
+      "type": "string",
+      "title": "Extra chips command",
+      "description": "A shell command whose output lines (up to 6) each become a chip, e.g. a script that prints 'blender 0/2'. Run with the host reading, so keep it fast (3 s limit). Empty: none.",
+      "default": ""
+    },
+    "kitRuntimeDir": {
+      "type": "string",
+      "title": "Kit runtime dir",
+      "description": "Where the kit's test-run limiter keeps its queue (gates, queue and holding chips).",
+      "default": "~/.orchestration-kit/runtime"
     },
     "flashSeconds": {
       "type": "number",
@@ -90,7 +124,7 @@
     "mounts": {
       "type": "string",
       "title": "Disk mounts",
-      "description": "Comma-separated mount points to show, e.g. /,/data.",
+      "description": "Comma-separated mount points to show, e.g. /,/data; or auto: the Linux root plus each other real drive in use (on WSL a Windows drive letter other than C:).",
       "default": "/"
     },
     "showForNames": {

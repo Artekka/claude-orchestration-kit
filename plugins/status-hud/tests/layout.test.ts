@@ -73,21 +73,66 @@ test('chips: quiet mode (clickable only when both commands are set), commit warn
   expect(chips(view({ snap: calm })).some(x => x.label.includes('commit'))).toBe(false)
 })
 
-test('each session row shows a face from 😀 to 💀 at the hand-over mark, and its model', async () => {
-  const row = (k: number, model = 'claude-opus-5-5[1m]'): string => sessionRow(view(), { ...S('Mars', k), model }, 70).runs(0).map(r => r.text).join('')
-  expect(row(0).slice(0, 10)).toBe('● 😀 Mars ')
-  expect(row(180).includes('😐')).toBe(true)
-  expect(row(399).includes('😱')).toBe(true)
-  expect(row(400).includes('💀')).toBe(true)
-  expect(row(100).includes(' opus ')).toBe(true)
-  expect(row(100, 'claude-sonnet-5-5').includes(' sonnet')).toBe(true)
-  // the emoji's second column is an empty cell, so the row stays exactly 70 columns wide on screen
-  const r = sessionRow(view(), S('Mars', 100), 70)
+test('session rows: optional face, model badge, project-coloured dot, STUCK and quiet activity', async () => {
+  const txt = (r: ReturnType<typeof sessionRow>): string => r.runs(0).map(x => x.text).join('')
+  const faces = parseConfig({ sessionFaces: 'on' }, '/h')
+  const row = (k: number, c = cfg, h: Partial<Heartbeat> = {}): string => txt(sessionRow(view({ cfg: c }), { ...S('Mars', k), model: 'claude-opus-5-5[1m]', ...h }, 70))
+  // faces are off unless asked for
+  expect(row(0).startsWith('● Mars    OPS')).toBe(true)
+  expect(row(0, faces).slice(0, 10)).toBe('● 😀 Mars ')
+  expect(row(180, faces).includes('😐')).toBe(true)
+  expect(row(400, faces).includes('💀')).toBe(true)
+  const r = sessionRow(view({ cfg: faces }), S('Mars', 100), 70)
   expect(r.cells[0]!.length).toBe(70)
   expect(r.cells[0]![3]!.ch).toBe('')
-  // faces off: the row starts with the name, as before
-  const off = parseConfig({ sessionFaces: 'off' }, '/h')
-  expect(sessionRow(view({ cfg: off }), S('Mars', 100), 70).runs(0).map(x => x.text).join('').startsWith('● Mars')).toBe(true)
+  // model badges
+  expect(row(100, cfg, { model: 'claude-sonnet-5-5' }).includes(' SNT ')).toBe(true)
+  expect(row(100, cfg, { model: 'gemini-2.5-pro' }).includes(' GEM ')).toBe(true)
+  // dot: account by default, the project's tab color in project mode
+  const proj = parseConfig({ dotMode: 'project' }, '/h')
+  const dot = (c: typeof cfg, h: Partial<Heartbeat>): string => sessionRow(view({ cfg: c }), { ...S('Mars', 10), ...h }, 70).cells[0]![0]!.fg
+  expect(dot(cfg, { account: 2 })).toBe('#b98cf0')
+  expect(dot(proj, { color: '#16a085' })).toBe('#16a085')
+  // STUCK in red with its reason; quiet for 25 minutes in amber
+  const stuck = sessionRow(view(), { ...S('Mars', 10), stuck: 'waiting on you (permission)' }, 90).runs(0).find(x => x.text.includes('STUCK'))
+  expect(stuck?.text.includes('STUCK · waiting on you (permission)')).toBe(true)
+  expect(stuck?.fg).toBe('#f05050')
+  const quiet = sessionRow(view(), { ...S('Mars', 10), quietMs: 25 * 60_000 }, 90).runs(0).find(x => x.text.includes('no progress'))
+  expect(quiet?.text.startsWith('no progress 25 min')).toBe(true)
+  expect(quiet?.fg).toBe('#e8b030')
+  // hideItems switches parts off
+  const bare = parseConfig({ hideItems: 'dot,model,activity' }, '/h')
+  expect(row(100, bare).startsWith('Mars    ')).toBe(true)
+  expect(row(100, bare).includes('OPS')).toBe(false)
+})
+
+test('chips: permission mode, test slots, queue, holding, extra, live and next versions; each can be hidden', async () => {
+  const host = { ...snap.host!, gates: { running: 1, waiting: 3 }, extra: ['blender 0/2'], wsl: true }
+  const s2 = { ...snap, host, local: { mode: 'auto', live: 'v0.06', next: 'v0.07', slots: 1 } }
+  const labels = (o: Record<string, unknown> = {}): string[] => chips({ ...view(), snap: s2, cfg: parseConfig({ quietModeOnCmd: 'a', quietModeOffCmd: 'b', ...o }, '/h') }).map(c => c.label.trim())
+  const all = labels()
+  for (const want of ['auto mode on', 'gates 1+1 slots', 'queue 3 waiting', 'holding: load 28.3 ≥ 25.2', 'blender 0/2', 'live v0.06', 'next v0.07']) expect(all).toContain(want)
+  const fewer = labels({ hideItems: 'perm-mode,gates,queue,holding,extra,live,next' })
+  for (const gone of ['auto mode on', 'gates 1+1 slots', 'queue 3 waiting', 'blender 0/2', 'live v0.06', 'next v0.07']) expect(fewer).not.toContain(gone)
+  // no waiters: no queue chip and nothing held
+  const calm = chips({ ...view(), snap: { ...s2, host: { ...host, gates: { running: 1, waiting: 0 } } } }).map(c => c.label.trim())
+  expect(calm.some(l => l.startsWith('queue') || l.startsWith('holding'))).toBe(false)
+})
+
+test('band: WSL2 in the host title, the CPU red mark, the state key, and the project key in project mode', async () => {
+  const s2 = { ...snap, host: { ...snap.host!, wsl: true }, sessions: sessions.map((h, i) => ({ ...h, project: i % 2 ? 'Book Shop' : 'Lunch Diary', color: i % 2 ? '#16a085' : '#d35400' })) }
+  const text = drawBand({ ...view(), snap: s2 }, 180, 10).map(l => lineText(l)).join('\n')
+  expect(text.includes('HOST · WSL2 · 28 threads')).toBe(true)
+  expect(text.includes('▘ busy')).toBe(true)
+  expect(text.includes('acct 1')).toBe(true)
+  const pv = drawBand({ ...view(), snap: s2, cfg: parseConfig({ dotMode: 'project' }, '/h') }, 180, 10).map(l => lineText(l)).join('\n')
+  expect(pv.includes('Book Shop')).toBe(true)
+  expect(pv.includes('2 projects')).toBe(true)
+  expect(pv.includes('acct 1')).toBe(false)
+  // the CPU bar carries the red-load mark; hidden with cpu-mark
+  const cpuLine = (o: Record<string, unknown>): string => drawBand({ ...view(), snap: { ...s2, host: { ...s2.host, load: [1, 1, 1] as [number, number, number] } }, cfg: parseConfig(o, '/h') }, 180, 10).map(l => lineText(l)).find(l => l.includes('CPU')) ?? ''
+  expect(cpuLine({}).includes('┊')).toBe(true)
+  expect(cpuLine({ hideItems: 'cpu-mark' }).includes('┊')).toBe(false)
 })
 
 test('the pane header icon follows headerIcon: helm (default), astronaut or saturn', async () => {

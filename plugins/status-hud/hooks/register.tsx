@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Heartbeat, Snapshot } from '../types'
-import { parseConfig, type Config } from '../lib/config'
+import type { Heartbeat, Local, Snapshot } from '../types'
+import { nameShown, parseConfig, type Config } from '../lib/config'
 import { accountFromConfigDir, nameFromArgs, oneLine } from '../lib/heartbeat'
+import { flagReason, localFromOverlay, modeFromArgs, projectColor, repoFromCommonDir } from '../lib/project'
 import type { Io } from '../lib/io'
 import { ensureStatusDirs } from '../lib/ensureDir'
 import { newTickState, tick } from '../lib/tick'
@@ -30,6 +31,14 @@ const S: {
   lastFull: number
   hasFlash: boolean
   last: Snapshot | null
+  /** This session's project facts (versions, slots), read at start and every minute. */
+  local: Local
+  repo: string
+  /** When this session last made progress, and what it is waiting on you for ('' = nothing). */
+  progressAt: number
+  waitingOn: string
+  localAt: number
+  clockNow: number
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
 } = {
@@ -39,6 +48,12 @@ const S: {
   lastFull: 0,
   hasFlash: false,
   last: null,
+  local: { mode: 'normal', live: '', next: '', slots: 2 },
+  repo: '',
+  progressAt: 0,
+  waitingOn: '',
+  localAt: 0,
+  clockNow: 0,
   forceShow: null,
 }
 
@@ -52,7 +67,7 @@ function shown(): boolean {
 
 function shownByConfig(): boolean {
   const names = S.cfg?.showForNames ?? []
-  return names.length === 0 || names.includes(S.me.name)
+  return nameShown(names, S.me.name)
 }
 
 function makeIo($: Dollar): Io {
@@ -77,6 +92,7 @@ async function doTick($: Dollar): Promise<void> {
   S.running = true
   try {
     const now = await $.clock.now()
+    S.clockNow = now
     if (S.lastFull === 0 || now - S.lastFull >= c.refreshMs) {
       S.lastFull = now
       try {
@@ -86,7 +102,11 @@ async function doTick($: Dollar): Promise<void> {
       } catch {
         /* no response yet: keep the last reading */
       }
-      const snap = await tick(io, c, S.me, S.ts, exists)
+      await refreshLocal(c, io, now)
+      const flag = flagReason(await io.read(`${c.statusDir}/flags/${S.me.name.replace(/[^A-Za-z0-9_-]/g, '_')}.json`), S.progressAt)
+      S.me.stuck = S.waitingOn || flag
+      S.me.quietMs = S.me.state === 'busy' && S.progressAt > 0 ? Math.max(0, now - S.progressAt) : 0
+      const snap = { ...(await tick(io, c, S.me, S.ts, exists)), local: S.local }
       S.hasFlash = Object.keys(S.ts.flash).length > 0
       S.last = snap
       await update($, snapA, () => snap)
@@ -100,6 +120,24 @@ async function doTick($: Dollar): Promise<void> {
   } finally {
     S.running = false
   }
+}
+
+/** This session's project: its folder, tab color, versions and test slots; re-read every minute (the seat edits them). */
+async function refreshLocal(c: Config, io: Io, now: number): Promise<void> {
+  if (S.localAt !== 0 && now - S.localAt < 60_000) return
+  S.localAt = now
+  if (S.repo) {
+    const overlay = (await io.read(`${S.repo}/docs/orchestration/ORCHESTRATION.md`)) ?? ''
+    const colors = (await io.read(`${c.kitRuntimeDir}/tab-colors`)) ?? ''
+    S.me.color = projectColor(S.repo, colors, overlay)
+    S.local = localFromOverlay(overlay, S.me.mode ?? 'normal')
+  }
+}
+
+const progress = (): void => {
+  // The engine clock as last read by the timer (500 ms), so progress and staleness share one clock.
+  S.progressAt = S.clockNow || Date.now()
+  S.waitingOn = ''
 }
 
 async function flipQuiet($: Dollar): Promise<string> {
@@ -185,6 +223,14 @@ export const register: Register = (on, options) => {
     const ps = await S.io.run(['sh', '-c', 'ps -o args= -p $PPID; echo ::; tr "\\0" "\\n" < /proc/$PPID/environ 2>/dev/null | grep "^CLAUDE_CONFIG_DIR="'])
     const [args = '', env = ''] = ps.stdout.split('::')
     me.name = c.sessionName || (await $.env.get('CLAUDE_HUD_NAME')) || nameFromArgs(args) || `s-${me.id.slice(0, 6)}`
+    me.mode = modeFromArgs(args)
+    // The project: the main checkout of the directory the session runs in. A host without session.cwd (or no repo)
+    // leaves it empty, and the HUD shows the session without a project.
+    const cwd = await $.session.cwd().catch(() => '')
+    const common = cwd ? await S.io.run(['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir']) : { exitCode: 1, stdout: '' }
+    S.repo = common.exitCode === 0 ? repoFromCommonDir(common.stdout) : ''
+    me.project = S.repo ? (S.repo.split('/').pop() ?? '') : ''
+    S.localAt = 0
     me.account = accountFromConfigDir(env.trim().replace(/^CLAUDE_CONFIG_DIR=/, '') || (await $.env.get('CLAUDE_CONFIG_DIR')))
     await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet' })
     $.clock.every(500, () => void doTick($))
@@ -200,6 +246,7 @@ export const register: Register = (on, options) => {
   })
 
   on('prompt.submit', ($, e, next) => {
+    progress()
     S.me.state = 'busy'
     // Heartbeats are plaintext files: never the prompt text.
     S.me.activity = 'working'
@@ -212,12 +259,30 @@ export const register: Register = (on, options) => {
     const detail = typeof r.description === 'string' && r.description !== '' ? r.description : undefined
     S.me.activity = oneLine(detail ? `${e.tool}: ${detail}` : String(e.tool), 100)
     S.me.state = e.tool === 'Bash' ? 'shell' : 'busy'
+    progress()
     const ran = await next(e)
     S.me.state = 'busy'
+    progress()
     return ran
   }).catch(($, e, next) => next(e))
 
+  // Waiting on the person: a permission prompt or a question dialog is open. Cleared by the next progress.
+  on('classic.PermissionRequest', ($, e, next) => {
+    S.waitingOn = 'waiting on you (permission)'
+    S.lastFull = 0
+    return next(e)
+  })
+  on('classic.Notification', ($, e, next) => {
+    const t = (e as unknown as { notification_type?: string }).notification_type ?? ''
+    if (t === 'permission_prompt' || t === 'elicitation_dialog') {
+      S.waitingOn = t === 'permission_prompt' ? 'waiting on you (permission)' : 'waiting on you (question)'
+      S.lastFull = 0
+    }
+    return next(e)
+  })
+
   on('turn.complete', ($, e, next) => {
+    progress()
     S.me.state = 'idle'
     S.me.activity = ''
     S.lastFull = 0
