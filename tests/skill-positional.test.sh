@@ -80,10 +80,10 @@ cat > "$REPO/docs/orchestration/AGENT_BOARD.md" <<'BOARD'
 # Board
 ## Archives
 | a | b |
-## 🎛 ORCHESTRATOR ACTIVE — **era-3 · Seat `[abc123]`** · prefix `S3-`
-- row S3-1 → Sib1
 ## (era-2 header, superseded) ORCHESTRATOR ACTIVE — **era-2**
 - stale row
+## 🎛 ORCHESTRATOR ACTIVE — **era-3 · Seat `[abc123]`** · prefix `S3-`
+- row S3-1 → Sib1
 BOARD
 git -C "$REPO" add -A && git -C "$REPO" commit -qm board
 git -C "$REPO" update-ref refs/remotes/origin/main HEAD
