@@ -35,9 +35,9 @@ export function chips(v: View): Chip[] {
   const local = snap.local
   if (local && on('perm-mode')) out.push({ label: ` ${MODE_LABEL[local.mode] ?? `${local.mode} mode`} `, fg: C.tx, bg: C.bD })
   const host = snap.host
+  // The slots are the project's setting, shown even before the first test run creates the limiter's queue.
+  if (local?.kit && on('gates')) out.push({ label: ` gates ${local.slots}+1 slots `, fg: C.tx, bg: C.gray })
   if (host?.gates) {
-    const slots = local?.slots ?? 2
-    if (on('gates')) out.push({ label: ` gates ${slots}+1 slots `, fg: C.tx, bg: C.gray })
     if (on('queue') && host.gates.waiting > 0) out.push({ label: ` queue ${host.gates.waiting} waiting `, fg: C.bg, bg: C.amber })
     // The limiter holds the head of the line while the load is at or above 90% of the threads (its default).
     const maxLoad = host.threads * 0.9
@@ -157,7 +157,7 @@ export function activityOf(v: View, h: Heartbeat): [string, Col] {
 }
 
 /** One session row: dot, (face), name, model badge, context bar + K, state glyph, activity. Flashes red after crossing the report mark. */
-export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): Scr {
+export function sessionRow(v: View, h: Heartbeat, w: number, selected = false, nameW = 7): Scr {
   const s = new Scr(w, 1)
   const on = (id: string): boolean => !v.cfg.hide.has(id)
   const lv = fillLevel(h.tokens, v.cfg)
@@ -177,8 +177,8 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): 
     s.cells[0]![x + 1] = { ch: '', fg: C.tx, bg, bold: false }
     x += 3
   }
-  s.put(x, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
-  x += 8
+  s.put(x, 0, pad(trunc(h.name, nameW), nameW), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
+  x += nameW + 1
   if (on('model') && w >= 30) {
     const [b, c] = modelBadge(h.model)
     s.put(x, 0, b, flashing ? C.white : c, bg, true)
@@ -204,6 +204,9 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): 
   }
   return s
 }
+
+/** The name column: wide enough for the longest name, 7 to 12 characters. */
+export const nameWidth = (ss: readonly Heartbeat[]): number => clamp(Math.max(0, ...ss.map(h => h.name.length)), 7, 12)
 
 const acctSummary = (ss: readonly Heartbeat[], shown = ss.length, cfg?: Config): string => {
   const head = shown < ss.length ? `SESSIONS ${shown}/${ss.length}` : `SESSIONS ${ss.length}`
@@ -284,7 +287,7 @@ export function drawBand(v: View, cols: number, maxRows: number): Line[] {
   const slots = 5 * nCols
   const shown = ss.length > slots ? slots - 1 : ss.length
   for (let i = 0; i < shown; i++) {
-    const r = sessionRow(v, ss[i] as Heartbeat, colW)
+    const r = sessionRow(v, ss[i] as Heartbeat, colW, false, nameWidth(ss))
     const cx = rx + Math.floor(i / 5) * (colW + 2)
     const cy = 2 + (i % 5)
     r.cells[0]!.forEach((c, k) => {
@@ -398,7 +401,7 @@ export function drawPane(v: View, cols: number): Line[] {
     for (let y = 0; y < 3; y++) lines.push([seg(g, y)])
   }
   lines.push(sep(W, acctSummary(ss, ss.length, v.cfg)))
-  ss.forEach((h, i) => lines.push([seg(sessionRow(v, h, W - 2, i === v.sel), 0, `sel:${i}`)]))
+  ss.forEach((h, i) => lines.push([seg(sessionRow(v, h, W - 2, i === v.sel, nameWidth(ss)), 0, `sel:${i}`)]))
   const cur = ss[clamp(v.sel, 0, Math.max(0, ss.length - 1))]
   if (cur) {
     const lv = fillLevel(cur.tokens, v.cfg)

@@ -294,7 +294,7 @@ export const register: Register = (on, options) => {
   on('turn.complete', ($, e, next) => {
     progress()
     S.me.state = 'idle'
-    S.me.activity = ''
+    // The last action stays on the row (drawn dim while idle), so an idle session still says what it last did.
     S.lastFull = 0
     void doTick($)
     return next(e)

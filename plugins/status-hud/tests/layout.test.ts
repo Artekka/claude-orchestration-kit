@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseConfig } from '../lib/config'
-import { chips, drawBand, drawPane, lineText, sessionRow, type Line, type View } from '../lib/layout'
+import { chips, drawBand, drawPane, lineText, nameWidth, sessionRow, type Line, type View } from '../lib/layout'
 import type { Heartbeat, Snapshot } from '../types'
 
 const S = (name: string, k: number, state: Heartbeat['state'] = 'busy', account = 1): Heartbeat => ({ id: name, name, model: 'opus', account, tokens: k * 1000, window: 1_000_000, state, activity: 'doing a long thing that should truncate rather than wrap', at: 0 })
@@ -108,12 +108,15 @@ test('session rows: optional face, model badge, project-coloured dot, STUCK and 
 
 test('chips: permission mode, test slots, queue, holding, extra, live and next versions; each can be hidden', async () => {
   const host = { ...snap.host!, gates: { running: 1, waiting: 3 }, extra: ['blender 0/2'], wsl: true }
-  const s2 = { ...snap, host, local: { mode: 'auto', live: 'v0.06', next: 'v0.07', slots: 1 } }
+  const s2 = { ...snap, host, local: { mode: 'auto', live: 'v0.06', next: 'v0.07', slots: 1, kit: true } }
   const labels = (o: Record<string, unknown> = {}): string[] => chips({ ...view(), snap: s2, cfg: parseConfig({ quietModeOnCmd: 'a', quietModeOffCmd: 'b', ...o }, '/h') }).map(c => c.label.trim())
   const all = labels()
   for (const want of ['auto mode on', 'gates 1+1 slots', 'queue 3 waiting', 'holding: load 28.3 ≥ 25.2', 'blender 0/2', 'live v0.06', 'next v0.07']) expect(all).toContain(want)
   const fewer = labels({ hideItems: 'perm-mode,gates,queue,holding,extra,live,next' })
   for (const gone of ['auto mode on', 'gates 1+1 slots', 'queue 3 waiting', 'blender 0/2', 'live v0.06', 'next v0.07']) expect(fewer).not.toContain(gone)
+  // the slots chip shows before the limiter has ever run (no queue yet), from the project's setting
+  const fresh = chips({ ...view(), snap: { ...s2, host: { ...host, gates: undefined } } }).map(c => c.label.trim())
+  expect(fresh).toContain('gates 1+1 slots')
   // no waiters: no queue chip and nothing held
   const calm = chips({ ...view(), snap: { ...s2, host: { ...host, gates: { running: 1, waiting: 0 } } } }).map(c => c.label.trim())
   expect(calm.some(l => l.startsWith('queue') || l.startsWith('holding'))).toBe(false)
@@ -154,4 +157,12 @@ test('the selected session detail sits under its own DETAIL heading', async () =
   const i = text.findIndex(t => t.includes('DETAIL · click a row above'))
   expect(i).toBeGreaterThan(0)
   expect(text[i + 1]!.includes(`▸ ${sessions[1]!.name}`)).toBe(true)
+})
+
+test('the name column fits the longest name (7 to 12), so Atlas-BS is not cut', async () => {
+  const ss = [S('Atlas-BS', 10), S('Mars', 10)]
+  const row = sessionRow(view(), ss[0]!, 90, false, nameWidth(ss)).runs(0).map(r => r.text).join('')
+  expect(row.includes('Atlas-BS')).toBe(true)
+  expect(nameWidth([S('a', 1)])).toBe(7)
+  expect(nameWidth([S('a-very-long-session-name', 1)])).toBe(12)
 })

@@ -26,8 +26,9 @@ test('tab color: the recorded one first, else the team block, else none', async 
 
 test('versions and test slots from ORCHESTRATION.md', async () => {
   const o = 'live_version:   v0.06\nnext_version:   v0.07   # set at release review\nteam:\n  gate_slots:       1\n'
-  expect(localFromOverlay(o, 'auto')).toEqual({ mode: 'auto', live: 'v0.06', next: 'v0.07', slots: 1 })
-  expect(localFromOverlay('next_version: <v1.2.3>\n', 'normal')).toEqual({ mode: 'normal', live: '', next: '', slots: 2 })
+  expect(localFromOverlay(o, 'auto')).toEqual({ mode: 'auto', live: 'v0.06', next: 'v0.07', slots: 1, kit: true })
+  expect(localFromOverlay('next_version: <v1.2.3>\n', 'normal')).toEqual({ mode: 'normal', live: '', next: '', slots: 2, kit: true })
+  expect(localFromOverlay('', 'normal').kit).toBe(false)
 })
 
 test('a stuck flag counts until the session makes progress after it', async () => {

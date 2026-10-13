@@ -29,7 +29,7 @@ export function projectColor(repo: string, tabColors: string, overlay: string): 
 export function localFromOverlay(overlay: string, mode: string): Local {
   const key = (k: string): string => (new RegExp(`^[ \\t]*${k}:[ \\t]*([^\\s#<]+)`, 'm').exec(overlay)?.[1] ?? '')
   const slots = Number(key('gate_slots'))
-  return { mode, live: key('live_version'), next: key('next_version'), slots: Number.isInteger(slots) && slots > 0 ? slots : 2 }
+  return { mode, live: key('live_version'), next: key('next_version'), slots: Number.isInteger(slots) && slots > 0 ? slots : 2, kit: overlay.trim() !== '' }
 }
 
 /**
