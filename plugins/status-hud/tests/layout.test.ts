@@ -120,13 +120,13 @@ test('chips: permission mode, test slots, queue, holding, extra, live and next v
 })
 
 test('band: WSL2 in the host title, the CPU red mark, the state key, and the project key in project mode', async () => {
-  const s2 = { ...snap, host: { ...snap.host!, wsl: true }, sessions: sessions.map((h, i) => ({ ...h, project: i % 2 ? 'Book Shop' : 'Lunch Diary', color: i % 2 ? '#16a085' : '#d35400' })) }
+  const s2 = { ...snap, host: { ...snap.host!, wsl: true }, sessions: sessions.map((h, i) => ({ ...h, project: i % 2 ? 'Web Shop' : 'Docs Site', color: i % 2 ? '#16a085' : '#d35400' })) }
   const text = drawBand({ ...view(), snap: s2 }, 180, 10).map(l => lineText(l)).join('\n')
   expect(text.includes('HOST · WSL2 · 28 threads')).toBe(true)
   expect(text.includes('▘ busy')).toBe(true)
   expect(text.includes('acct 1')).toBe(true)
   const pv = drawBand({ ...view(), snap: s2, cfg: parseConfig({ dotMode: 'project' }, '/h') }, 180, 10).map(l => lineText(l)).join('\n')
-  expect(pv.includes('Book Shop')).toBe(true)
+  expect(pv.includes('Web Shop')).toBe(true)
   expect(pv.includes('2 projects')).toBe(true)
   expect(pv.includes('acct 1')).toBe(false)
   // the CPU bar carries the red-load mark; hidden with cpu-mark

@@ -12,7 +12,7 @@ test('permission mode from the claude command line', async () => {
 })
 
 test('the project is the main checkout, also from inside a worktree', async () => {
-  expect(repoFromCommonDir('/home/u/projects/Book Shop/.git\n')).toBe('/home/u/projects/Book Shop')
+  expect(repoFromCommonDir('/home/u/projects/My App/.git\n')).toBe('/home/u/projects/My App')
   expect(repoFromCommonDir('/home/u/projects/x/.git/worktrees/w1\n')).toBe('')
   expect(repoFromCommonDir('')).toBe('')
 })
