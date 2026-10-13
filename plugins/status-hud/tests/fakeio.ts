@@ -47,6 +47,6 @@ export const SAMPLE_OUT = [
   '##load', '28.31 30.00 31.20 5/900 12345',
   '##nproc', '28',
   '##mem', 'MemTotal:       65011712 kB', 'MemAvailable:   48234496 kB',
-  '##df', 'Filesystem 1024-blocks Used Available Capacity Mounted on', '/dev/sdc 1056858112 857000000 150000000 86% /', 'x 10381000000 4400000000 5900000000 43% /mnt/n',
+  '##df', 'Filesystem 1024-blocks Used Available Capacity Mounted on', '/dev/sdc 1056858112 857000000 150000000 86% /', 'x 2097152000 943718400 1153433600 45% /data',
   '##gpu', '9, 12100, 32607, 44',
 ].join('\n')

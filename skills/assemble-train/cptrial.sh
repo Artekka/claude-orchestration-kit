@@ -6,15 +6,19 @@
 B=${B:?set B=<base commit>}; C=${C:?set C=<commit to pick>}
 git rev-parse -q --verify "$B^{commit}" >/dev/null || { echo "B=$B is not a commit here" >&2; exit 2; }
 P=$(git rev-parse -q --verify "$C^1") || { echo "C=$C has no parent here" >&2; exit 2; }
-OUT=$(git merge-tree --write-tree --name-only --messages --merge-base="$P" "$B" "$C"); RC=$?
+if git merge-base --is-ancestor "$C" "$B"; then
+  echo "pick $C onto $B: ALREADY-ON-TRAIN (the commit is an ancestor of the base: picking it changes nothing)"
+  echo "SYNTH $(git rev-parse "$B")"; exit 0
+fi
+OUT=$(git -c core.quotePath=false merge-tree --write-tree --name-only --messages --merge-base="$P" "$B" "$C"); RC=$?
 [ "$RC" -le 1 ] || { echo "merge-tree failed (rc $RC): $OUT" >&2; exit 2; }
 T=$(printf '%s\n' "$OUT" | head -1)
 echo "pick $C onto $B: RC=$RC tree=${T:0:8}"
 [ "$RC" -ne 0 ] && printf '%s\n' "$OUT" | tail -n +2
-git diff --name-only "$P" "$C" | while IFS= read -r f; do
+git -c core.quotePath=false diff -z --name-only "$P" "$C" | while IFS= read -r -d "" f; do
   t=$(git rev-parse -q --verify "$T:$f" || echo ABSENT); r=$(git rev-parse -q --verify "$C:$f" || echo ABSENT)
   h=$(git rev-parse -q --verify "$B:$f" || echo ABSENT)
-  if [ "$t" = "$r" ]; then s=RIDER; elif [ "$t" = "$h" ]; then s=TRAIN; else s=NEITHER; fi
+  if [ "$t" = "$r" ] && [ "$r" = "$h" ]; then s=SAME; elif [ "$t" = "$r" ]; then s=RIDER; elif [ "$t" = "$h" ]; then s=TRAIN; else s=NEITHER; fi
   echo "  $s $f"
 done
 echo "SYNTH $(echo trial | git commit-tree "$T" -p "$B")"

@@ -129,7 +129,8 @@ STUB
 chmod +x "$TMP/bin/claude"
 runhud() {  # HUD answer → output; the stub's log is in $LOG
   : > "$LOG"
-  (cd "$P" && HOME="$H" STUB_LOG="$LOG" PATH="$TMP/bin:$PATH" HUD_ANSWER="$1" \
+  # hermetic: the host running this suite may load a HUD folder itself; HUD_PD sets one on purpose
+  (cd "$P" && env -u CLAUDE_CODE_PLUGIN_DIRS ${HUD_PD:+CLAUDE_CODE_PLUGIN_DIRS="$HUD_PD"} HOME="$H" STUB_LOG="$LOG" PATH="$TMP/bin:$PATH" HUD_ANSWER="$1" \
      bash -c "$(printf '%s\n' "$hudblk" | sed "s/^HUD=<yes|no>.*/HUD=\$HUD_ANSWER/")" 2>&1)
 }
 out="$(runhud no)"; calls="$(cat "$LOG")"
@@ -168,12 +169,12 @@ has "HUD Yes, acct2 loads the upstream HUD: explained" "CLAUDE_CODE_PLUGIN_DIRS"
 hasnt "HUD Yes, acct2 loads the upstream HUD: not installed there" "dir=$H/.claude-acct2" "$calls"
 has "HUD Yes, acct2 loads the upstream HUD: the default account still gets it" "CALL dir=default args=plugin install" "$calls"
 rm -f "$H/.claude-acct2/settings.json"
-out="$(CLAUDE_CODE_PLUGIN_DIRS=/opt/y/status-hud runhud yes)"; calls="$(cat "$LOG")"
+out="$(HUD_PD=/opt/y/status-hud runhud yes)"; calls="$(cat "$LOG")"
 has "HUD Yes, this shell loads a HUD dir: explained" "CLAUDE_CODE_PLUGIN_DIRS" "$out"
 # READ LOW-3: macOS keeps logins in the Keychain, so a second account has no .credentials.json there
 mkdir -p "$TMP/darwin"; printf '#!/bin/sh\necho Darwin\n' > "$TMP/darwin/uname"; chmod +x "$TMP/darwin/uname"
 : > "$LOG"
-out="$(cd "$P" && HOME="$H" STUB_LOG="$LOG" PATH="$TMP/darwin:$TMP/bin:$PATH" HUD_ANSWER=yes \
+out="$(cd "$P" && env -u CLAUDE_CODE_PLUGIN_DIRS HOME="$H" STUB_LOG="$LOG" PATH="$TMP/darwin:$TMP/bin:$PATH" HUD_ANSWER=yes \
   bash -c "$(printf '%s\n' "$hudblk" | sed "s/^HUD=<yes|no>.*/HUD=\$HUD_ANSWER/")" 2>&1)"
 n=$(grep -c 'args=plugin install' "$LOG")
 [ "$n" -eq 3 ] && ok || bad "HUD Yes on macOS: every ~/.claude-acctN dir counts (want 3 installs, got $n): $(cat "$LOG")"

@@ -70,7 +70,7 @@ has "trial: a rider edit the train already holds (plus more) shows TRAIN" "TRAIN
 git checkout -q -b t6 "$TIP0"; git merge -q --no-ff -m "t6 has r1" "$R1" >/dev/null 2>&1; T6=$(git rev-parse HEAD)
 out="$(B=$T6 R=$R1 bash "$ASM/trial.sh" 2>&1)"
 has "trial: a rider merged into the base is flagged" "ALREADY-ON-TRAIN" "$out"
-git checkout -q -b t7 "$TIP0"; git cherry-pick -q "$R1" >/dev/null 2>&1; T7=$(git rev-parse HEAD)
+git checkout -q -b t7 "$TIP0"; git cherry-pick "$R1" >/dev/null 2>&1 || bad "setup: cherry-pick of r1 onto t7 failed"; T7=$(git rev-parse HEAD)
 out="$(B=$T7 R=$R1 bash "$ASM/trial.sh" 2>&1)"
 has "trial: a cherry-picked rider's file reads SAME" "SAME a.txt" "$out"
 hasnt "trial: ...not RIDER" "RIDER a.txt" "$out"

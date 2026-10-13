@@ -80,10 +80,21 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      QF="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}/quiet-mode"
      VALS=$(printf '{"showForNames":"%s","quietModeFlagFile":"%s","quietModeOnCmd":"bash scripts/quiet-mode.sh on","quietModeOffCmd":"bash scripts/quiet-mode.sh off"}' "${SEAT:-Orca}" "$QF")
      for D in default "$HOME"/.claude-acct*; do
-       if [ "$D" = default ]; then unset CLAUDE_CONFIG_DIR; elif [ -e "$D/.credentials.json" ]; then export CLAUDE_CONFIG_DIR="$D"; else continue; fi
-       claude plugin install status-hud@artekka-kits --scope project \
-         && printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin \
-         && echo "status HUD installed for ${CLAUDE_CONFIG_DIR:-the default account} (shown in: ${SEAT:-Orca})"
+       # an extra account counts when logged in; macOS keeps logins in the Keychain, so there every dir counts
+       if [ "$D" = default ]; then unset CLAUDE_CONFIG_DIR; SJ="$HOME/.claude/settings.json"; WHO="the default account"
+       elif [ -d "$D" ] && { [ "$(uname -s)" = Darwin ] || [ -e "$D/.credentials.json" ]; }; then export CLAUDE_CONFIG_DIR="$D"; SJ="$D/settings.json"; WHO="$D"
+       else continue; fi
+       # a status HUD already loaded from a folder (CLAUDE_CODE_PLUGIN_DIRS, in this shell or that account's settings env)
+       PD="$(grep -o '"CLAUDE_CODE_PLUGIN_DIRS"[^,}]*' "$SJ" 2>/dev/null) ${CLAUDE_CODE_PLUGIN_DIRS:-}"
+       case "$PD" in *status-hud*)
+         echo "SKIP status HUD for $WHO: a status HUD already loads there through CLAUDE_CODE_PLUGIN_DIRS (${PD# }); two copies would both draw and the configure step fails. Remove that entry from the settings env, then ask again."
+         continue ;; esac
+       if claude plugin install status-hud@artekka-kits --scope project \
+         && printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin; then
+         echo "status HUD installed for $WHO (shown in: ${SEAT:-Orca})"
+       else
+         echo "status HUD install FAILED for $WHO (claude's own message is above; tell the human, nothing else was changed)"
+       fi
      done
      unset CLAUDE_CONFIG_DIR
    fi

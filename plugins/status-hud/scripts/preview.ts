@@ -19,7 +19,7 @@ const snap: Snapshot = {
   now: Date.now(), selfId: 'Orca', sessions, quietMode: false,
   host: {
     at: 0, threads: 28, load: [28.3, 28.0, 27.1], ramUsedGb: 15.6, ramTotalGb: 62, gpu: { util: 9, vramUsedGb: 11.8, vramTotalGb: 32.6, tempC: 44 },
-    disks: [{ mount: '/', usedGb: 818, totalGb: 1007 }, { mount: '/mnt/n', usedGb: 4300, totalGb: 10150 }],
+    disks: [{ mount: '/', usedGb: 818, totalGb: 1007 }, { mount: '/data', usedGb: 900, totalGb: 2000 }],
     commit: { usedPct: 88, limitGb: 127, usedGb: 112, at: 0 },
     hist: { load: Array.from({ length: 60 }, (_, i) => 24 + 6 * Math.sin(i / 5)), ram: Array.from({ length: 60 }, (_, i) => 14 + Math.sin(i / 7)), gpu: Array.from({ length: 60 }, (_, i) => 10 + 8 * Math.sin(i / 3)) },
   },

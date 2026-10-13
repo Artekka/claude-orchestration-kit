@@ -63,7 +63,7 @@
     "mounts": {
       "type": "string",
       "title": "Disk mounts",
-      "description": "Comma-separated mount points to show, e.g. /,/mnt/n.",
+      "description": "Comma-separated mount points to show, e.g. /,/data.",
       "default": "/"
     },
     "showForNames": {

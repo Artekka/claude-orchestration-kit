@@ -22,6 +22,8 @@ cd <the repo> || exit 1
 printf '%s\n' <rider sha 1> <rider sha 2> … > "$SP/approved"     # the seat's approved SHAs, one per line
 BASE=<base> TIP=<tip> APPROVED="$SP/approved" bash "$H/audit.sh" | tee "$SP/audit-<tip>.txt"
 ```
+Exit 0 = every merge tree-equal (and approved); 1 = at least one line to explain (`tree_eq=NO`, `approved=NO`, an octopus); 2 = usage. `SINGLE` lines never change it: check each against §2.
+
 **Positive control first:** run it over an already-audited range AND over one merge known to conflict (`mt_rc` must read 1 there). A sweep that cannot show NO proves nothing.
 
 ## 2. Per line

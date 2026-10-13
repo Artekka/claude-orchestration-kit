@@ -9,7 +9,7 @@ import { SAMPLE_OUT, fakeIo } from './fakeio'
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 50; i++) await Promise.resolve()
 }
-const cfg = parseConfig({ statusDir: '/s', mounts: '/,/mnt/n', commitCmd: 'ps1' }, '/home/u')
+const cfg = parseConfig({ statusDir: '/s', mounts: '/,/data', commitCmd: 'ps1' }, '/home/u')
 
 test('parsers read /proc, df and nvidia-smi output', async () => {
   const s = sections(SAMPLE_OUT)
@@ -18,7 +18,7 @@ test('parsers read /proc, df and nvidia-smi output', async () => {
   expect(Math.round((mem?.totalGb ?? 0) * 10) / 10).toBe(62)
   expect(Math.round((mem?.usedGb ?? 0) * 10) / 10).toBe(16)
   const disks = parseDf(s.df ?? [])
-  expect(disks.map(d => d.mount)).toEqual(['/', '/mnt/n'])
+  expect(disks.map(d => d.mount)).toEqual(['/', '/data'])
   expect(parseGpu(s.gpu ?? [])).toEqual({ util: 9, vramUsedGb: 12100 / 1024, vramTotalGb: 32607 / 1024, tempC: 44 })
   expect(parseGpu([])).toBe(null)
   expect(parseLoadavg(['garbage'])).toBe(null)

@@ -54,11 +54,11 @@ test('cpu level uses 90% of threads unless cpuRedLoad is set', async () => {
 })
 
 test('bad option values fall back to defaults instead of throwing', async () => {
-  const c = parseConfig({ contextReportMark: -5, variant: 'nonsense', refreshSeconds: 0, mounts: ' /, /mnt/n ,' }, '/home/u')
+  const c = parseConfig({ contextReportMark: -5, variant: 'nonsense', refreshSeconds: 0, mounts: ' /, /data ,' }, '/home/u')
   expect(c.reportMark).toBe(350_000)
   expect(c.variant).toBe('band')
   expect(c.refreshMs).toBe(1000)
-  expect(c.mounts).toEqual(['/', '/mnt/n'])
+  expect(c.mounts).toEqual(['/', '/data'])
   // Settings written by `plugin configure` before this option existed lack it: the default keeps the HUD on the seat only.
   expect(c.showForNames).toEqual(['Orca'])
   expect(parseConfig({ showForNames: ' Orca , Vali ,' }, '/home/u').showForNames).toEqual(['Orca', 'Vali'])

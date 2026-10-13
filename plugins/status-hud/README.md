@@ -1,6 +1,6 @@
 # Status HUD
 
-A Claude Code mod that shows, in pixel-style terminal style, what every session is doing and how loaded the machine is.
+A Claude Code mod that shows, pixel-style in the terminal, what every session is doing and how loaded the machine is.
 It is project-agnostic: it knows nothing about any repo until you configure it.
 
 It ships with the orchestration kit as an **optional** component: `/orchestration-kit:kit-init` asks whether to install it (default No), and you can add or remove it any time — just ask Claude.
@@ -130,6 +130,7 @@ Layout and logic are plain modules in `lib/`; `hooks/register.tsx` only wires th
 
 - Known issue (accepted): the stale-lock takeover can in theory hit an ABA race: if a writer's lock is judged dead and renamed away at the same instant a new owner takes it, the new owner's run may be removed. The worst case is one missed host reading, since the next refresh simply retries.
 
+- Host readings come from /proc (`/proc/loadavg`, `/proc/meminfo`) plus `nproc`, `df` and `nvidia-smi`, so they work on Linux and WSL. On macOS (no /proc) no host reading is taken: the host meters stay empty, while every session row, context bar and chip works as usual. The GPU meters need `nvidia-smi`.
 - Terminal and desktop surfaces only (the engine raises the band there); other surfaces get nothing.
 - The Windows commit reading needs WSL interop. On a machine without it, set `commitCmd` empty.
 - A peer's context is visible only if that peer runs the mod too; a session without it is absent from the list.
