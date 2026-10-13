@@ -174,3 +174,24 @@ test('a busy session\'s mark turns clockwise: ▘ ▝ ▗ ▖, one step per half
   expect(mark(1000).includes('▗')).toBe(true)
   expect(sessionRow(view({ now: 1000 }), S('Mars', 10, 'idle'), 70).runs(0).map(r => r.text).join('').includes('○')).toBe(true)
 })
+
+test('alerts sit at the right of the chip line, most urgent first; holding is amber information', async () => {
+  // snap: commit 88% (amber warning), load 28.3/28 (high); add a stuck session and one past the report mark
+  const host = { ...snap.host!, gates: { running: 1, waiting: 2 } }
+  const ss = sessions.map((h, i) => (i === 0 ? { ...h, stuck: 'waiting on you (permission)' } : h))
+  const s2 = { ...snap, host, sessions: ss, local: { mode: 'auto', live: 'v0.06', next: '', slots: 1, kit: true } }
+  const v2 = { ...view(), snap: s2 }
+  const cs = chips(v2)
+  const alerts = cs.filter(c => c.alert !== undefined).map(c => c.label.trim().split(':')[0]!.split(' ')[0])
+  expect(alerts).toEqual(['⚠', 'STUCK', '≥350K', 'load'])
+  const holding = cs.find(c => c.label.includes('holding'))
+  expect(holding?.alert).toBe(undefined)
+  expect(holding?.bg).toBe('#e8b030')
+  // in the band every information chip comes before every alert, and the alerts end at the frame's right edge
+  const line = lineText(drawBand(v2, 200, 10)[8]!)
+  const lastInfo = Math.max(line.indexOf('sessions'), line.indexOf('live v0.06'))
+  expect(lastInfo).toBeLessThan(line.indexOf('⚠ Windows commit'))
+  expect(line.indexOf('⚠ Windows commit')).toBeLessThan(line.indexOf('STUCK'))
+  expect(line.trimEnd().endsWith('high │')).toBe(true)
+  expect(Array.from(line).length).toBe(200)
+})

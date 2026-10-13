@@ -19,7 +19,8 @@ const one = (text: string, fg: Col, bg: Col | null = null, bold = false, press?:
 export const kfmt = (t: number): string => `${Math.round(t / 1000)}K`
 const gb = (v: number, d = 1): string => v.toFixed(d)
 
-export type Chip = { label: string; fg: Col; bg: Col; press?: string }
+/** `alert`: a warning to act on, its urgency (1 = most urgent); alerts are drawn apart, at the right, most urgent first. */
+export type Chip = { label: string; fg: Col; bg: Col; press?: string; alert?: number }
 
 const MODE_LABEL: Record<string, string> = { normal: 'normal mode', acceptEdits: 'accept-edits mode', auto: 'auto mode on', bypass: 'bypass mode on', plan: 'plan mode' }
 
@@ -42,37 +43,51 @@ export function chips(v: View): Chip[] {
     // The limiter holds the head of the line while the load is at or above 90% of the threads (its default).
     const maxLoad = host.threads * 0.9
     if (on('holding') && host.gates.waiting > 0 && host.load[0] >= maxLoad) {
-      out.push({ label: ` holding: load ${host.load[0].toFixed(1)} ≥ ${maxLoad.toFixed(1)} `, fg: C.white, bg: C.rD })
+      out.push({ label: ` holding: load ${host.load[0].toFixed(1)} ≥ ${maxLoad.toFixed(1)} `, fg: C.bg, bg: C.amber })
     }
   }
   if (on('extra')) for (const e of host?.extra ?? []) out.push({ label: ` ${e} `, fg: C.tx, bg: C.goldD })
   if (local?.live && on('live')) out.push({ label: ` live ${local.live} `, fg: C.gold, bg: C.goldD })
   if (local?.next && on('next')) out.push({ label: ` next ${local.next} `, fg: C.cyan, bg: C.cyanD })
+  if (on('count')) out.push({ label: ` ${snap.sessions.length} sessions `, fg: C.tx, bg: C.gray })
   if (on('warnings')) {
+    // Most urgent first: Windows memory (all of WSL dies at 100%), a stuck session (needs you), a session past the
+    // report mark (hand it over soon), then a high load (watch).
     if (host?.commit) {
       const lv = commitLevel(host.commit.usedPct, cfg)
-      if (lv !== 'ok') out.push({ label: ` ⚠ Windows commit ${Math.round(host.commit.usedPct)}% `, fg: C.white, bg: lv === 'red' ? C.rD : C.aD })
+      if (lv !== 'ok') out.push({ label: ` ⚠ Windows commit ${Math.round(host.commit.usedPct)}% `, fg: C.white, bg: lv === 'red' ? C.rD : C.aD, alert: 1 })
     }
-    const over = snap.sessions.filter(s => s.tokens >= cfg.reportMark)
-    if (over.length > 0) out.push({ label: ` ≥${kfmt(cfg.reportMark)}: ${over.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD })
     const stuck = snap.sessions.filter(s => s.stuck)
-    if (stuck.length > 0) out.push({ label: ` STUCK: ${stuck.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD })
-    if (host && loadLevel(host.load[0], host.threads, cfg) === 'red') out.push({ label: ` load ${host.load[0].toFixed(1)} high `, fg: C.white, bg: C.rD })
+    if (stuck.length > 0) out.push({ label: ` STUCK: ${stuck.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD, alert: 2 })
+    const over = snap.sessions.filter(s => s.tokens >= cfg.reportMark)
+    if (over.length > 0) out.push({ label: ` ≥${kfmt(cfg.reportMark)}: ${over.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD, alert: 3 })
+    if (host && loadLevel(host.load[0], host.threads, cfg) === 'red') out.push({ label: ` load ${host.load[0].toFixed(1)} high `, fg: C.white, bg: C.rD, alert: 4 })
   }
-  if (on('count')) out.push({ label: ` ${snap.sessions.length} sessions `, fg: C.tx, bg: C.gray })
   return out
 }
 
+/** Chips in two groups: information from the left, alerts against the right edge, so the two never mix. */
 function chipLine(v: View, width: number, left: string, right: string): Line {
-  const line: Line = [one(left, C.dim)]
+  const all = chips(v)
+  const alerts = all.filter(c => c.alert !== undefined)
+  const info = all.filter(c => c.alert === undefined)
   let used = left.length + right.length
-  for (const c of chips(v)) {
-    const w = c.label.length + 1
-    if (used + w > width) break
-    line.push(one(c.label, c.fg, c.bg, true, c.press), one(' ', C.tx))
-    used += w
+  // Alerts claim their room first (they matter most), then information fills what is left.
+  const shownAlerts: Chip[] = []
+  for (const c of alerts) {
+    if (used + c.label.length + 1 > width) break
+    shownAlerts.push(c)
+    used += c.label.length + 1
   }
-  line.push(one(' '.repeat(Math.max(0, width - used)), C.tx), one(right, C.dim))
+  const line: Line = [one(left, C.dim)]
+  for (const c of info) {
+    if (used + c.label.length + 1 > width) break
+    line.push(one(c.label, c.fg, c.bg, true, c.press), one(' ', C.tx))
+    used += c.label.length + 1
+  }
+  line.push(one(' '.repeat(Math.max(0, width - used)), C.tx))
+  for (const c of shownAlerts) line.push(one(' ', C.tx), one(c.label, c.fg, c.bg, true, c.press))
+  line.push(one(right, C.dim))
   return line
 }
 
@@ -419,12 +434,17 @@ export function drawPane(v: View, cols: number): Line[] {
     for (let y = 0; y < 3; y++) lines.push([seg(t, y)])
   }
   lines.push(sep(W, 'MODE'))
-  const cl = chips(v)
+  const all = chips(v)
+  // Information first, then the alerts on a row of their own, most urgent first: the two never mix.
+  const cl = [...all.filter(c => c.alert === undefined), ...all.filter(c => c.alert !== undefined)]
   let row: Line = [one(' ', C.tx)]
   let used = 1
+  let inAlerts = false
   for (const c of cl) {
     const w = c.label.length + 1
-    if (used + w > W && row.length > 1) {
+    const breakToAlerts = c.alert !== undefined && !inAlerts && row.length > 1
+    if (c.alert !== undefined) inAlerts = true
+    if ((used + w > W || breakToAlerts) && row.length > 1) {
       lines.push(row)
       row = [one(' ', C.tx)]
       used = 1

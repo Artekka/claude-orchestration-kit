@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **Changed, status HUD: alerts apart from information.** Warnings now sit against the right edge of the chip line (on a row of their own in the pane), most urgent first: Windows commit, STUCK, past the report mark, high load. `holding` is amber information, not a red alert.
 - **New, status HUD: a busy session's mark turns** clockwise through the four corners (▘ ▝ ▗ ▖), so a working session reads as working at a glance.
 - **Changed, status HUD:** the name column widens to the longest name (7 to 12), so per-project seat names are not cut; an idle session keeps its last action on its row, drawn dim; the `gates N+1 slots` chip shows from the project's `gate_slots` before the limiter's first run.
 - **Fixed, status HUD: nothing shown when the saved look is the pane and the window is narrow.** A pane opened at session start waits undrawn below 144 columns; the band now stands in until the pane is placed, and a one-line note says `/hud pane` opens it at any width.
