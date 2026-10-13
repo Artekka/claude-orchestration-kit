@@ -636,19 +636,20 @@ launch_recycle_inplace() {
 
 # Optional `team:` block in docs/orchestration/ORCHESTRATION.md: an unindented `team:` line,
 # then indented `key: value` lines. Sets TEAM_SEAT TEAM_PREFIX TEAM_N TEAM_MODE TEAM_TERMINAL
-# TEAM_MODEL TEAM_EFFORT (empty when absent; template placeholders like <Orca> are ignored for the
+# TEAM_NAMES (a comma list, no spaces) TEAM_MODEL TEAM_EFFORT (empty when absent; template placeholders like <Orca> are ignored for the
 # name/mode keys, but an invalid model/effort EXITS 64, since silently launching on the default model
 # is the failure this block exists to prevent).
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
-  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""
+  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""; TEAM_NAMES=""
   [ -f "$conf" ] || return 0
   while IFS='=' read -r k v; do
     case "$k" in
       seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;;
       permission_mode) TEAM_MODE="$v" ;; terminal) TEAM_TERMINAL="$v" ;;
       model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;; max_sessions) TEAM_MAX="$v" ;;
+      names) TEAM_NAMES="$v" ;;
     esac
   done < <(awk '
     /^team:[[:space:]]*$/ { on=1; next }

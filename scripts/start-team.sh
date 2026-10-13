@@ -9,10 +9,12 @@
 # You can change the team size, names, permission mode or terminal at any time — just ask Claude.
 #
 # Usage:
-#   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX]
+#   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX] [--names A,B,C]
 #                         [--mode normal|accept-edits|auto] [--model M] [--effort E]
 #                         [--terminal BACKEND|auto|list] [--repo DIR]
 #   --terminal list   print every backend and whether it is available here, then exit
+#   --names A,B,C     name siblings from this pool instead of <prefix>1..N: names already running are
+#                     kept, the rest are drawn at random (TEAM_NAMES_SHUFFLE=0 keeps list order)
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
 #   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | a full id). Always
 #                     passed explicitly; default = the team block's `model:`, else opus[1m]. One value
@@ -24,6 +26,7 @@
 #   team:
 #     seat:             Orca
 #     prefix:           Sib
+#     names:            Mars,Venus,Vulcan   (optional: a pool of sibling names, comma list, no spaces)
 #     siblings:         2
 #     permission_mode:  normal
 #     terminal:         auto
@@ -33,11 +36,11 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '11,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '11,34p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0; f_names=""
 # A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
 need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }
 while [ $# -gt 0 ]; do
@@ -46,6 +49,7 @@ while [ $# -gt 0 ]; do
     --siblings) shift; f_n="${1:?--siblings needs a number}" ;;
     --seat) shift; f_seat="${1:?--seat needs a name}" ;;
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
+    --names) shift; f_names="${1:?--names needs a comma list, e.g. Mars,Venus,Vulcan}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     # f_model_set / f_effort_set record "given", apart from "empty": `--model=` is a given, invalid value.
@@ -74,7 +78,34 @@ launch_set_account "$f_account"
 launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set"
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
-for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
+pool_csv="${f_names:-${TEAM_NAMES:-}}"
+if [ -n "$pool_csv" ]; then
+  # A name pool: keep the pool's names that are already running (a re-run fills gaps, as with numbers),
+  # then draw the rest at random. The seat's own name is never a sibling.
+  IFS=',' read -ra pool <<<"$pool_csv"
+  live=(); idle=()
+  for nm in "${pool[@]}"; do
+    launch_valid_name "$nm" || { echo "names: '$nm' is not a valid session name (letters, digits, _ and - only)" >&2; exit 64; }
+    [ "$nm" = "$seat" ] && continue
+    case " ${live[*]-} ${idle[*]-} " in *" $nm "*) continue ;; esac
+    if [ -n "$(launch_pids "$nm")" ]; then live+=("$nm"); else idle+=("$nm"); fi
+  done
+  if [ "$(( ${#live[@]} + ${#idle[@]} ))" -lt "$n" ]; then
+    echo "names: the pool has $(( ${#live[@]} + ${#idle[@]} )) usable names for $n siblings; add names or lower --siblings" >&2; exit 64
+  fi
+  if [ "${TEAM_NAMES_SHUFFLE:-1}" != 0 ] && [ "${#idle[@]}" -gt 1 ]; then
+    if command -v shuf >/dev/null 2>&1; then mapfile -t idle < <(printf '%s\n' "${idle[@]}" | shuf)
+    else
+      for ((i = ${#idle[@]} - 1; i > 0; i--)); do j=$((RANDOM % (i + 1))); t="${idle[$i]}"; idle[$i]="${idle[$j]}"; idle[$j]="$t"; done
+    fi
+  fi
+  for nm in "${live[@]+"${live[@]}"}" "${idle[@]+"${idle[@]}"}"; do
+    [ "$(( ${#names[@]} - 1 ))" -lt "$n" ] || break
+    names+=("$nm"); prompts+=("$SIB_PROMPT")
+  done
+else
+  for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
+fi
 for i in "${!names[@]}"; do launch_check_args "${names[$i]}" "${prompts[$i]}"; done
 
 launch_init "$REPO" "${f_term:-${TEAM_TERMINAL:-}}"
@@ -83,8 +114,8 @@ if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or saved"
   launch_describe_env
   src="none (built-in defaults)"
-  if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_N$TEAM_MODE$TEAM_TERMINAL" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
-  echo "team       seat=${seat} siblings=${n} prefix=${prefix} mode=${LAUNCH_MODE} terminal=${f_term:-${TEAM_TERMINAL:-auto}}   config: ${src}; flags override"
+  if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_NAMES$TEAM_N$TEAM_MODE$TEAM_TERMINAL" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
+  echo "team       seat=${seat} siblings=${n} ${pool_csv:+names=${pool_csv} }prefix=${prefix} mode=${LAUNCH_MODE} terminal=${f_term:-${TEAM_TERMINAL:-auto}}   config: ${src}; flags override"
   if [ "$LAUNCH_BACKEND" = manual ]; then echo "manual     nothing can open windows here; a real run prints these commands and exits 2"; fi
 else
   if [ "$LAUNCH_FORCED" = 1 ] && [ "$LAUNCH_AVAILABLE" = 0 ]; then

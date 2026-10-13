@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: a sibling name pool.** `names: Mars,Venus,Vulcan` in the `team:` block (or `--names` on `start-team.sh`) names siblings from your own list instead of `Sib1`, `Sib2`. Names already running are kept, the rest are drawn at random (`TEAM_NAMES_SHUFFLE=0` keeps list order), the seat's name is never drawn, and a pool too small for `siblings` exits 64. Tests: `tests/sibling-names.test.sh`.
+
 ## 0.8.1 — 2026-10-13
 
 Polish for the guide page and its troubleshooting notes. No behavior change in any script.
