@@ -24,8 +24,6 @@ flowchart TD
   deploy --> human
   builders -.->|context fills| recycle["Retro, then recycle into a fresh session"]
   recycle -.-> board
-  classDef pending stroke-dasharray: 5 5
-  class train pending
 ```
 
 You give ideas to the seat; the seat writes fenced rows on the board; builders work in private worktrees; validators check each finished row; the seat merges approved rows one at a time onto a train, runs the full gate and deploys. Dotted lines are the context loop: a full session writes down what it learned and is replaced.
@@ -41,13 +39,11 @@ Ten writers can share one codebase because six things never happen:
 5. **Merge one at a time.** The seat lands approved rows one by one (`skills/reconcile/SKILL.md`), re-proves the gate after each and pushes immediately.
 6. **Tests come first.** Every row starts with a test that fails, then the code that makes it pass. A merge that breaks something shows up red in the gate before it ships.
 
-> verify at merge
-
-With the v0.8 train skills (`skills/assemble-train/SKILL.md`, `skills/audit-train/SKILL.md`) each merge is also rehearsed with a dry run (`git merge-tree`) onto a train branch first, and the finished train is audited independently.
+With the train skills (`skills/assemble-train/SKILL.md`, `skills/audit-train/SKILL.md`) each merge is also rehearsed with a dry run (`git merge-tree`) onto a train branch first, and the finished train is audited independently.
 
 ## The pieces, one by one
 
-Each piece has the same three parts. Parts marked *verify at merge* describe v0.8 items that are being finished in parallel.
+Each piece has the same three parts.
 
 ### The seat, the board and one allocator
 
@@ -91,13 +87,11 @@ Each piece has the same three parts. Parts marked *verify at merge* describe v0.
 
 ### Release trains and the deploy policy
 
-> verify at merge
-
 **What it does:** The seat merges READ-PASS rows one at a time onto a train branch cut from main, rehearses each merge, runs one full gate, has the train audited independently, then deploys. Whether it deploys on its own once green or asks you first is a policy you choose (default: ask).
 
 **Why it exists:** Merging in parallel hides conflicts until deploy day; deploying on an unaudited or red tree ships the failure to your users.
 
-**The knob:** the `Deploy` block in `templates/ORCHESTRATION.md` (`vehicle`, `exclusivity`, `post-deploy`); `skills/reconcile/SKILL.md`; the train skills `skills/assemble-train/SKILL.md` and `skills/audit-train/SKILL.md` and the deploy-policy setting.
+**The knob:** the `Deploy` block in `templates/ORCHESTRATION.md` (`vehicle`, `exclusivity`, `post-deploy`, and `deploy_policy: ask | auto-when-green`, default `ask`); `skills/reconcile/SKILL.md`; the train skills `skills/assemble-train/SKILL.md` (land approved rows one merge at a time) and `skills/audit-train/SKILL.md` (a validator's sweep of the finished train).
 
 ### Context guard, retro and recycle
 
@@ -109,33 +103,27 @@ Each piece has the same three parts. Parts marked *verify at merge* describe v0.
 
 ### Multi-account and the session cap
 
-> verify at merge
-
 **What it does:** Optional: one team can use several Claude Code accounts (a config directory per account, `--account N` on the launch scripts). You also pick a cap on concurrent sessions that your machine can carry, and relaunch one session at a time after a crash.
 
 **Why it exists:** Usage limits are per account, and memory is per machine: too many sessions together once exhausted a host and took every session down at once.
 
-**The knob:** `docs/MULTI-ACCOUNT.md`, `--account` on `scripts/start-team.sh` and `scripts/recycle-sibling.sh`, `siblings` in the team block, and the session-cap setting.
+**The knob:** `docs/MULTI-ACCOUNT.md`, `--account` on `scripts/start-team.sh` and `scripts/recycle-sibling.sh`, `siblings` and `max_sessions` in the team block (unset = no check; the launch scripts warn before one more session would pass it).
 
 ### Non-blocking questions
-
-> verify at merge
 
 **What it does:** The seat never freezes on a question for you. It asks in plain text (plus a push notification if you have one), keeps moving everything that does not depend on the answer, holds open questions as one queue line on the board banner, and re-presents them when you next type. A permission request arrives as one copy-pastable shell command, never a prose "please approve".
 
 **Why it exists:** A blocking prompt has no timeout: one unanswered question would freeze every session behind it.
 
-**The knob:** the question mode in `templates/ORCHESTRATION.md` and the loop in `skills/orchestrate/SKILL.md`. Change it any time: just ask Claude.
+**The knob:** `questions: blocking | non-blocking` in `templates/ORCHESTRATION.md` and the loop in `skills/orchestrate/SKILL.md`. Change it any time: just ask Claude.
 
 ### The status HUD (optional)
-
-> verify at merge
 
 **What it does:** A Claude Code mod that shows, in a band above your prompt and in a pane, each session's context fill, model and activity. `kit-init` asks whether to install it; the default is no.
 
 **Why it exists:** From one terminal you cannot see ten sessions' fill; the HUD puts the report and hand-over marks where you can see them.
 
-**The knob:** the HUD's README under `plugins/status-hud/`, the `kit-init` question, and the seat name it highlights. A lighter option with no mod is the statusline script `scripts/statusline-ctx.sh`. Change it any time: just ask Claude.
+**The knob:** the HUD's README under `plugins/status-hud/`, the `kit-init` question, `/hud band|pane|off|quiet` while running, and `claude plugin configure status-hud@artekka-kits --values-stdin` for `showForNames` (the seat name it highlights) and the `quietMode*` keys. A lighter option with no mod is the statusline script `scripts/statusline-ctx.sh`. Change it any time: just ask Claude.
 
 ## Make it your own flavor
 
@@ -149,9 +137,9 @@ Nothing in the kit is sacred. This is the order to tune things, what to drop whe
 | Throttle slots | `gate_slots` | 2; lower it if gates flake under load, raise it on a big machine |
 | Permission mode | `permission_mode` | `normal` (asks before risky actions); move to `accept-edits` or `auto` only once the guards are on |
 | Model per lane | `model` / `effort` | Strong model for risky rows and every READ, a cheaper one for mechanical rows |
-| Deploy policy | the `Deploy` block + the deploy-policy setting | Ask first, until you trust the gate |
-| Question mode | question mode in `templates/ORCHESTRATION.md` | Non-blocking: keeps the team moving while you are away |
-| Session cap | the session-cap setting + `siblings` | Start at 3 to 4 on a laptop, and measure memory before raising it |
+| Deploy policy | the `Deploy` block + `deploy_policy` | Ask first, until you trust the gate |
+| Question mode | `questions:` in `templates/ORCHESTRATION.md` | Non-blocking: keeps the team moving while you are away |
+| Session cap | `max_sessions` + `siblings` | Start at 3 to 4 on a laptop, and measure memory before raising it |
 
 ### What is safe to drop
 
@@ -207,7 +195,8 @@ verdict="$(printf '%s' "$input" | CUR="$cur" awk '
       t = w[k]
       if (t == "" || substr(t, 1, 1) == "-") continue          # options
       if (++pos == 1) continue                                # the remote
-      d = t; sub(/^\+/, "", d); sub(/^.*:/, "", d); sub(/^refs\/heads\//, "", d)
+      d = t; if (d == "HEAD") d = ENVIRON["CUR"]            # bare HEAD pushes the current branch
+       sub(/^\+/, "", d); sub(/^.*:/, "", d); sub(/^refs\/heads\//, "", d)
       if (d == "main") print "deny"                           # main, +main, HEAD:main, HEAD:refs/heads/main, :main
     }
     if (pos < 2 && ENVIRON["CUR"] == "main") print "deny"     # no refspec: pushes the current branch
@@ -224,7 +213,7 @@ Registration entry for `.claude/settings.json`:
   "hooks": [ { "type": "command", "command": "bash .claude/hooks/no-push-main.sh" } ] } ] } }
 ```
 
-What it does **not** catch: `git -C <dir> push`, aliases, scripts that push, and `git push <remote>` from a branch whose upstream is `main`. A quoted `;` or `&&` is respected, so a commit message that merely mentions the phrase is not blocked. Like `hooks/git-guard.sh`, it is a speed bump for an agent, not a sandbox.
+What it does **not** catch: `git -C <dir> push`, aliases, scripts that push, a `FOO=1 git push` env prefix, `sudo git push`, a subshell or `bash -c "git push …"`, a `--repo=` remote, and `git push <remote>` from a branch whose upstream is `main`. A quoted `;` or `&&` is respected, so a commit message that merely mentions the phrase is not blocked. Like `hooks/git-guard.sh`, it is a speed bump for an agent, not a sandbox.
 
 Then prove it can fail, the kit way: run the hook with a push to `main` (it must deny) and with a push to a feature branch (it must stay silent), as `skills/falsify/SKILL.md` describes. Skills and rules follow the same pattern: write the rule, make it opt-in, prove it red.
 
@@ -234,9 +223,7 @@ Then prove it can fail, the kit way: run the hook with a push to `main` (it must
 - **There is a cap.** Your machine's memory sets how many sessions can run at once. A session that runs low on context writes down what it learned and restarts fresh; the board and the build log carry everything forward.
 - **Every knob is changeable.** Nothing here is fixed: ask Claude to change any setting, any time.
 
-> verify at merge
-
-With the v0.8 train skills the dry-run merge shows such a conflict ahead of time, before anything is merged.
+With the train skills the dry-run merge shows such a conflict ahead of time, before anything is merged.
 
 ## Where to go next
 

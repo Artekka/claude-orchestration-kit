@@ -31,11 +31,7 @@ SECTIONS=(
   "hud|The status HUD"
 )
 # Paths a "verify at merge" section may name before the parallel items land (remove entries at reconcile).
-PENDING=(
-  skills/assemble-train/SKILL.md
-  skills/audit-train/SKILL.md
-  plugins/status-hud
-)
+PENDING=()
 # Team-block keys the guide must explain AND templates/ORCHESTRATION.md must define.
 KEYS=(worktrees git_guard ctx_guard context_window gate_slots permission_mode model effort terminal)
 
@@ -47,7 +43,8 @@ MD="$ROOT/HOW-IT-WORKS.md"; HTML="$ROOT/docs/how-it-works.html"
 if [ -f "$MD" ] && [ -f "$HTML" ]; then
   # The brief's private list, plus machine paths and account-ish strings. Case-insensitive.
   priv='einherjar|camelot|artekkaos|darkage|dark age|tekkaman|/home/artekka|/mnt/[a-z]/|discord|gamelabs|@gmail|@artekka|session_0|claude\.ai/code|\bart\b|pnpm gate|\bOrca\b'
-  hits="$(grep -n -i -E "$priv" "$MD" "$HTML" | head -5)"
+  # the public marketplace id (plugin@artekka-kits) is the one allowed use of the handle
+  hits="$(sed 's/@artekka-kits//g' "$MD" "$HTML" | grep -n -i -E "$priv" | head -5)"
   [ -z "$hits" ] && ok || bad "private strings in the guide: $hits"
   # US English (the kit's own text is US): the usual British spellings, none allowed.
   brit="$(sed 's/aria-labelledby//g' "$MD" "$HTML" | grep -n -i -E '\b(colour|behaviour|favour|centre|grey|defence|honour|licence|organis|analys(e|ing)\b|cancelled|labelled|modelled|catalogue)' | head -3)"
@@ -181,31 +178,10 @@ if [ "${#PENDING[@]}" -eq 0 ]; then
 else
   [ "$nm" -gt 0 ] && ok || bad "(f) PENDING lists ${#PENDING[@]} path(s) but no 'verify at merge' marker is left: empty the list"
 fi
-# the diagram's pending step is dashed in BOTH renderings (mermaid class + svg group)
-grep -q '^  class [a-z]* pending$' "$MD" && grep -q '<g class="box [a-z ]*pending" data-pending="true"' "$HTML" && ok || bad "(f) the pending step in the loop diagram is not dashed in both the Mermaid and the SVG"
+# no pending styling is left in either diagram rendering
+grep -q 'classDef pending\|class [a-z]* pending' "$MD" || grep -q 'box [a-z ]*pending' "$HTML" && bad "(f) pending diagram styling remains" || ok
 # every marker in the MD has its twin in the HTML, and the other way round
 [ "$nm" = "$nh" ] && ok || bad "(f) $nm '> verify at merge' marker(s) in the MD but $nh data-pending element(s) in the HTML"
-
-# ---- (h) nothing unmarked claims what is not merged yet (READ ORCA171-4c MED-2) ---------------
-# The train skills (dry-run merges onto a train branch, an independent audit) arrive in v0.8 from another
-# item. Until reconcile removes the markers, those words may appear ONLY inside a marked region.
-unm="$(python3 - "$MD" "$HTML" <<'PY'
-import re, sys
-md = open(sys.argv[1], encoding="utf8").read()
-ht = open(sys.argv[2], encoding="utf8").read()
-words = re.compile(r"merge-tree|rehears|dry[- ]run", re.I)
-# MD: drop marked ### sections and the paragraph after a bare marker line, then look.
-md = re.sub(r"^###[^\n]*\n(?:(?!^##).*\n)*?> verify at merge\n(?:(?!^##).*\n)*", "", md, flags=re.M)
-md = re.sub(r"^> verify at merge\n\n[^\n]*\n", "", md, flags=re.M)
-for ln in md.splitlines():
-    if words.search(ln): print("MD: " + ln[:110])
-# HTML: drop every element that carries data-pending (section, p or svg group; none nest).
-ht = re.sub(r'<(section|p|g)\b[^>]*data-pending="true"[^>]*>.*?</\1>', "", ht, flags=re.S)
-for m in words.finditer(ht):
-    print("HTML: ..." + re.sub(r"\s+", " ", ht[max(0, m.start() - 50):m.end() + 40]))
-PY
-)"
-[ -z "$unm" ] && ok || bad "(h) claims about unmerged behavior outside a 'verify at merge' region: $unm"
 
 # ---- (i) small pins: registration snippet parses; recycle claim is qualified; links are real ------
 python3 - "$MD" <<'PY' && ok || bad "(i) the registration snippet under 'Add your own' is missing or is not valid JSON that names the hook"
