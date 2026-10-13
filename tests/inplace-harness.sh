@@ -106,13 +106,15 @@ sbenv() {  # prints NAME=VALUE words for `env`; extra pairs may follow as argume
   printf '%s\n' "PATH=$SB/bin:$PATH" "HOME=$SB/home" "SIBLING_STATE_DIR=$SB/state" "STUB_DIR=$SB/stub" \
     "SIBLING_MIN_RUN_SECS=0" "FAKE_TERM_DIR=$SB" "DISPLAY=:0" "RECYCLE_POLL_SECS=0.2" "RECYCLE_INPLACE_TIMEOUT=20" \
     "FAKE_TERM_MODE=run" \
-    "WSL_DISTRO_NAME=" "WSL_INTEROP=" "TMUX=" "WT_EXE=$SB/no-such-wt.exe" "$@"
+    "WSL_DISTRO_NAME=" "WSL_INTEROP=" "TMUX=" "WT_EXE=$SB/no-such-wt.exe" "TERMINAL=xterm" "$@"
 }
 # ISOLATION (the m7 incident, 2026-10-03): lib-launch auto-detects the terminal. On a WSL box that is the
 # REAL wt.exe (derived from cmd.exe's %USERNAME% when WT_EXE is unset), so any run that reaches the
 # auto-detect path (e.g. a mutant that drops --terminal) opened a real Windows Terminal tab on the
 # user's screen. The defaults above make the sandbox non-WSL, non-tmux and point WT_EXE at a path that
 # does not exist; a case that needs the WSL dry-run text passes SB_WSL_ENV (a fake wt.exe FILE, never run).
+# TERMINAL=xterm: a desktop with its own x-terminal-emulator (Debian/Ubuntu ship one) would otherwise win the
+# auto-detect over the stand-in xterm; $TERMINAL is asked first, so the sandbox always lands on the stand-in.
 sb_wsl_env() { printf '%s\n' "WSL_DISTRO_NAME=TestDistro" "WT_EXE=$SB/fake-wt.exe"; }
 # env -u CLAUDE_CONFIG_DIR (this session may run under one); a case that wants it passes it explicitly.
 run_in_sb() {  # <env pairs...> -- <command...>   (sets RC OUT ERR)
