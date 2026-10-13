@@ -24,7 +24,9 @@ Protocol table lives in the board file; project specifics in `docs/orchestration
    board's highest id and add one — that read-then-write has no lock and git can't catch it.
 5. **The board carries status, not narrative.** Past ~60 KB it is archived verbatim to
    `docs/orchestration/archive/BOARD_ARCHIVE_<date>.md`. Grep archives; never read one whole.
-6. **Run the gate from inside your own worktree** and read the literal pass line.
+6. **Run the gate from inside your own worktree** and read the literal pass line. Whole-suite
+   runs go through `scripts/gate-throttle.sh`; one full gate per tree (touched files mid-row,
+   the full gate once at GREEN-FINAL).
 7. **Independent verification at every hand-off** — by a SIBLING SESSION that didn't build
    the row (no mutual pairs), contract only, reporting to the seat and stating whether it
    DERIVED its verdict or only consistency-checked. The verifier reports; it never fixes.

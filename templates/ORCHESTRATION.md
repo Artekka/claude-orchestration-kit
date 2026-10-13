@@ -15,7 +15,19 @@ pass proof:   <the literal summary line to assert, e.g. "Tests N passed / 0 fail
 never run:    <known-flaky full-suite commands and WHY, e.g. "full parallel test — container storm">
 slow path:    <the exhaustive gate reserved for pre-deploy / before a train, and when it's required>
 run from:     INSIDE your own worktree (a script that cd's to its own dir gates the tree it lives in)
+throttle:     bash scripts/gate-throttle.sh <command>   (host-wide slots: `gate_slots:` in the team block)
 ```
+
+- **One full gate per tree.** Builders run the touched test files directly while they work (RED
+  proofs, mutants, mid-row checks) and the FULL gate once, at GREEN-FINAL. A verifier reading at the
+  builder's GREEN-FINAL SHA uses the builder's gate log at that SHA as gate evidence (it checks the
+  printed counts itself) and runs only the extra files and mutants it needs. Mutants never go
+  through the full gate.
+- **Every whole-suite run goes through the throttle**, the full gate and any whole test suite alike,
+  so N sessions on one machine never run N heavy suites at once (load flakes look like real reds).
+  One or a few test files may run directly.
+- `bash scripts/quiet-mode.sh on|off|status` frees the machine for the human: no NEW throttled run
+  starts while it is on; running ones finish. The seat turns it on and off when the human asks.
 
 ## Change classes
 
@@ -78,6 +90,9 @@ from the warn mark up, injects one line: approaching (300K), report now (350K), 
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
 `on` for a team, `off` solo. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
 the guard; a session whose transcript names a Haiku model always gets the 200K marks.
+`gate_slots` (default 2) is how many throttled runs (`scripts/gate-throttle.sh`) may run at once on
+this machine, plus one priority slot for the paths the seat lists in
+`~/.orchestration-kit/runtime/gate-priority.txt` (release/train gates). Lower it if gates flake under load.
 `model` / `effort` (both optional) set the default for every launch: `model` is `opus[1m]`, `sonnet[1m]`, `haiku` or a full model id (default `opus[1m]`), `effort` one of `low|medium|high|xhigh|max` (default: not passed). The launch scripts ALWAYS pass `--model` and never inherit the old session's, so a recycled session starts on the model its lane needs, not on whatever the terminal had. `--model` / `--effort` flags override the block; a bad value in the block is ignored with a warning, a bad flag exits 64. Per-lane choices: orchestrate skill, "Model per lane".
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
 `tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
@@ -95,6 +110,7 @@ team:
   git_guard:        off
   ctx_guard:        off
   context_window:   1m
+  gate_slots:       2
   terminal:         auto
 ```
 
