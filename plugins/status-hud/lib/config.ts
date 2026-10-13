@@ -4,6 +4,10 @@ export type Config = {
   variant: 'band' | 'pane' | 'off'
   amberMark: number
   reportMark: number
+  /** Context the face scale ends at (💀): the kit's hand-over mark. */
+  handoverMark: number
+  /** Draw a face per session row: 😀 when fresh to 💀 at the hand-over mark. */
+  faces: boolean
   flashMs: number
   commitWarnPct: number
   commitCritPct: number
@@ -35,6 +39,8 @@ export function parseConfig(o: PluginOptions, home: string): Config {
     variant: variant === 'pane' || variant === 'off' ? variant : 'band',
     amberMark: num(o.contextAmberMark, 300_000),
     reportMark: num(o.contextReportMark, 350_000),
+    handoverMark: num(o.contextHandoverMark, 400_000, 1),
+    faces: str(o.sessionFaces, 'on') !== 'off',
     flashMs: num(o.flashSeconds, 6) * 1000,
     commitWarnPct: num(o.commitWarnPct, 85),
     commitCritPct: num(o.commitCritPct, 95),

@@ -9,6 +9,20 @@ export function fillLevel(tokens: number, c: Pick<Config, 'amberMark' | 'reportM
   return 'ok'
 }
 
+const FACES = ['😀', '😃', '😄', '🙂', '😐', '😕', '😟', '😧', '😨', '😰', '😱']
+/** A session's mood at a glance: 😀 when fresh, worse as context fills, 💀 from the hand-over mark on. */
+export function faceFor(tokens: number, c: Pick<Config, 'handoverMark'>): string {
+  const p = tokens / c.handoverMark
+  return p >= 1 ? '💀' : (FACES[Math.min(FACES.length - 1, Math.max(0, Math.floor(p * FACES.length)))] as string)
+}
+
+/** Short model label for a session row: the family name (opus, sonnet, haiku), else the id's first word. */
+export function modelLabel(model: string): string {
+  const m = model.toLowerCase()
+  for (const f of ['opus', 'sonnet', 'haiku', 'gemini']) if (m.includes(f)) return f
+  return m.replace(/^claude-/, '').split(/[-[ ]/)[0] ?? ''
+}
+
 /** True only on the update that moves a session from below the report mark to at/above it. */
 export function crossedReport(prev: number | undefined, now: number, c: Pick<Config, 'reportMark'>): boolean {
   return prev !== undefined && prev < c.reportMark && now >= c.reportMark

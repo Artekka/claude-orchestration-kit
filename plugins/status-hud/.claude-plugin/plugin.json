@@ -30,6 +30,22 @@
       "description": "At or above this the session turns red, and flashes red when it crosses.",
       "default": 350000
     },
+    "contextHandoverMark": {
+      "type": "number",
+      "title": "Context hand-over mark (tokens)",
+      "description": "Where each session's face reaches 💀: the kit's hand-over mark (400K on a 1M window).",
+      "default": 400000
+    },
+    "sessionFaces": {
+      "type": "string",
+      "title": "Session faces",
+      "description": "on draws a face per session row, 😀 when fresh to 💀 at the hand-over mark; off hides it.",
+      "default": "on",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
     "flashSeconds": {
       "type": "number",
       "title": "Report flash seconds",

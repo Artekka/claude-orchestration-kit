@@ -1,7 +1,7 @@
 import type { Heartbeat, Host, Snapshot } from '../types'
 import type { Config } from './config'
 import { C, type Col, type Run, Scr, bar, clamp, graph2, lpad, pad, spark, sprite, trunc } from './cells'
-import { commitLevel, fillLevel, flashPhase, isFlashing, loadLevel, type Level } from './thresholds'
+import { commitLevel, faceFor, fillLevel, flashPhase, isFlashing, loadLevel, modelLabel, type Level } from './thresholds'
 import { canToggle } from './quietmode'
 
 export type View = { snap: Snapshot; cfg: Config; flash: Record<string, number>; sel: number; now: number }
@@ -101,7 +101,7 @@ export function meters(v: View, max: number): Meter[] {
   return out
 }
 
-/** One session row: acct dot, name, context bar + K, state glyph, activity. Flashes red after crossing the report mark. */
+/** One session row: acct dot, face, name, context bar + K, model, state glyph, activity. Flashes red after crossing the report mark. */
 export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): Scr {
   const s = new Scr(w, 1)
   const lv = fillLevel(h.tokens, v.cfg)
@@ -111,8 +111,15 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): 
   for (let x = 0; x < w; x++) s.put(x, 0, ' ', C.tx, bg)
   const st = h.state === 'busy' ? ['▘', C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
   s.put(0, 0, '●', h.account === 2 ? C.purple : C.blue, bg)
-  s.put(2, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
-  let x = 10
+  let x = 2
+  if (v.cfg.faces && w >= 30) {
+    // An emoji is two terminal columns: the second cell holds nothing so the row keeps its width.
+    s.put(x, 0, faceFor(h.tokens, v.cfg), C.tx, bg)
+    s.cells[0]![x + 1] = { ch: '', fg: C.tx, bg, bold: false }
+    x += 3
+  }
+  s.put(x, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
+  x += 8
   if (w >= 24) {
     const mark = Math.round((v.cfg.reportMark / h.window) * 8)
     bar(s, x, 0, 8, h.tokens / h.window, fg, mark)
@@ -121,6 +128,10 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): 
   }
   s.put(x, 0, `${lpad(kfmt(h.tokens), 5)}${lv === 'red' ? '!' : lv === 'amber' ? '~' : ' '}`, fg, bg, true)
   x += 7
+  if (w - x > 16) {
+    s.put(x, 0, pad(trunc(modelLabel(h.model), 6), 6), flashing ? C.white : C.dim, bg)
+    x += 7
+  }
   s.put(x, 0, st[0] as string, flashing ? C.white : (st[1] as Col), bg, true)
   x += 2
   if (w - x > 6) s.put(x, 0, trunc(h.activity, w - x), flashing ? C.white : C.dim, bg)

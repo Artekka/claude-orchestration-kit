@@ -17,7 +17,8 @@ const snap: Snapshot = {
 }
 const cfg = parseConfig({ quietModeOnCmd: 'a', quietModeOffCmd: 'b' }, '/h')
 const view = (o: Partial<View> = {}): View => ({ snap, cfg, flash: {}, sel: 0, now: 1_000, ...o })
-const widthOf = (l: Line): number => Array.from(lineText(l)).length
+// Display width: an emoji (a session face) takes two terminal columns.
+const widthOf = (l: Line): number => Array.from(lineText(l)).reduce((n, ch) => n + ((ch.codePointAt(0) ?? 0) >= 0x1f000 ? 2 : 1), 0)
 
 test('variant A: 10 rows at 180 columns, every line exactly the width, never wider', async () => {
   const lines = drawBand(view(), 180, 10)
@@ -70,4 +71,21 @@ test('chips: quiet mode (clickable only when both commands are set), commit warn
   expect(chips(view({ snap: { ...snap, quietMode: null } })).some(x => x.label.includes('mode'))).toBe(false)
   const calm = { ...snap, host: { ...snap.host!, commit: { ...snap.host!.commit!, usedPct: 40 } } }
   expect(chips(view({ snap: calm })).some(x => x.label.includes('commit'))).toBe(false)
+})
+
+test('each session row shows a face from 😀 to 💀 at the hand-over mark, and its model', async () => {
+  const row = (k: number, model = 'claude-opus-5-5[1m]'): string => sessionRow(view(), { ...S('Mars', k), model }, 70).runs(0).map(r => r.text).join('')
+  expect(row(0).slice(0, 10)).toBe('● 😀 Mars ')
+  expect(row(180).includes('😐')).toBe(true)
+  expect(row(399).includes('😱')).toBe(true)
+  expect(row(400).includes('💀')).toBe(true)
+  expect(row(100).includes(' opus ')).toBe(true)
+  expect(row(100, 'claude-sonnet-5-5').includes(' sonnet')).toBe(true)
+  // the emoji's second column is an empty cell, so the row stays exactly 70 columns wide on screen
+  const r = sessionRow(view(), S('Mars', 100), 70)
+  expect(r.cells[0]!.length).toBe(70)
+  expect(r.cells[0]![3]!.ch).toBe('')
+  // faces off: the row starts with the name, as before
+  const off = parseConfig({ sessionFaces: 'off' }, '/h')
+  expect(sessionRow(view({ cfg: off }), S('Mars', 100), 70).runs(0).map(x => x.text).join('').startsWith('● Mars')).toBe(true)
 })
