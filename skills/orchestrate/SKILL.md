@@ -131,6 +131,7 @@ git push origin main                                # never HEAD:main
 - Deploy after each reconcile wave (1–3 rows finishing together); a hotfix or human-awaited fix ships immediately. Main never sits ahead of live past a working day.
 - Claim DEPLOY slot (written + pushed BEFORE running) → announce the window → run **ORCHESTRATION.md → Deploy `vehicle`** → verify with its `post-deploy` check (a marker from this train in the live artifact + the version string) → release the slot with the verified version.
 - Siblings never deploy while the banner stands; they hand SHAs to the seat.
+- **Deploy policy** = ORCHESTRATION.md → Deploy `deploy_policy:`. `ask` (default): ask the human before running the vehicle. `auto-when-green`: a train whose rows all passed READ and whose gate is green deploys without asking; tell the human after, with the verified version. Never ask under `auto-when-green`, never skip the ask under `ask`.
 
 ## 8 · Log
 

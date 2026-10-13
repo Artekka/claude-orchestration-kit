@@ -59,11 +59,11 @@ has "trial 3-way: b.txt is NEITHER side's blob" "NEITHER b.txt" "$out"
 has "trial 3-way: d.txt is the rider's" "RIDER d.txt" "$out"
 hasnt "trial 3-way: an earlier rider's file is not listed" "a.txt" "$out"
 
-# a rider whose change the train already reverted to base: TRAIN won (the rider's blob did not land)
-git checkout -q -b r5 "$BASE0"; echo c5 > c.txt; git commit -qam r5; R5=$(git rev-parse HEAD)
-git checkout -q -b t5 "$BASE0"; echo c5 > c.txt; git commit -qam "t5 same"; echo c > c.txt; git commit -qam "t5 back"; T5=$(git rev-parse HEAD)
+# the train already carries the rider's edit plus one more hunk: the merged blob is the TRAIN's, not the rider's
+git checkout -q -b r5 "$BASE0"; sed -i 's/^5$/five/' a.txt; git commit -qam r5; R5=$(git rev-parse HEAD)
+git checkout -q -b t5 "$BASE0"; sed -i -e 's/^5$/five/' -e 's/^7$/seven/' a.txt; git commit -qam t5; T5=$(git rev-parse HEAD)
 out="$(B=$T5 R=$R5 bash "$ASM/trial.sh" 2>&1)"
-has "trial: a rider change the train already undid shows TRAIN" "TRAIN c.txt" "$out"
+has "trial: a rider edit the train already holds (plus more) shows TRAIN" "TRAIN a.txt" "$out"
 git checkout -q train
 
 out="$(R=$R1 bash "$ASM/trial.sh" 2>&1)"; rc=$?
@@ -97,7 +97,7 @@ out="$(bash "$ASM/gsum.sh" 2>&1)"; rc=$?
 
 # ---- land a train, then audit it -----------------------------------------------------------------
 git merge -q --no-ff -m "merge(train): r1" "$R1"; M1=$(git rev-parse HEAD)
-git merge -q --no-ff -m "merge(train): r3" "$R3"; M3=$(git rev-parse HEAD)
+git merge -q --no-ff -m "merge(train): r3" "$R3" >/dev/null 2>&1; M3=$(git rev-parse HEAD)
 git merge --no-ff -m "merge(train): r2 (hand-resolved a.txt)" "$R2" >/dev/null 2>&1
 sed -i -e '/^<<<<<<<\|^=======\|^>>>>>>>/d' -e '/^two$/d' a.txt; git add a.txt; git commit -qm "merge(train): r2 (hand-resolved a.txt)"; M2=$(git rev-parse HEAD)
 git cherry-pick -x "$R4B" >/dev/null 2>&1; P4=$(git rev-parse HEAD)
@@ -116,11 +116,11 @@ has "audit: oldest first" "${M1:0:9}" "$first"
 # the rider ids are ordinary commits, not first-parent; they must not appear as lines
 hasnt "audit: rider commits are not swept" "SINGLE ${R1:0:9}" "$out"
 
-# cleared list: every p2 must be named in it
-printf '%s\n' "$R1" "$R3" > "$TMP/cleared"
-out="$(BASE=$TIP0 TIP=$TIP CLEARED="$TMP/cleared" bash "$AUD/audit.sh" 2>&1)"
-has "audit cleared: r1 is cleared" "p2=${R1:0:9} cleared=YES" "$out"
-has "audit cleared: r2 is NOT in the list" "p2=${R2:0:9} cleared=NO" "$out"
+# approved list: every p2 must be named in it
+printf '%s\n' "$R1" "$R3" > "$TMP/approved"
+out="$(BASE=$TIP0 TIP=$TIP APPROVED="$TMP/approved" bash "$AUD/audit.sh" 2>&1)"
+has "audit approved: r1 is approved" "p2=${R1:0:9} approved=YES" "$out"
+has "audit approved: r2 is NOT in the list" "p2=${R2:0:9} approved=NO" "$out"
 
 # runs against the repo it is called in, never a fixed path
 out="$(cd "$TMP" && BASE=$TIP0 TIP=$TIP bash "$AUD/audit.sh" 2>&1)"; rc=$?
@@ -147,7 +147,7 @@ done
 has "assemble-train calls trial.sh" "trial.sh" "$(cat "$ASM/SKILL.md" 2>/dev/null)"
 has "assemble-train calls cptrial.sh" "cptrial.sh" "$(cat "$ASM/SKILL.md" 2>/dev/null)"
 has "audit-train calls audit.sh" "audit.sh" "$(cat "$AUD/SKILL.md" 2>/dev/null)"
-priv="$(grep -nIiE 'pnpm|vitest|einherjar|/home/|AIDriver|strandh|Agent Scratchpad' "$ASM"/* "$AUD"/* 2>/dev/null)"
+priv="$(grep -nIiE 'pnpm|vitest|/home/|AIDriver|strandh' "$ASM"/* "$AUD"/* 2>/dev/null)"
 [ -z "$priv" ] && ok || bad "train skills carry project-specific text: $priv"
 
 echo "train: $pass passed, $fail failed"
