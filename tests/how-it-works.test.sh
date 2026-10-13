@@ -246,6 +246,9 @@ if [ -z "$ex" ]; then bad "(g) no bash example found"; else
   git -C "$TMP/repo" symbolic-ref HEAD refs/heads/main
   out="$(runhook 'git push')"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) bare git push from main was not denied"
   out="$(runhook 'git push -u origin')"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) git push -u origin from main was not denied"
+  out="$(runhook 'git push origin HEAD')"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) git push origin HEAD from main was not denied"
+  git -C "$TMP/repo" symbolic-ref HEAD refs/heads/feature-x
+  out="$(runhook 'git push origin HEAD')"; [ -z "$out" ] && ok || bad "(g) git push origin HEAD from a feature branch was blocked: $out"
 fi
 
 echo "RESULT pass=$pass fail=$fail"
