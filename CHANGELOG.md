@@ -4,6 +4,8 @@ Newest first.
 
 ## Unreleased
 
+- **New: `/orchestration-kit:release-review`**, the hardening pass before a release, run by the seat as rows on the normal board: feature freeze, a review of the human's decisions for staleness, a scope check of every request against the code, release tests written by a session that built nothing this cycle and then **locked** (`skills/release-review/lock.sh` writes a sha256 manifest; reconcile refuses any row that changes a locked test), falsify on every release test, an attack pass, a fresh-eyes code review per area, fix rows, cleanup and a README/docs row, an optional acceptance checklist for the human (the release never waits on it), then release. Tests: `tests/release-review.test.sh`.
+- **New: a decisions log** (`templates/DECISIONS.md`, copied by kit-init to `docs/orchestration/DECISIONS.md`) and the seat's **decision check**: every 10 closed rows or 7 days, and whenever a new ask contradicts an entry, the seat asks the human (plain text, numbered) whether stale decisions still hold. A **Release** section in `ORCHESTRATION.md` names the log, the release tests dir and the review dir.
 - **New: a sibling name pool.** `names: Mars,Venus,Vulcan` in the `team:` block (or `--names` on `start-team.sh`) names siblings from your own list instead of `Sib1`, `Sib2`. Names already running are kept, the rest are drawn at random (`TEAM_NAMES_SHUFFLE=0` keeps list order), the seat's name is never drawn, and a pool too small for `siblings` exits 64. Tests: `tests/sibling-names.test.sh`.
 
 ## 0.8.1 — 2026-10-13

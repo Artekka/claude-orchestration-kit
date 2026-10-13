@@ -62,6 +62,16 @@ human's explicit sign-off in-context:
 - `<e.g. balance constants in src/constants.ts>`
 - `<e.g. golden fixtures>`
 
+## Release
+
+Read by `/orchestration-kit:release-review` and the seat's decision check (orchestrate skill, §2).
+
+```
+decisions:      docs/orchestration/DECISIONS.md   # the human's dated decisions; the seat records each one as it is made
+release tests:  tests/release/                     # locked during a release review; builders never edit them
+review dir:     docs/orchestration/release/<version>/   # REVIEW.md, SCOPE.md, LOCKED.sha256, CHECKLIST.md
+```
+
 ## Sessions
 
 ```

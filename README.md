@@ -60,6 +60,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`) · quiet mode holds every new run while you use the machine |
 | `plugins/status-hud` | **optional** second plugin (`status-hud@artekka-kits`): a band or pane that shows every session's context fill, model and activity; `kit-init` asks (default: no), `/hud band\|pane\|off\|quiet` switches it. Host meters work on Linux and WSL only |
 | `HOW-IT-WORKS.md` · `docs/how-it-works.html` | the guide to the whole loop: one diagram, one short section per system (what it does, why it exists, which setting changes it), and how to make it your own |
+| `skills/release-review` | `/orchestration-kit:release-review`: harden before a release — feature freeze, decisions review, scope check, LOCKED release tests written by a non-builder (`lock.sh` locks and checks them; reconcile refuses a row that changed one), falsify, an attack pass, fresh-eyes code review per area, fix rows, cleanup + README, an optional acceptance checklist for the human, then release |
 | `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
 | `skills/reconcile` | land one worktree at a time onto main, push merges immediately, re-prove the gate there |
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |

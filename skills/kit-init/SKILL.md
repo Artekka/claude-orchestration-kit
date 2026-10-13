@@ -16,6 +16,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    put() { if [ -e "$DST" ]; then echo "SKIP   $DST (exists)"; else mkdir -p "$(dirname "$DST")" && cp "$SRC" "$DST" && echo "CREATE $DST"; fi; }
    for p in templates/AGENT_BOARD.md:docs/orchestration/AGENT_BOARD.md \
             templates/ORCHESTRATION.md:docs/orchestration/ORCHESTRATION.md \
+            templates/DECISIONS.md:docs/orchestration/DECISIONS.md \
             templates/briefs/README.md:docs/orchestration/briefs/README.md \
             templates/briefs/_TEMPLATE.md:docs/orchestration/briefs/_TEMPLATE.md \
             templates/CLAUDE-slimness.md:docs/orchestration/CLAUDE-slimness.md \

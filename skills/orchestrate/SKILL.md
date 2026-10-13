@@ -39,6 +39,9 @@ Every ask (human plain language, external tracker, issue queue) becomes a row un
 **Row brief = a file**, `docs/orchestration/briefs/<ROW>.md`, from `${CLAUDE_PLUGIN_ROOT}/templates/briefs/_TEMPLATE.md` (goal · numbered acceptance · fence · seam map from your own Explore pass · base branch · gate · **model/effort** · report protocol). **Commit + push it BEFORE the assign message**, which then only names the file. The builder starts with `/orchestration-kit:orient-brief <ROW>` (the brief + banner arrive injected; no project orient); the verifier reads the brief + the diff. Keep it contract-only — a brief that narrates your reasoning briefs your own verifiers.
 Every brief is a hypothesis — a builder correcting it upward is expected, not insubordination.
 
+**Record the human's decisions as they are made.** A ruling the code must follow (a product choice, a number, a scope cut) goes into the decisions log (ORCHESTRATION.md → Release → `decisions`; template `${CLAUDE_PLUGIN_ROOT}/templates/DECISIONS.md`) as a dated `D-0nn` entry, in the human's words, in the same commit as the brief that relies on it. A brief cites the decision ids it builds on.
+**Decision check** — every 10 closed rows or 7 days, whichever comes first, and at once when a new ask contradicts an active entry: list the active entries not confirmed within that window and ask the human about them in plain text, numbered, at most four per message ("D-007 (2026-09-02): refunds take 3 days. Still right?"). Move `Last confirmed` on a yes; add a superseding entry on a change. Before a release, run `/orchestration-kit:release-review`.
+
 | Brief rule | Why |
 |---|---|
 | **Never illustrate a "find every X" requirement.** Name the enumeration itself as the deliverable ("send me the table, then fix"); the verifier rebuilds it independently | An illustration inside a requirement is read AS the requirement — two rows guarded exactly the 3 named sites of populations of 8 and 13 (LESSON 42) |
