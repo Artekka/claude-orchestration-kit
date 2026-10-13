@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# gate-throttle.sh (orchestration-kit): run a heavy command (your gate, a whole test suite) only when one of
+# N host-wide slots is free, so several sessions on one machine do not run N full gates at once and flake
+# on load. Usage, from inside YOUR worktree:
+#   bash scripts/gate-throttle.sh <command> [args...]        e.g. bash scripts/gate-throttle.sh npm test
+# Exit code = the command's exit code.
+#
+# Slots:     `gate_slots:` in the team block of docs/orchestration/ORCHESTRATION.md (default 2);
+#            GATE_SLOTS overrides it.
+# Priority:  one extra slot for release/train gates. A command may take it only if its working directory
+#            starts with a line of "$RT/gate-priority.txt" (one path prefix per line; the seat owns it).
+#            The priority slot ignores the queue and the load check.
+# Fair order: each waiter takes a numbered ticket; only the oldest LIVE waiter may try for a normal slot
+#            (polling alone is not first-come-first-served: a gate once waited 1.5 h while later arrivals
+#            took freed slots). A dead waiter's ticket is skipped and deleted.
+# Load:      the head of the line takes a normal slot only while the 1-minute load average is below
+#            GATE_MAX_LOAD (default 0.9 x CPU count). Unreadable load = admit.
+# Quiet mode: while "$RT/quiet-mode" exists (scripts/quiet-mode.sh on), no NEW command starts; running
+#            ones finish. GATE_IGNORE_QUIET=1 is the seat's escape for a hotfix gate; while quiet
+#            mode is on it also skips the line, because the waiters ahead of it are parked.
+# Runtime dir: $KIT_RUNTIME_DIR, default ~/.orchestration-kit/runtime. Not /tmp: a reboot wipes /tmp.
+#            A lock file that survives a reboot is harmless, because flock locks are held by the kernel,
+#            not by the file: the holder died with the machine, so the next command simply takes it.
+# Needs flock(1) (util-linux; macOS: `brew install flock`). Without it, it warns and runs unthrottled.
+set -u
+[ $# -ge 1 ] || { echo "usage: gate-throttle.sh <command> [args...]" >&2; exit 64; }
+RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
+FLOCK="${KIT_FLOCK_BIN:-flock}"
+if ! command -v "$FLOCK" >/dev/null 2>&1; then
+  echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2
+  "$@"; exit $?
+fi
+locks_dir="$RT/locks"; qdir="$RT/queue"; rdir="$RT/running"
+mkdir -p "$locks_dir" "$qdir" "$rdir" || exit 1
+
+# Slots: env > team block > 2. The overlay is read from the MAIN checkout, so a worktree gets the same value.
+slots="${GATE_SLOTS:-}"
+if [ -z "$slots" ]; then
+  main="$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+  conf="${main:-.}/docs/orchestration/ORCHESTRATION.md"
+  slots="$(sed -n 's/^[[:space:]]*gate_slots:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$conf" 2>/dev/null | head -n1)"
+fi
+case "$slots" in ''|*[!0-9]*|0) slots=2 ;; esac
+poll="${GATE_POLL:-5}"
+
+prio=0
+if [ -f "$RT/gate-priority.txt" ]; then
+  here="$(pwd -P)"
+  while IFS= read -r p; do
+    [ -n "$p" ] && case "$here" in "$p"*) prio=1 ;; esac
+  done < "$RT/gate-priority.txt"
+fi
+
+alive() { kill -0 "$1" 2>/dev/null; }
+
+quiet_told=0
+quiet_wait() {
+  [ "${GATE_IGNORE_QUIET:-}" = 1 ] && return 0
+  while [ -f "$RT/quiet-mode" ]; do
+    if [ "$quiet_told" = 0 ]; then echo "gate-throttle: QUIET MODE is on; waiting for it to turn off..." >&2; quiet_told=1; fi
+    sleep "$poll"
+  done
+}
+
+my_ticket=""
+take_ticket() {
+  local n
+  exec 8>"$qdir/lock"; "$FLOCK" 8
+  n="$(cat "$qdir/counter" 2>/dev/null || echo 0)"; n=$((n + 1)); echo "$n" > "$qdir/counter"
+  my_ticket="$(printf '%010d.%d' "$n" "$$")"
+  printf '%s\n' "$(pwd -P)" > "$qdir/$my_ticket"
+  exec 8>&-
+}
+drop_ticket() { [ -n "$my_ticket" ] && rm -f "$qdir/$my_ticket"; my_ticket=""; }
+am_head() {  # 0 = I am the oldest live waiter (dead waiters' tickets are deleted on the way)
+  local f pid
+  for f in $(ls "$qdir" 2>/dev/null | grep -E '^[0-9]{10}\.[0-9]+$' | sort); do
+    [ "$f" = "$my_ticket" ] && return 0
+    pid="${f#*.}"
+    alive "$pid" && return 1
+    rm -f "$qdir/$f"
+  done
+  return 0
+}
+
+cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+max_load="${GATE_MAX_LOAD:-$(awk -v n="$cpus" 'BEGIN { printf "%.2f", n * 0.9 }')}"
+load_now() {
+  if [ -n "${KIT_LOADAVG_FILE:-}" ]; then cut -d' ' -f1 "$KIT_LOADAVG_FILE" 2>/dev/null
+  elif [ -r /proc/loadavg ]; then cut -d' ' -f1 /proc/loadavg
+  else sysctl -n vm.loadavg 2>/dev/null | tr -d '{}' | awk '{print $1}'; fi
+}
+load_ok() {
+  local l; l="$(load_now)"
+  [ -z "$l" ] && return 0
+  awk -v l="$l" -v m="$max_load" 'BEGIN { exit !(l < m) }'
+}
+
+take_ticket
+trap 'drop_ticket; rm -f "$rdir/$$"' EXIT
+load_told=0
+while :; do
+  cands=""
+  # The quiet-mode escape also skips the line: the waiters ahead are parked in quiet mode and would hold it forever.
+  if am_head || { [ "${GATE_IGNORE_QUIET:-}" = 1 ] && [ -f "$RT/quiet-mode" ]; }; then
+    if load_ok; then cands="$(seq 1 "$slots")"; load_told=0
+    elif [ "$load_told" = 0 ]; then
+      echo "gate-throttle: next in line, holding: load $(load_now) >= $max_load (GATE_MAX_LOAD)" >&2; load_told=1
+    fi
+  fi
+  [ "$prio" = 1 ] && cands="prio $cands"
+  for i in $cands; do
+    quiet_wait
+    exec 9>"$locks_dir/gate-slot-$i.lock"
+    if "$FLOCK" -n 9; then
+      drop_ticket
+      printf '%s\t%s\t%s\n' "$i" "$(pwd -P)" "$*" > "$rdir/$$"
+      echo "gate-throttle: slot $i acquired $(date +%H:%M:%S) in $(pwd -P)" >&2
+      "$@"; rc=$?
+      exit $rc
+    fi
+    exec 9>&-
+  done
+  sleep "$poll"
+done
