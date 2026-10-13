@@ -649,10 +649,12 @@ launch_team_conf() {  # <repo>
 # Session cap (team block `max_sessions:`; unset = no check). Every Claude session holds GBs of RAM, and a
 # host that runs out does not slow down politely: a WSL VM is killed by Windows with nothing logged inside
 # Linux. This WARNS (it never refuses: the human may know better) when launching <adding> more sessions would
-# pass the cap. The count is every `claude` process on this host, any repo, any account.
+# pass the cap. The count is every process NAMED `claude` on this host (any repo, any account); an argv match
+# would also count test stand-ins and anything whose command line merely starts with "claude".
+# KIT_CLAUDE_COUNT overrides the count (tests only, so they do not depend on what this host runs).
 launch_cap_warn() {  # <adding>
   [ -n "${TEAM_MAX:-}" ] || return 0
-  local n; n="$(pgrep -f '^claude( |$)' 2>/dev/null | wc -l | tr -d ' ')"
+  local n; n="${KIT_CLAUDE_COUNT:-$(pgrep -x claude 2>/dev/null | wc -l | tr -d ' ')}"
   if [ $((n + $1)) -gt "$TEAM_MAX" ]; then
     echo "warning: ${n} Claude sessions already run on this host; launching ${1} more passes max_sessions (${TEAM_MAX}). Retire one first (retro, then close it), or raise max_sessions in the team block." >&2
   fi
