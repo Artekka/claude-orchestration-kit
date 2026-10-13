@@ -18,6 +18,17 @@
         "off"
       ]
     },
+    "headerIcon": {
+      "type": "string",
+      "title": "Pane header icon",
+      "description": "The pixel picture at the top of the pane: helm (horned helmet), astronaut (space helmet) or saturn.",
+      "default": "helm",
+      "options": [
+        "helm",
+        "astronaut",
+        "saturn"
+      ]
+    },
     "contextAmberMark": {
       "type": "number",
       "title": "Context amber mark (tokens)",

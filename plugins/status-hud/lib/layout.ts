@@ -246,6 +246,23 @@ const HELM = [
   '...KSSSKKSSDK...', '....KSSKKSSK....', '....KDS..SDK....', '.....KK..KK.....',
 ]
 const PX: Record<string, Col> = { K: C.ol, S: C.steel, L: C.steelL, D: C.steelD, G: C.gold, H: C.bone }
+// An astronaut's helmet: white shell, gold visor with a cyan glint, steel neck ring.
+const ASTRONAUT = [
+  '.....KKKKKK.....', '...KKWWWWWWKK...', '..KWWWWWWWWWWK..', '.KWWKKKKKKKKWWK.',
+  '.KWKGGGGGGCCKWK.', '.KWKGGGGGGGCKWK.', '.KWKGGGGGGGGKWK.', '.KWKDGGGGGGDKWK.',
+  '.KWWKKKKKKKKWWK.', '..KWWWWWWWWWWK..', '..KSSSSSSSSSSK..', '...KKKKKKKKKK...',
+]
+const ASTRONAUT_PX: Record<string, Col> = { K: C.ol, W: C.white, G: C.gold, C: C.cyan, D: C.goldD, S: C.steel }
+// Saturn: a banded gold planet with its ring passing in front.
+const SATURN = [
+  '................', '......AAAA......', '....AAAAAAAA....', '...AYYYYYYYYA...',
+  '...AAAAAAAAAA...', 'RR.AYYYYYYYYA.RR', '.RRRRRRRRRRRRRR.', '...RRRRRRRRRR...',
+  '...AAAAAAAAAA...', '....AYYYYYYA....', '.....AAAAAA.....', '................',
+]
+const SATURN_PX: Record<string, Col> = { A: C.amber, Y: C.bone, R: C.steelL }
+const ICONS: Record<Config['headerIcon'], [readonly string[], Record<string, Col>]> = {
+  helm: [HELM, PX], astronaut: [ASTRONAUT, ASTRONAUT_PX], saturn: [SATURN, SATURN_PX],
+}
 
 const sep = (W: number, label: string): Line => {
   const s = new Scr(W, 1)
@@ -262,7 +279,7 @@ export function drawPane(v: View, cols: number): Line[] {
   const lines: Line[] = []
   const head = new Scr(W, 6)
   const showHelm = W >= 44
-  if (showHelm) sprite(head, 1, 0, HELM, PX)
+  if (showHelm) sprite(head, 1, 0, ...ICONS[v.cfg.headerIcon])
   const hx = showHelm ? 19 : 1
   head.put(hx, 0, 'STATUS HUD', C.gold, null, true)
   head.put(hx, 1, 'terminal status hud', C.steel)

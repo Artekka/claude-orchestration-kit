@@ -89,3 +89,17 @@ test('each session row shows a face from 😀 to 💀 at the hand-over mark, and
   const off = parseConfig({ sessionFaces: 'off' }, '/h')
   expect(sessionRow(view({ cfg: off }), S('Mars', 100), 70).runs(0).map(x => x.text).join('').startsWith('● Mars')).toBe(true)
 })
+
+test('the pane header icon follows headerIcon: helm (default), astronaut or saturn', async () => {
+  const head = (icon?: string): string => {
+    const c = parseConfig(icon ? { headerIcon: icon } : {}, '/h')
+    return drawPane(view({ cfg: c }), 60).slice(0, 6).map(l => l.map(s => s.runs.map(r => `${r.text}${r.fg}${r.bg}`).join('')).join('')).join('\n')
+  }
+  const [h, a, s] = [head(), head('astronaut'), head('saturn')]
+  expect(head('helm')).toBe(h)
+  expect(new Set([h, a, s]).size).toBe(3)
+  expect(head('bogus')).toBe(h)
+  expect(a.includes('#e0b050')).toBe(true) // the gold visor
+  expect(s.includes('#e8b030')).toBe(true) // the amber planet
+  for (const icon of ['helm', 'astronaut', 'saturn']) for (const l of drawPane(view({ cfg: parseConfig({ headerIcon: icon }, '/h') }), 60)) expect(widthOf(l)).toBeLessThanOrEqual(60)
+})

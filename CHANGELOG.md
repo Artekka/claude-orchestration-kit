@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New, status HUD: a choice of pane header icon.** `headerIcon: helm` (the default horned helmet), `astronaut` (a space helmet with a gold visor) or `saturn`.
 - **New, status HUD: a face and the model on every session row.** The face runs 😀 → 😱 as a session's context fills and turns 💀 at the hand-over mark (`contextHandoverMark`, default 400K); `sessionFaces: off` hides it. The model's family (opus, sonnet, haiku) shows after the token count.
 - **New: Windows Terminal tab style on WSL.** Tabs now open with the distro's own profile (`-p Ubuntu`), so they look like your other Linux tabs instead of a plain console (the `C:\` icon), and with one tab color per repo (`--tabColor`), shared by the seat and its siblings and different between projects. `tab_profile:` and `tab_color:` in the team block override either (`none` turns it off). Tests: `tests/tab-style.test.sh`.
 - **Fixed: repos whose path has a space (or `;` `"` `'`) can launch on WSL.** `start-team.sh` and `recycle-sibling.sh` used to refuse them, because such a path cannot cross the `wt.exe` / conhost command line. The tab now opens through a safe-name symlink in `~/.orchestration-kit/runtime/repos/` and its command runs `cd -P .` first, so git, Claude Code and its memory see the real path; a wrapper inside the repo is reached through the same link, so recycling in place works there too. Tests: `tests/wsl-spaced-repo.test.sh`.

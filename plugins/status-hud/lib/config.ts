@@ -2,6 +2,8 @@ import type { PluginOptions } from 'claude-code'
 
 export type Config = {
   variant: 'band' | 'pane' | 'off'
+  /** The pixel picture at the top of the pane. */
+  headerIcon: 'helm' | 'astronaut' | 'saturn'
   amberMark: number
   reportMark: number
   /** Context the face scale ends at (💀): the kit's hand-over mark. */
@@ -37,6 +39,7 @@ export function parseConfig(o: PluginOptions, home: string): Config {
   const dir = str(o.statusDir).trim()
   return {
     variant: variant === 'pane' || variant === 'off' ? variant : 'band',
+    headerIcon: ((i: string): Config['headerIcon'] => (i === 'astronaut' || i === 'saturn' ? i : 'helm'))(str(o.headerIcon, 'helm')),
     amberMark: num(o.contextAmberMark, 300_000),
     reportMark: num(o.contextReportMark, 350_000),
     handoverMark: num(o.contextHandoverMark, 400_000, 1),
