@@ -363,10 +363,24 @@ launch_init() {
   esac
   LAUNCH_CAN_VERIFY=1
   command -v pgrep >/dev/null 2>&1 || LAUNCH_CAN_VERIFY=0
+  LAUNCH_CD="$LAUNCH_REPO"
   case "$LAUNCH_BACKEND" in
-    wsl-*) case "$LAUNCH_REPO" in *[\;\"\'\ ]*)
-      echo "repo path must not contain spaces or ; \" ' on WSL (wt.exe/conhost command lines): $LAUNCH_REPO" >&2; exit 64 ;; esac ;;
+    wsl-*) case "$LAUNCH_REPO" in *[\;\"\'\ ]*) _launch_safe_cd || exit 64 ;; esac ;;
   esac
+}
+
+# A repo path with a space or ; " ' cannot cross the wt.exe / conhost command line on WSL. Instead of
+# refusing it, point a symlink with a safe name at the repo, open the tab there, and have the tab's
+# command `cd -P .` into the real path first (so git, Claude Code and its memory see the real repo).
+# The link lives in ${KIT_STATE_DIR:-~/.orchestration-kit}/runtime/repos/<name>-<checksum>; re-runs reuse it.
+_launch_safe_cd() {
+  local dir="${KIT_STATE_DIR:-$HOME/.orchestration-kit}/runtime/repos" slug link
+  slug="$(printf '%s' "$(basename "$LAUNCH_REPO")" | tr -c 'A-Za-z0-9._-' '-')-$(printf '%s' "$LAUNCH_REPO" | cksum | cut -d' ' -f1)"
+  link="$dir/$slug"
+  case "$link" in *[\;\"\'\ ]*)
+    echo "repo path has spaces or ; \" ' and so does the kit state dir ($dir), so no safe link is possible on WSL: $LAUNCH_REPO" >&2; return 1 ;; esac
+  mkdir -p "$dir" && ln -sfn "$LAUNCH_REPO" "$link" || { echo "could not link $link -> $LAUNCH_REPO" >&2; return 1; }
+  LAUNCH_CD="$link"
 }
 
 # The part identified by pgrep: `claude --name N [flags] prompt` (or the test override).
@@ -377,7 +391,7 @@ _launch_core() {  # <name> <prompt> <quote-fn>
     # child: same pgrep pattern, and the next recycle of this session can happen in this very tab.
     local mflag=""
     [ "$LAUNCH_MODE" = normal ] || mflag="--mode $LAUNCH_MODE "
-    printf '%sbash %s %s %s%s%s' "$(_launch_env "$3")" "$("$3" "$(launch_wrapper)")" "$1" "$mflag" "$(launch_model_flags "$3")" "$("$3" "$2")"
+    printf '%sbash %s %s %s%s%s' "$(_launch_env "$3")" "$("$3" "$(launch_tab_wrapper)")" "$1" "$mflag" "$(launch_model_flags "$3")" "$("$3" "$2")"
     return
   fi
   # --name stays FIRST: launch_pattern matches "^claude --name <Name>( |$)".
@@ -399,7 +413,9 @@ _launch_q_cmd() {  # cmd.exe: the global prompt whitelist already excludes its m
 launch_cmd() {
   local q=_launch_q_posix
   case "$LAUNCH_BACKEND" in wsl-*) q=_launch_q_wsl ;; esac
-  printf 'cd %s && %s%s' "$(printf '%q' "$LAUNCH_REPO")" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
+  local cd="${LAUNCH_CD:-$LAUNCH_REPO}" phys=""
+  [ "$cd" = "$LAUNCH_REPO" ] || phys="cd -P . && "   # a safe-name link (see _launch_safe_cd): land in the real path
+  printf 'cd %s && %s%s%s' "$(printf '%q' "$cd")" "$phys" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
 }
 
 # Git Bash: a cmd.exe command line (Windows path, native Windows claude).
@@ -423,7 +439,7 @@ _launch_argv() {  # <name> <prompt>
   local name="$1" prompt="$2" cmd emu bin
   case "$LAUNCH_BACKEND" in
     wsl-wt)
-      LAUNCH_ARGV=("$LAUNCH_WT" -w 0 new-tab --title "$name" wsl.exe -d "$LAUNCH_DISTRO" --cd "$LAUNCH_REPO" -e bash -lc "$(launch_cmd "$name" "$prompt")") ;;
+      LAUNCH_ARGV=("$LAUNCH_WT" -w 0 new-tab --title "$name" wsl.exe -d "$LAUNCH_DISTRO" --cd "${LAUNCH_CD:-$LAUNCH_REPO}" -e bash -lc "$(launch_cmd "$name" "$prompt")") ;;
     wsl-conhost)
       LAUNCH_ARGV=("$LAUNCH_PS" -NoProfile -Command "$(_launch_ps_cmd "$name" "$prompt")") ;;
     tmux)
@@ -463,7 +479,7 @@ _launch_argv() {  # <name> <prompt>
 
 _launch_ps_cmd() {
   printf "Start-Process conhost.exe -ArgumentList 'wsl.exe -d %s --cd %s -e bash -lc \"%s\"'" \
-    "$LAUNCH_DISTRO" "$LAUNCH_REPO" "$(launch_cmd "$1" "$2")"
+    "$LAUNCH_DISTRO" "${LAUNCH_CD:-$LAUNCH_REPO}" "$(launch_cmd "$1" "$2")"
 }
 
 _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_ARGV[@]:1}"; echo; }
@@ -477,6 +493,15 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 # opens a new tab that runs the wrapper, so a hand-started session moves over at its next recycle.
 launch_state_dir() { printf '%s' "${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}"; }
 launch_wrapper() { printf '%s/sibling-shell.sh' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; }
+# The wrapper path as a tab's command line names it: under a safe-name repo link (_launch_safe_cd) a
+# wrapper inside the repo is reached through the link, so a repo path with a space keeps the wrapper.
+launch_tab_wrapper() {
+  local w; w="$(launch_wrapper)"
+  if [ -n "${LAUNCH_CD:-}" ] && [ "$LAUNCH_CD" != "${LAUNCH_REPO:-}" ]; then
+    case "$w" in "$LAUNCH_REPO"/*) w="$LAUNCH_CD/${w#"$LAUNCH_REPO"/}" ;; esac
+  fi
+  printf '%s' "$w"
+}
 
 # True when a tab's command should run the wrapper rather than a bare claude. Not for: the test
 # override, a missing wrapper, LAUNCH_NO_WRAPPER (an escape hatch), Git Bash (cmd.exe windows run the
@@ -488,7 +513,7 @@ launch_use_wrapper() {
   [ -f "$(launch_wrapper)" ] || return 1
   case "${LAUNCH_BACKEND:-}" in
     gitbash-cmd|manual|"") return 1 ;;
-    wsl-*) case "$(launch_wrapper)" in *[\;\"\'\ ]*) return 1 ;; esac ;;
+    wsl-*) case "$(launch_tab_wrapper)" in *[\;\"\'\ ]*) return 1 ;; esac ;;
   esac
   return 0
 }
