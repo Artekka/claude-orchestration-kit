@@ -251,5 +251,44 @@ if [ -z "$ex" ]; then bad "(g) no bash example found"; else
   out="$(runhook 'git push origin HEAD')"; [ -z "$out" ] && ok || bad "(g) git push origin HEAD from a feature branch was blocked: $out"
 fi
 
+# ---- (j) the recycle-refusal knob is documented with the code's real default ---------------------
+def="$(sed -n 's/.*LAUNCH_LIVE_RECHECK:-\([0-9.]*\)}.*/\1/p' "$ROOT/scripts/lib-launch.sh" | head -1)"
+[ -n "$def" ] && ok || bad "(j) could not read the LAUNCH_LIVE_RECHECK default from scripts/lib-launch.sh"
+for f in "$MD" "$HTML"; do
+  grep -q 'LAUNCH_LIVE_RECHECK' "$f" && grep -q "default $def)" "$f" && ok || bad "(j) $f must name LAUNCH_LIVE_RECHECK with 'default $def)' (the code's default)"
+done
+
+# ---- (k) the loop diagram: a stacked variant for narrow screens, and no label sitting on an arrow --
+python3 - "$HTML" <<'PY' && ok || bad "(k) loop diagram: see the message above"
+import re, sys
+h = open(sys.argv[1], encoding="utf8").read()
+svgs = re.findall(r'<svg class="(wide|tall)"[^>]*>(.*?)</svg>', h, re.S)
+kinds = [k for k, _ in svgs]
+if sorted(kinds) != ["tall", "wide"]: print("want one wide and one tall SVG, got", kinds); sys.exit(1)
+body = dict(svgs)
+nw, nt = (len(re.findall(r'<g class="box ', body[k])) for k in ("wide", "tall"))
+if nw != nt: print(f"the tall diagram has {nt} boxes, the wide one {nw}: every node must appear in both"); sys.exit(1)
+if not re.search(r'@media \(max-width:\d+px\)\{[^}]*svg\.wide\{display:none\}[^}]*svg\.tall\{display:block\}', h): print("no media rule swaps the wide diagram for the tall one"); sys.exit(1)
+if re.search(r'svg\.wide\{[^}]*min-width', h) is None: print("the wide diagram lost its min-width"); sys.exit(1)
+if re.search(r'\.diagram svg\{[^}]*min-width', h): print("a min-width on every diagram SVG pushes the tall one past a phone screen"); sys.exit(1)
+# no italic note label overlaps a drawn arrow segment (M/H/V paths only)
+for kind, b in svgs:
+    segs = []
+    for d in re.findall(r'<path class="arrow[^"]*" d="([^"]+)"', b):
+        x = y = 0
+        for c, v in re.findall(r'([MHV])\s*(-?[\d.]+)', d):
+            v = float(v)
+            if c == "M": x = v; y = float(re.search(r'M\s*-?[\d.]+\s*(-?[\d.]+)', d).group(1)); continue
+            nx, ny = (v, y) if c == "H" else (x, v)
+            segs.append((min(x, nx), min(y, ny), max(x, nx), max(y, ny))); x, y = nx, ny
+    for m in re.finditer(r'<text x="([\d.]+)" y="([\d.]+)" class="note"( text-anchor="(\w+)")?>([^<]+)</text>', b):
+        x, y, anc, s = float(m.group(1)), float(m.group(2)), m.group(4) or "start", m.group(5)
+        w = sum(9 if ch.isupper() else 6.5 for ch in s); l = x - w if anc == "end" else x - w / 2 if anc == "middle" else x
+        box = (l, y - 12, l + w, y + 3)
+        for a in segs:
+            if a[0] <= box[2] and a[2] >= box[0] and a[1] <= box[3] and a[3] >= box[1]:
+                print(f"{kind} diagram: the label '{s}' overlaps an arrow segment {a}"); sys.exit(1)
+PY
+
 echo "RESULT pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
