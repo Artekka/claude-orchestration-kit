@@ -165,7 +165,7 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false, n
   const bg = flashing ? C.rD : selected ? C.gray : null
   const fg = flashing ? C.white : LV[lv]
   for (let x = 0; x < w; x++) s.put(x, 0, ' ', C.tx, bg)
-  const st = h.state === 'busy' ? ['▘', C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
+  const st = h.state === 'busy' ? [spin(v.now), C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
   let x = 0
   if (on('dot')) {
     s.put(0, 0, '●', dotColor(v, h), bg)
@@ -204,6 +204,9 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false, n
   }
   return s
 }
+
+/** A busy session's mark turns clockwise through the four corners (▘ ▝ ▗ ▖), one step per half second. */
+export const spin = (now: number): string => '▘▝▗▖'.charAt(Math.floor(now / 500) % 4)
 
 /** The name column: wide enough for the longest name, 7 to 12 characters. */
 export const nameWidth = (ss: readonly Heartbeat[]): number => clamp(Math.max(0, ...ss.map(h => h.name.length)), 7, 12)
@@ -327,7 +330,7 @@ export function drawCompact(v: View, W: number): Line[] {
     const flashing = isFlashing(v.flash[h.id], v.now) && flashPhase(v.now)
     const bg = flashing ? C.rD : h.state === 'idle' ? C.gray : LVD[lv]
     const txt = ` ${trunc(h.name, 8)} ${kfmt(h.tokens)}${lv === 'red' ? '!' : ''} `
-    const g = h.state === 'busy' ? '▘' : h.state === 'shell' ? '$' : '○'
+    const g = h.state === 'busy' ? spin(v.now) : h.state === 'shell' ? '$' : '○'
     if (x + txt.length + 4 > W) break
     s.put(x, 1, ' ', C.tx, bg)
     s.put(x + 1, 1, '●', h.account === 2 ? C.purple : C.blue, bg)

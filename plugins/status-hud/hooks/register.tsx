@@ -41,6 +41,8 @@ const S: {
   clockNow: number
   /** The pane was asked for but the surface has not placed it (a terminal under 144 columns): draw the band meanwhile. */
   paneWaiting: boolean
+  /** Some session is busy: redraw each tick so its mark turns. */
+  anyBusy: boolean
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
 } = {
@@ -57,6 +59,7 @@ const S: {
   localAt: 0,
   clockNow: 0,
   paneWaiting: false,
+  anyBusy: false,
   forceShow: null,
 }
 
@@ -111,11 +114,12 @@ async function doTick($: Dollar): Promise<void> {
       S.me.quietMs = S.me.state === 'busy' && S.progressAt > 0 ? Math.max(0, now - S.progressAt) : 0
       const snap = { ...(await tick(io, c, S.me, S.ts, exists)), local: S.local }
       S.hasFlash = Object.keys(S.ts.flash).length > 0
+      S.anyBusy = snap.sessions.some(x => x.state === 'busy')
       S.last = snap
       await update($, snapA, () => snap)
       await update($, flashA, () => ({ ...S.ts.flash }))
-    } else if (S.hasFlash) {
-      // Between full refreshes only the clock moves, so a flash blinks without any disk or process work.
+    } else if (S.hasFlash || S.anyBusy) {
+      // Between full refreshes only the clock moves, so a flash blinks and a busy mark turns without any disk or process work.
       await update($, snapA, s => (s ? { ...s, now } : s))
     }
   } catch (err) {

@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseConfig } from '../lib/config'
-import { chips, drawBand, drawPane, lineText, nameWidth, sessionRow, type Line, type View } from '../lib/layout'
+import { chips, drawBand, drawPane, lineText, nameWidth, sessionRow, spin, type Line, type View } from '../lib/layout'
 import type { Heartbeat, Snapshot } from '../types'
 
 const S = (name: string, k: number, state: Heartbeat['state'] = 'busy', account = 1): Heartbeat => ({ id: name, name, model: 'opus', account, tokens: k * 1000, window: 1_000_000, state, activity: 'doing a long thing that should truncate rather than wrap', at: 0 })
@@ -165,4 +165,12 @@ test('the name column fits the longest name (7 to 12), so Atlas-BS is not cut', 
   expect(row.includes('Atlas-BS')).toBe(true)
   expect(nameWidth([S('a', 1)])).toBe(7)
   expect(nameWidth([S('a-very-long-session-name', 1)])).toBe(12)
+})
+
+test('a busy session\'s mark turns clockwise: ▘ ▝ ▗ ▖, one step per half second', async () => {
+  expect([0, 500, 1000, 1500, 2000].map(spin).join('')).toBe('▘▝▗▖▘')
+  const mark = (now: number): string => sessionRow(view({ now }), S('Mars', 10, 'busy'), 70).runs(0).map(r => r.text).join('')
+  expect(mark(0).includes('▘')).toBe(true)
+  expect(mark(1000).includes('▗')).toBe(true)
+  expect(sessionRow(view({ now: 1000 }), S('Mars', 10, 'idle'), 70).runs(0).map(r => r.text).join('').includes('○')).toBe(true)
 })
