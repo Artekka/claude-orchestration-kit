@@ -7,7 +7,7 @@ import { accountFromConfigDir, nameFromArgs, oneLine } from '../lib/heartbeat'
 import type { Io } from '../lib/io'
 import { ensureStatusDirs } from '../lib/ensureDir'
 import { newTickState, tick } from '../lib/tick'
-import { toggleQuietMode } from '../lib/quietmode'
+import { QUIET_EXPLAIN, quietFailure, quietNote, toggleQuietMode } from '../lib/quietmode'
 import { drawBand, drawPane, type Line, type View } from '../lib/layout'
 
 const PANE = 'status-hud'
@@ -30,6 +30,8 @@ const S: {
   lastFull: number
   hasFlash: boolean
   last: Snapshot | null
+  /** The session directory (session.start's cwd): the chip's toggle script is looked up there. */
+  cwd: string
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
 } = {
@@ -39,6 +41,7 @@ const S: {
   lastFull: 0,
   hasFlash: false,
   last: null,
+  cwd: '',
   forceShow: null,
 }
 
@@ -86,7 +89,7 @@ async function doTick($: Dollar): Promise<void> {
       } catch {
         /* no response yet: keep the last reading */
       }
-      const snap = await tick(io, c, S.me, S.ts, exists)
+      const snap = await tick(io, c, S.me, S.ts, exists, S.cwd)
       S.hasFlash = Object.keys(S.ts.flash).length > 0
       S.last = snap
       await update($, snapA, () => snap)
@@ -106,10 +109,11 @@ async function flipQuiet($: Dollar): Promise<string> {
   const { cfg: c, io } = S
   if (!c || !io) return 'Status HUD is starting.'
   const r = await toggleQuietMode(io, c, S.last?.quietMode ?? null)
-  if (!r.ran) return 'Quiet mode needs quietModeOnCmd and quietModeOffCmd in the status-hud config.'
+  // A failure is state, not just a toast: the chip stays red until it expires or a press works.
+  S.ts.quietErr = r.ok ? null : quietFailure(r, await $.clock.now())
   S.lastFull = 0
   await doTick($)
-  const msg = r.ok ? `Quiet mode ${r.wanted ? 'ON' : 'OFF'}.` : `Quiet mode command failed (${r.wanted ? 'on' : 'off'}).`
+  const msg = r.ok ? quietNote(r.wanted) : `Quiet ${r.wanted ? 'on' : 'off'} failed (${S.ts.quietErr?.msg}). Run it by hand to see why: ${r.wanted ? c.quietOnCmd : c.quietOffCmd}`
   $.ui.toast(msg)
   return msg
 }
@@ -174,6 +178,7 @@ export const register: Register = (on, options) => {
     S.cfg = c
     S.io = makeIo($)
     S.exists = p => $.fs.exists(p)
+    S.cwd = e.cwd ?? ''
     const saved = await $.store.get('variant')
     if (saved === 'band' || saved === 'pane' || saved === 'off') await update($, variantA, () => saved)
     // Owner-only status dir, but only a directory we create ourselves (a configured shared dir keeps its mode).
@@ -186,7 +191,7 @@ export const register: Register = (on, options) => {
     const [args = '', env = ''] = ps.stdout.split('::')
     me.name = c.sessionName || (await $.env.get('CLAUDE_HUD_NAME')) || nameFromArgs(args) || `s-${me.id.slice(0, 6)}`
     me.account = accountFromConfigDir(env.trim().replace(/^CLAUDE_CONFIG_DIR=/, '') || (await $.env.get('CLAUDE_CONFIG_DIR')))
-    await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet' })
+    await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet | help' })
     $.clock.every(500, () => void doTick($))
     void doTick($)
     if ((saved ?? c.variant) === 'pane' && shown()) void $.ui.open({ id: PANE, title: 'Status HUD' })
@@ -229,10 +234,11 @@ export const register: Register = (on, options) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'band' || arg === 'pane' || arg === 'off') return { text: await setVariant($, arg) }
     if (arg === 'quiet') return { text: await flipQuiet($) }
+    if (arg === 'help') return { text: `${QUIET_EXPLAIN} The chip shows only where the toggle script (quietModeRequiresFile, default scripts/quiet-mode.sh) exists in the session directory, or while quiet mode is already on; set that option to an empty value to always show it.` }
     const snap = await read($, snapA)
     if (!snap) return { text: 'Status HUD: no reading yet.' }
     const over = snap.sessions.filter(x => S.cfg && x.tokens >= S.cfg.reportMark).map(x => x.name)
-    return { text: `Status HUD: ${snap.sessions.length} sessions${over.length ? `, over the report mark: ${over.join(', ')}` : ''}. Commands: /hud band | pane | off | quiet.` }
+    return { text: `Status HUD: ${snap.sessions.length} sessions${over.length ? `, over the report mark: ${over.join(', ')}` : ''}. Commands: /hud band | pane | off | quiet | help.` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

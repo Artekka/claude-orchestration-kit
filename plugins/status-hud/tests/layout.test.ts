@@ -106,7 +106,7 @@ test('an error on a chip the visibility rule hides does not resurrect it', () =>
 })
 
 test('the pane explains the chip in one caption line; the band does not spend a row on it', () => {
-  const pane = drawPane(view(), 60).map(lineText).join('\n')
+  const pane = drawPane(view(), 60).map(l => lineText(l).trim()).join(' ')
   expect(pane).toContain('QUIET holds NEW test/gate runs while you use the machine; running ones finish')
   expect(drawBand(view(), 180, 10).map(lineText).join('\n')).not.toContain('holds NEW')
   const hidden = drawPane(view({ snap: { ...snap, quietAvail: false } }), 60).map(lineText).join('\n')

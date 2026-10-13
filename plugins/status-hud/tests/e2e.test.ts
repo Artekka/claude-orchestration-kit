@@ -195,8 +195,6 @@ test('Quiet Mode chip: no toggle script in the session directory means no chip a
 test('Quiet Mode chip: a failing command turns the chip red with "failed" and toasts why', { options: { ...QUIET_OPTS, quietModeOnCmd: 'false' } }, async ($, on) => {
   const w = world(on)
   w.files.set('/x/scripts/quiet-mode.sh', '')
-  const toasts: string[] = []
-  on('ui.toast', async (_$, e) => (toasts.push(JSON.stringify(e)), { value: undefined }))
   await $.session.start(START)
   await w.clock.advance(500)
   const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
@@ -206,7 +204,7 @@ test('Quiet Mode chip: a failing command turns the chip red with "failed" and to
   const tree = JSON.stringify(await after.drawn())
   expect(tree).toContain('failed')
   expect(tree).toContain('#6a1c22')
-  expect(toasts.join(' ')).toContain('exit 1')
+  expect(w.toasts.join(' ')).toContain('exit 1')
   // It heals: 60 s later the red chip is gone even if nobody pressed again.
   await w.clock.advance(61_000)
   const healed = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
@@ -216,8 +214,6 @@ test('Quiet Mode chip: a failing command turns the chip red with "failed" and to
 test('/hud help explains the chip; a good press toasts what quiet mode does', { options: QUIET_OPTS }, async ($, on) => {
   const w = world(on)
   w.files.set('/x/scripts/quiet-mode.sh', '')
-  const toasts: string[] = []
-  on('ui.toast', async (_$, e) => (toasts.push(JSON.stringify(e)), { value: undefined }))
   await $.session.start(START)
   await w.clock.advance(500)
   const help = await $.command.run({ command: 'hud', args: 'help' } as never)
@@ -225,5 +221,5 @@ test('/hud help explains the chip; a good press toasts what quiet mode does', { 
   expect(help.text).toContain('quietModeRequiresFile')
   const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await band.press({ key: 'p-quiet' })
-  expect(toasts.join(' ')).toContain('running ones finish')
+  expect(w.toasts.join(' ')).toContain('running ones finish')
 })

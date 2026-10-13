@@ -27,7 +27,8 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
     opened.push(e.id)
     return { value: { isPlaced: true } }
   })
-  on('ui.toast', async () => ({ value: undefined }))
+  const toasts: string[] = []
+  on('ui.toast', async (_$, e) => (toasts.push(JSON.stringify(e)), { value: undefined }))
   on('ui.status', async () => ({ value: undefined }))
   on('ui.close', async () => ({ value: undefined }))
   // The engine's own drawing beneath the mod: a pass-through (next) lands here and draws nothing of the HUD.
@@ -69,5 +70,5 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
     if (script.includes('ps -o args=')) return out(`claude --name ${o.name ?? 'Orca'} --model opus::\nCLAUDE_CONFIG_DIR=${o.acct ?? '/home/u/.claude-acct2'}`)
     return out('')
   })
-  return { files, ran, usage, clock, stored, opened }
+  return { files, ran, usage, clock, stored, opened, toasts }
 }
