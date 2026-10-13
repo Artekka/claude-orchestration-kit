@@ -77,6 +77,9 @@ install_if_missing templates/build-log.md docs/timeline/build-log.md
 for s in "$KIT_ROOT"/skills/*/; do
   name="$(basename "$s")"
   install_if_missing "skills/$name/SKILL.md" ".claude/skills/$name/SKILL.md"
+  for f in "$s"*; do   # a skill's helper files (e.g. orient-brief/brief.sh) travel with it
+    case "$(basename "$f")" in SKILL.md) ;; *) [ -f "$f" ] && install_if_missing "skills/$name/$(basename "$f")" ".claude/skills/$name/$(basename "$f")" ;; esac
+  done
 done
 
 # ── 4. Agents ───────────────────────────────────────────────────────────────

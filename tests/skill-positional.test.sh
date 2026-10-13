@@ -23,6 +23,7 @@ hasnt() { case "$3" in *"$2"*) bad "$1: did not want '$2' in: $3" ;; *) ok ;; es
 # ALLOW: "<path relative to the repo>=<exact count>" for a deliberate use (e.g. a skill that injects its
 # own argument). An exact count, so a second, accidental use in the same file still fails.
 ALLOW=(
+  "skills/orient-brief/SKILL.md=2"   # $0 in the title and in the injected brief.sh call: the row id, on purpose
 )
 scan="$(cd "$ROOT" && python3 - "${ALLOW[@]}" <<'PY'
 import os, re, sys

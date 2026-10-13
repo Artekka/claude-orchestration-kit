@@ -23,7 +23,7 @@ out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
          docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh .claude/agents/verifier.md \
-         .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md \
+         .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
   [ -f "$P/$f" ] && ok || bad "first run did not create $f"

@@ -59,7 +59,7 @@ or the human relaunches it with an explicit `--model` (a bare `/clear` keeps the
 The seat picks each session's model by lane when it launches it (`scripts/recycle-sibling.sh <Name>
 --model <m>`; table in the orchestrate skill, "Model per lane"). A recycled session never inherits
 one. Read your own model and window from your env block, and state both in READY. Builders start
-with `/orchestration-kit:orient --brief <ROW>` when the seat gave them a brief file.
+with `/orchestration-kit:orient-brief <ROW>` when the seat gave them a brief file.
 
 > Keep this file slim: it is re-read on every turn of every session. Rules here, narrative in a
 > linked archive (`docs/orchestration/CLAUDE-slimness.md`).

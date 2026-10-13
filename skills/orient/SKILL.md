@@ -7,7 +7,9 @@ description: Bring a fresh session up to speed on a kit-adopted project — rest
 
 Load a fresh session's working memory without the human re-explaining. End state: five bullets + a productive next question (or a report to the orchestrator).
 
-## Lean mode: `/orchestration-kit:orient --brief <ROW>`
+## Lean mode: `/orchestration-kit:orient --brief <ROW>` (fallback)
+
+Prefer `/orchestration-kit:orient-brief <ROW>`: it runs steps 1–2 below before the session reads anything (the brief and banner arrive injected). This table is the same start by hand, for a host that cannot run skill-injected commands.
 
 For a builder the seat assigned a row that has a brief file (`docs/orchestration/briefs/<ROW>.md`, made from `templates/briefs/_TEMPLATE.md`). A full orient costs ~100K tokens of a fresh context; the brief already holds what this row needs. The full mode below stays for the seat, for a lone session, and for any start without a brief.
 

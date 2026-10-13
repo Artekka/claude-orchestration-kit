@@ -284,7 +284,8 @@ builds and every verification are sessions. Details: the orchestrate skill, "Mod
 ### Lean start for a builder
 
 The seat writes a **brief file** per row (`docs/orchestration/briefs/<ROW>.md`, from
-`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orchestration-kit:orient --brief <ROW>`:
+`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orchestration-kit:orient-brief <ROW>`
+(the brief and the board banner arrive already injected into the skill text, so there is nothing to read first):
 the brief + the board banner, then READY. A full orient reads a whole project to learn one row; the
 brief is the row. Keep `CLAUDE.md` slim too (`docs/orchestration/CLAUDE-slimness.md`): it is re-read on every
 turn of every session.

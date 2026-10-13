@@ -1,7 +1,7 @@
 # <ROW> — <one-line title>
 
 > Copy to `docs/orchestration/briefs/<ROW>.md`, fill every section, commit + push BEFORE the assign
-> message. The builder runs `/orchestration-kit:orient --brief <ROW>` and reads ONLY this file + the
+> message. The builder runs `/orchestration-kit:orient-brief <ROW>`, which injects ONLY this file + the
 > board banner. Contract only: no reasoning, no history of how you got here.
 
 | field | value |
