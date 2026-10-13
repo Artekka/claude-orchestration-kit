@@ -7,6 +7,8 @@
 SUITE=recycle-safety
 . "$(dirname "$0")/inplace-harness.sh"
 FORBID=(FAKE_TERM_MODE=forbid)
+launches_ge() { [ "$(nlaunch)" -ge "$1" ]; }
+file_has() { grep -Eq -- "$2" "$1" 2>/dev/null; }
 
 # A stand-in claude named <Name> whose child is <kind>: "shell" = a live `bash -c` (what the Bash tool leaves
 # running), "plain" = a sleep (what an MCP server looks like to this check: not a shell). Records every pid.
@@ -59,5 +61,24 @@ stop_fake "$n"
 sandbox; n=$(nameFor S4)
 recycle "${FORBID[@]}" -- --dry-run "$n"
 rematch "S4 no old process: live work none" '^live work +none$' "$OUT"
+
+# S5. The seat's self-recycle while its own tool shell is still alive. The seat runs the recycle from a shell
+#     that is its claude's child; that shell is the recycle's ANCESTOR, so the first check skips it. The
+#     detached copy is no longer below it, and in real use the tool shell can outlive the call by a moment
+#     (here: `; sleep 3`), so the copy must not check again (the parent already did) or the seat would
+#     refuse to recycle itself on its own tool call.
+sandbox; n=$(nameFor S5)
+printf self-recycle > "$SB/stub/mode.1"; printf term-trap > "$SB/stub/mode.2"
+# The harness redirects the LAST command of SELF_RECYCLE_CMD (here the sleep), so the recycle writes its own files.
+start_wrapper "$n" "SELF_RECYCLE_CMD=bash $RECYCLE --repo $SB/repo --terminal linux-xterm $n go --model haiku > $SB/stub/s5.out 2> $SB/stub/s5.err; sleep 3" \
+  FAKE_TERM_MODE=forbid RECYCLE_DETACH_DELAY=1
+OLD="$(launch_pid 1)"
+wait_for "the seat's recycle call to print its log" file_has "$SB/stub/s5.out" 'log:'
+logp="$(sed -n 's/.*log: //p' "$SB/stub/s5.out" | head -1)"
+hasnt "S5 the seat's own call did not refuse" "still has live shells" "$(cat "$SB/stub/s5.err" 2>/dev/null)"
+wait_for "the fresh claude" launches_ge 2
+wait_for "old claude gone" not_alive "$OLD"
+eq "S5 the old seat was SIGTERMed" "TERM" "$(cat "$SB/stub/sigterm.$OLD" 2>/dev/null)"
+hasnt "S5 the detached copy did not refuse" "still has live shells" "$(cat "$logp" 2>/dev/null)"
 
 finish
