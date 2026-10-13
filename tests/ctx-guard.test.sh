@@ -33,11 +33,12 @@ T="$TMP/t.jsonl"
 
 # --- opt-in gating
 tx "$T" 380000
-empty "no marker, no config: silent" "$(run "$T" s1)"
-conf "  ctx_guard: on"; empty "config on but no .kit-hooks marker: silent" "$(run "$T" s1)"
-marker; conf "  ctx_guard: off"; empty "marker + ctx_guard: off: silent" "$(run "$T" s1)"
-conf "  git_guard: on"; empty "marker, key absent: silent (default off)" "$(run "$T" s1)"
-conf "  ctx_guard: on"; out="$(run "$T" s1)"
+empty "no marker, no config: silent" "$(run "$T" g1)"
+conf "  ctx_guard: on"; empty "config on but no .kit-hooks marker: silent" "$(run "$T" g2)"
+marker; conf "  ctx_guard: off"; empty "marker + ctx_guard: off: silent" "$(run "$T" g3)"
+conf "  git_guard: on"; empty "marker, key absent: silent (default off)" "$(run "$T" g4)"
+# each gating check has its own session id: a shared one would let the rate limit silence a check
+conf "  ctx_guard: on"; out="$(run "$T" g5)"
 has "on + 380K (1M): report line" "crossed the 350K self-report mark" "$out"
 has "output is a hook JSON with additionalContext" '"additionalContext"' "$out"
 has "hookEventName echoes the event" '"hookEventName": "PostToolUse"' "$out"
