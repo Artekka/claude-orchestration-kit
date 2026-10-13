@@ -2,7 +2,7 @@
 
 Newest first.
 
-## Unreleased (0.8.2)
+## 0.8.2 — 2026-10-13
 
 The status HUD's WORK/QUIET chip now shows only where it can work, says what it does, and no longer fails silently.
 
