@@ -104,7 +104,12 @@ No terminal this script can open windows in ($LAUNCH_REASON). Do it by hand:
 HELP
 }
 
-old="$(launch_pids "$name")"
+old="$(launch_pids_here "$name")"
+# The same name running for ANOTHER project is never ours to end or replace.
+if [ -z "$old" ] && [ -n "$(launch_pids_elsewhere "$name")" ]; then
+  echo "refusing to recycle '${name}': that session belongs to another project ($(launch_repo_of_pid "$(launch_pids_elsewhere "$name" | head -1)")), not $LAUNCH_REPO" >&2
+  exit 64
+fi
 if [ -n "$ACCOUNT" ]; then
   launch_set_account "$ACCOUNT"
 elif [ -n "$old" ]; then  # keep the session on the account it was running on

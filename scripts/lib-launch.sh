@@ -457,6 +457,24 @@ launch_pattern() {
 }
 launch_pids() { [ "${LAUNCH_CAN_VERIFY:-1}" = 1 ] || return 0; pgrep -f "$(launch_pattern "$1")" || true; }
 
+# Several projects on one machine: a session name is unique per MACHINE (pgrep), so each running session is
+# placed by the repo it works in. A session's repo is its main checkout, found from its working directory's git
+# common dir, so a sibling inside its own worktree still counts as its project's. Unknown (no /proc) = "".
+launch_repo_of_pid() {  # <pid>
+  local cwd common
+  cwd="$(readlink "/proc/$1/cwd" 2>/dev/null)" || { printf ''; return 0; }
+  common="$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || { printf '%s' "$cwd"; return 0; }
+  case "$common" in */.git) printf '%s' "$(cd "${common%/.git}" 2>/dev/null && pwd -P)" ;; *) printf '%s' "$cwd" ;; esac
+}
+# Only a session working in a DIFFERENT kit project (one with docs/orchestration/ORCHESTRATION.md) is "elsewhere";
+# any other place (no /proc, not a repo, a plain checkout, a stand-in) counts as here, as before.
+_launch_here() {
+  local r; r="$(launch_repo_of_pid "$1")"
+  [ -z "$r" ] || [ "$r" = "$(cd "${LAUNCH_REPO:-${REPO:-.}}" 2>/dev/null && pwd -P)" ] || [ ! -f "$r/docs/orchestration/ORCHESTRATION.md" ]
+}
+launch_pids_here() { local p; for p in $(launch_pids "$1"); do _launch_here "$p" && echo "$p"; done; return 0; }
+launch_pids_elsewhere() { local p; for p in $(launch_pids "$1"); do _launch_here "$p" || echo "$p"; done; return 0; }
+
 # Fills the global array LAUNCH_ARGV with the argv that opens one window.
 _launch_argv() {  # <name> <prompt>
   local name="$1" prompt="$2" cmd emu bin
@@ -814,7 +832,7 @@ launch_wait_fresh() {
   local name="$1" old="$2" polls="$3" _
   LAUNCH_FRESH=""
   for _ in $(seq 1 "$polls"); do
-    LAUNCH_FRESH="$(launch_pids "$name" | grep -vxF -e "${old:-__none__}" || true)"
+    LAUNCH_FRESH="$(launch_pids_here "$name" | grep -vxF -e "${old:-__none__}" || true)"
     [ -n "$LAUNCH_FRESH" ] && return 0
     sleep 2
   done

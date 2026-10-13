@@ -88,7 +88,9 @@ if [ -n "$pool_csv" ]; then
     launch_valid_name "$nm" || { echo "names: '$nm' is not a valid session name (letters, digits, _ and - only)" >&2; exit 64; }
     [ "$nm" = "$seat" ] && continue
     case " ${live[*]-} ${idle[*]-} " in *" $nm "*) continue ;; esac
-    if [ -n "$(launch_pids "$nm")" ]; then live+=("$nm"); else idle+=("$nm"); fi
+    # A pool name another project's session holds is taken, not ours to keep.
+    [ -z "$(launch_pids_elsewhere "$nm")" ] || continue
+    if [ -n "$(launch_pids_here "$nm")" ]; then live+=("$nm"); else idle+=("$nm"); fi
   done
   if [ "$(( ${#live[@]} + ${#idle[@]} ))" -lt "$n" ]; then
     echo "names: the pool has $(( ${#live[@]} + ${#idle[@]} )) usable names for $n siblings; add names or lower --siblings" >&2; exit 64
@@ -132,13 +134,22 @@ else
 fi
 
 # Session cap: count the names this run would actually open (running ones are skipped below).
-adding=0; for nm in "${names[@]}"; do [ -n "$(launch_pids "$nm")" ] || adding=$((adding + 1)); done
+# A fixed name (the seat, or prefix + number) that another project's session holds would be skipped as "running"
+# here, and a recycle could end the wrong project's session: refuse, and say how to name this team.
+for nm in "${names[@]}"; do
+  other="$(launch_pids_elsewhere "$nm" | head -1)"
+  if [ -n "$other" ]; then
+    echo "name '$nm' is already used by a session of another project ($(launch_repo_of_pid "$other")): give this project its own seat name (team block \`seat:\`, e.g. ${nm}-$(basename "$REPO" | tr -cd 'A-Za-z0-9' | cut -c1-6)) or its own sibling prefix or names" >&2
+    exit 64
+  fi
+done
+adding=0; for nm in "${names[@]}"; do [ -n "$(launch_pids_here "$nm")" ] || adding=$((adding + 1)); done
 launch_cap_warn "$adding"
 
 failed=0
 for i in "${!names[@]}"; do
   name="${names[$i]}"; prompt="${prompts[$i]}"
-  running="$(launch_pids "$name")"
+  running="$(launch_pids_here "$name")"
   if [ -n "$running" ]; then
     echo "SKIP   $name — already running (pid $(echo "$running" | tr '\n' ' ' | sed 's/ $//'))"
     continue
