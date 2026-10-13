@@ -34,7 +34,7 @@ SECTIONS=(
 PENDING=(
   skills/assemble-train/SKILL.md
   skills/audit-train/SKILL.md
-  extras/status-hud/README.md
+  plugins/status-hud
 )
 # Team-block keys the guide must explain AND templates/ORCHESTRATION.md must define.
 KEYS=(worktrees git_guard ctx_guard context_window gate_slots permission_mode model effort terminal)
@@ -124,7 +124,7 @@ done
 ext="$(grep -n -i -E '(src|href)="https?:|@import|url\(\s*["'"'"']?https?:|<script[^>]*\ssrc=|<link[^>]*rel="stylesheet"' "$HTML" | head -3)"
 [ -z "$ext" ] && ok || bad "how-it-works.html is not self-contained: $ext"
 grep -q -i '<meta name="viewport"' "$HTML" && ok || bad "how-it-works.html has no viewport meta (phones)"
-grep -q 'data-theme' "$HTML" && ok || bad "how-it-works.html has no data-theme (dark default + light option)"
+grep -q '<html[^>]*data-theme="dark"' "$HTML" && ok || bad "how-it-works.html: <html> must carry data-theme=\"dark\" (dark is the default; light is the option)"
 grep -q 'id="theme-toggle"' "$HTML" && ok || bad "how-it-works.html has no #theme-toggle button"
 python3 - "$HTML" <<'PY' && ok || bad "how-it-works.html: default theme is not dark (a :root dark palette first, [data-theme=light] second)"
 import re, sys
@@ -143,7 +143,7 @@ t = open(md, encoding="utf8").read()
 seen = set()
 for tok in re.findall(r"`([^`\n]+)`", t):
     tok = tok.strip().split()[0] if tok.strip() else ""
-    m = re.match(r"^((?:scripts|skills|hooks|templates|docs|tests|extras|agents)/[A-Za-z0-9_./-]+)$", tok)
+    m = re.match(r"^((?:scripts|skills|hooks|templates|docs|tests|extras|agents|plugins)/[A-Za-z0-9_./-]+)$", tok)
     if not m or "<" in tok: continue
     p = m.group(1).rstrip("/.")
     if p.startswith("docs/orchestration/"):
@@ -174,13 +174,66 @@ done
 # ---- (f) the marker and the allowlist cannot drift apart ----------------------------------------
 # Reconcile empties PENDING and removes every marker. A marker left behind with an empty allowlist
 # means a section was never verified; an allowlist entry left with no marker is a dead exception.
-nm="$(grep -c -x '> verify at merge' "$MD")"; nh="$(grep -c 'class="pending' "$HTML")"
+nm="$(grep -c -x '> verify at merge' "$MD")"; nh="$(grep -o '<\(section\|p\)[^>]*data-pending="true"' "$HTML" | wc -l | tr -d ' ')"
 if [ "${#PENDING[@]}" -eq 0 ]; then
   [ "$nm" -eq 0 ] && ok || bad "(f) $nm 'verify at merge' marker(s) remain in HOW-IT-WORKS.md but the PENDING allowlist is empty"
-  [ "$nh" -eq 0 ] && ok || bad "(f) $nh class=\"pending\" section(s) remain in the HTML but the PENDING allowlist is empty"
+  [ "$nh" -eq 0 ] && ok || bad "(f) $nh data-pending element(s) remain in the HTML but the PENDING allowlist is empty"
 else
   [ "$nm" -gt 0 ] && ok || bad "(f) PENDING lists ${#PENDING[@]} path(s) but no 'verify at merge' marker is left: empty the list"
 fi
+# the diagram's pending step is dashed in BOTH renderings (mermaid class + svg group)
+grep -q '^  class [a-z]* pending$' "$MD" && grep -q '<g class="box [a-z ]*pending" data-pending="true"' "$HTML" && ok || bad "(f) the pending step in the loop diagram is not dashed in both the Mermaid and the SVG"
+# every marker in the MD has its twin in the HTML, and the other way round
+[ "$nm" = "$nh" ] && ok || bad "(f) $nm '> verify at merge' marker(s) in the MD but $nh data-pending element(s) in the HTML"
+
+# ---- (h) nothing unmarked claims what is not merged yet (READ ORCA171-4c MED-2) ---------------
+# The train skills (dry-run merges onto a train branch, an independent audit) arrive in v0.8 from another
+# item. Until reconcile removes the markers, those words may appear ONLY inside a marked region.
+unm="$(python3 - "$MD" "$HTML" <<'PY'
+import re, sys
+md = open(sys.argv[1], encoding="utf8").read()
+ht = open(sys.argv[2], encoding="utf8").read()
+words = re.compile(r"merge-tree|rehears|dry[- ]run", re.I)
+# MD: drop marked ### sections and the paragraph after a bare marker line, then look.
+md = re.sub(r"^###[^\n]*\n(?:(?!^##).*\n)*?> verify at merge\n(?:(?!^##).*\n)*", "", md, flags=re.M)
+md = re.sub(r"^> verify at merge\n\n[^\n]*\n", "", md, flags=re.M)
+for ln in md.splitlines():
+    if words.search(ln): print("MD: " + ln[:110])
+# HTML: drop every element that carries data-pending (section, p or svg group; none nest).
+ht = re.sub(r'<(section|p|g)\b[^>]*data-pending="true"[^>]*>.*?</\1>', "", ht, flags=re.S)
+for m in words.finditer(ht):
+    print("HTML: ..." + re.sub(r"\s+", " ", ht[max(0, m.start() - 50):m.end() + 40]))
+PY
+)"
+[ -z "$unm" ] && ok || bad "(h) claims about unmerged behavior outside a 'verify at merge' region: $unm"
+
+# ---- (i) small pins: registration snippet parses; recycle claim is qualified; links are real ------
+python3 - "$MD" <<'PY' && ok || bad "(i) the registration snippet under 'Add your own' is missing or is not valid JSON that names the hook"
+import json, re, sys
+t = open(sys.argv[1], encoding="utf8").read()
+m = re.search(r"^### Add your own rule, skill or hook\n(.*?)(?=^##|\Z)", t, re.S | re.M)
+b = re.search(r"```json\n(.*?)```", m.group(1), re.S) if m else None
+d = json.loads(b.group(1))
+cmd = d["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+sys.exit(0 if d["hooks"]["PreToolUse"][0]["matcher"] == "Bash" and "no-push-main.sh" in cmd else 1)
+PY
+python3 - "$MD" <<'PY' && ok || bad "(i) the recycle claim must say 'same tab' only under the sibling-shell wrapper, else a new window"
+import re, sys
+t = open(sys.argv[1], encoding="utf8").read()
+m = re.search(r"^### Context guard, retro and recycle\n(.*?)(?=^###|^## |\Z)", t, re.S | re.M)
+b = m.group(1) if m else ""
+sys.exit(0 if "same tab" in b and "sibling-shell.sh" in b and "new window" in b else 1)
+PY
+python3 - "$HTML" "$ROOT/docs" <<'PY' && ok || bad "(i) 'Where to go next' in the HTML must be real links to files that exist next to it"
+import os, re, sys
+t = open(sys.argv[1], encoding="utf8").read()
+m = re.search(r'<section id="next">(.*?)</section>', t, re.S)
+hrefs = re.findall(r'<a href="([^"#]+)"', m.group(1)) if m else []
+sys.exit(0 if len(hrefs) >= 4 and all(os.path.exists(os.path.join(sys.argv[2], h)) for h in hrefs) else 1)
+PY
+# one arrow per builder ends on the validator's top edge (y=332, left column)
+n="$(grep -c 'class="arrow" d="M[0-9]* 278[^"]*V332"' "$HTML")"
+[ "$n" -ge 3 ] && ok || bad "(i) the SVG draws $n builder arrow(s) into the validator, want 3 (every builder)"
 # the worked example's hook is opt-in (the .kit-hooks marker), never a default
 grep -q '\.kit-hooks' "$MD" && ok || bad "the guide never mentions the opt-in .kit-hooks marker"
 
@@ -200,12 +253,23 @@ if [ -z "$ex" ]; then bad "(g) no bash example found"; else
   runhook() { printf '{"tool_input":{"command":"%s"}}' "$1" | (cd "$TMP/repo" && bash "$TMP/hook.sh") 2>&1; }
   out="$(runhook 'git push origin main')"; echo "$out" | grep -q '"permissionDecision":"deny"' && bad "(g) denied without the opt-in marker" || ok
   mkdir -p "$TMP/repo/docs/orchestration" && : > "$TMP/repo/docs/orchestration/.kit-hooks"
-  for c in 'git push origin main' 'git push -u origin main' 'git push origin HEAD:main'; do
+  git -C "$TMP/repo" symbolic-ref HEAD refs/heads/feature-x
+  runhook() { printf '{"tool_input":{"command":"%s"}}' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')" | (cd "$TMP/repo" && bash "$TMP/hook.sh") 2>&1; }
+  for c in 'git push origin main' 'git push -u origin main' 'git push origin HEAD:main' 'git push origin +main' \
+           'git push origin HEAD:refs/heads/main' 'git push origin :main' 'git push --force-with-lease origin main' \
+           'cd sub && git push origin main' 'git status; git push origin main' 'git add x | git push origin main'; do
     out="$(runhook "$c")"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) did not deny: $c"
   done
-  for c in 'git push origin feature-x' 'git push origin feat/main-menu' 'git status' 'echo maintain'; do
+  for c in 'git push origin feature-x' 'git push origin feat/main-menu' 'git status' 'echo maintain' \
+           'git push origin feat-x && git checkout main' 'git push origin feat-x; git log main' 'git push origin feat-x | tee main' \
+           'git commit -m "git push origin main"' 'git commit -m "x && git push origin main"' 'echo "git push origin main"' \
+           'git push' 'git push -u origin' ; do
     out="$(runhook "$c")"; [ -z "$out" ] && ok || bad "(g) blocked a harmless command: $c -> $out"
   done
+  # a bare `git push` from main pushes main: that one must deny
+  git -C "$TMP/repo" symbolic-ref HEAD refs/heads/main
+  out="$(runhook 'git push')"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) bare git push from main was not denied"
+  out="$(runhook 'git push -u origin')"; echo "$out" | grep -q '"permissionDecision":"deny"' && ok || bad "(g) git push -u origin from main was not denied"
 fi
 
 echo "RESULT pass=$pass fail=$fail"

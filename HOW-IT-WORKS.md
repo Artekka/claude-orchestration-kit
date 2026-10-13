@@ -16,7 +16,7 @@ flowchart TD
   seat --> board[("Board: one row per task<br/>owner + file fence")]
   board --> builders["Builders: each in its own worktree + branch<br/>tests first, then code"]
   builders --> validator["Validator: sees spec + diff only<br/>tries to break it"]
-  validator -->|PASS| train["Release train: seat merges one at a time<br/>rehearsed with a dry run"]
+  validator -->|PASS| train["Merge: seat lands approved rows one at a time<br/>(release-train skills: v0.8)"]
   validator -->|fix round| builders
   train --> gate["Full gate + independent audit"]
   gate -->|green| deploy["Deploy + build-log entry"]
@@ -24,6 +24,8 @@ flowchart TD
   deploy --> human
   builders -.->|context fills| recycle["Retro, then recycle into a fresh session"]
   recycle -.-> board
+  classDef pending stroke-dasharray: 5 5
+  class train pending
 ```
 
 You give ideas to the seat; the seat writes fenced rows on the board; builders work in private worktrees; validators check each finished row; the seat merges approved rows one at a time onto a train, runs the full gate and deploys. Dotted lines are the context loop: a full session writes down what it learned and is replaced.
@@ -36,8 +38,12 @@ Ten writers can share one codebase because six things never happen:
 2. **Every session has its own copy.** Each builder works in a separate git worktree on its own branch, so nobody sweeps up another session's half-finished edit.
 3. **One allocator for shared numbers.** Row ids, versions, build-log entries and the deploy slot are minted only by the seat. Siblings name their own discoveries with a per-session prefix.
 4. **Check before merge.** A finished row goes to a different session that never saw the builder's reasoning, only the spec and the change. It tries to prove the change wrong.
-5. **Merge one at a time, rehearsed first.** The seat dry-runs each merge (`git merge-tree`), merges approved rows one by one onto a train branch, and pushes after each.
+5. **Merge one at a time.** The seat lands approved rows one by one (`skills/reconcile/SKILL.md`), re-proves the gate after each and pushes immediately.
 6. **Tests come first.** Every row starts with a test that fails, then the code that makes it pass. A merge that breaks something shows up red in the gate before it ships.
+
+> verify at merge
+
+With the v0.8 train skills (`skills/assemble-train/SKILL.md`, `skills/audit-train/SKILL.md`) each merge is also rehearsed with a dry run (`git merge-tree`) onto a train branch first, and the finished train is audited independently.
 
 ## The pieces, one by one
 
@@ -95,7 +101,7 @@ Each piece has the same three parts. Parts marked *verify at merge* describe v0.
 
 ### Context guard, retro and recycle
 
-**What it does:** Each session's real context fill is measured (`scripts/ctx-fill.py`, never bytes divided by four). With the guard on, a `CONTEXT GUARD:` line appears as a session nears its report mark and its hand-over mark. At the mark the session runs `/orchestration-kit:retro` (writes down what it learned), and the seat recycles it into a fresh session in the same tab. Auto-compact stays off.
+**What it does:** Each session's real context fill is measured (`scripts/ctx-fill.py`, never bytes divided by four). With the guard on, a `CONTEXT GUARD:` line appears as a session nears its report mark and its hand-over mark. At the mark the session runs `/orchestration-kit:retro` (writes down what it learned), and the seat recycles it into a fresh session: in the same tab when that tab runs the kit's `scripts/sibling-shell.sh` wrapper (every tab `start-team.sh` opens does), otherwise in a new window. Auto-compact stays off.
 
 **Why it exists:** A session that runs into its window wall degrades silently: it re-reads files, loses SHAs and fences, and nobody notices until the damage is merged.
 
@@ -129,7 +135,7 @@ Each piece has the same three parts. Parts marked *verify at merge* describe v0.
 
 **Why it exists:** From one terminal you cannot see ten sessions' fill; the HUD puts the report and hand-over marks where you can see them.
 
-**The knob:** the HUD's README under `extras/status-hud/README.md`, the `kit-init` question, and the seat name it highlights. A lighter option with no mod is the statusline script `scripts/statusline-ctx.sh`. Change it any time: just ask Claude.
+**The knob:** the HUD's README under `plugins/status-hud/`, the `kit-init` question, and the seat name it highlights. A lighter option with no mod is the statusline script `scripts/statusline-ctx.sh`. Change it any time: just ask Claude.
 
 ## Make it your own flavor
 
@@ -161,7 +167,7 @@ The kit way to add a rule has three steps and one test. Worked example: **"never
 
 1. **Write the rule where every session reads it.** One line under `Locked` in `docs/orchestration/ORCHESTRATION.md`, mirrored in your `CLAUDE.md` (`templates/CLAUDE-section.md` shows the shape): *"Never push to `main`; push a branch and open a pull request."*
 2. **Add the hook, opt-in.** Save the script below as `.claude/hooks/no-push-main.sh`. It does nothing unless the repo carries the `docs/orchestration/.kit-hooks` marker, exactly like `hooks/git-guard.sh`.
-3. **Register it** under `PreToolUse` with matcher `Bash` in your project's `.claude/settings.json` (`templates/settings-snippets.md` shows where). To turn it off, delete the marker or the registration, or just ask Claude.
+3. **Register it.** The kit's own hooks register themselves; yours needs one entry under `PreToolUse` in your project's `.claude/settings.json` (merge it with what is there). To turn it off, delete the marker or the entry, or just ask Claude.
 
 ```bash
 #!/usr/bin/env bash
@@ -169,19 +175,68 @@ The kit way to add a rule has three steps and one test. Worked example: **"never
 input="$(cat)"
 main="$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
 [ -f "$main/docs/orchestration/.kit-hooks" ] || exit 0
-if printf '%s' "$input" | grep -Eq 'git push[^"]* (origin )?(HEAD:)?main([^A-Za-z0-9_/-]|$)'; then
-  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked: push a branch and open a pull request instead of pushing to main."}}'
-fi
+cur="$(git symbolic-ref --short -q HEAD 2>/dev/null)"
+verdict="$(printf '%s' "$input" | CUR="$cur" awk '
+  { s = s $0 }
+  END {
+    # the command string of the tool call, JSON-unescaped (a newline becomes a separator)
+    if (!match(s, /"command"[ \t]*:[ \t]*"/)) exit
+    s = substr(s, RSTART + RLENGTH); out = ""; i = 1
+    while (i <= length(s)) {
+      c = substr(s, i, 1)
+      if (c == "\\") { n = substr(s, i + 1, 1); out = out (n == "n" ? " ; " : n); i += 2; continue }
+      if (c == "\"") break
+      out = out c; i++
+    }
+    # split into simple commands on ; & | outside quotes, then judge each one on its own
+    q = ""; seg = ""
+    for (i = 1; i <= length(out) + 1; i++) {
+      c = substr(out, i, 1)
+      if (q == "" && (c == ";" || c == "&" || c == "|" || c == "")) { judge(seg); seg = ""; continue }
+      if (q == "" && (c == "\"" || c == "\047")) q = c
+      else if (q != "" && c == q) q = ""
+      seg = seg c
+    }
+  }
+  function judge(cmd,   n, w, k, pos, t, d) {
+    gsub(/["\047]/, "", cmd); n = split(cmd, w, /[ \t]+/); k = 1
+    while (k <= n && w[k] == "") k++
+    if (w[k] != "git" || w[k + 1] != "push") return
+    pos = 0
+    for (k += 2; k <= n; k++) {
+      t = w[k]
+      if (t == "" || substr(t, 1, 1) == "-") continue          # options
+      if (++pos == 1) continue                                # the remote
+      d = t; sub(/^\+/, "", d); sub(/^.*:/, "", d); sub(/^refs\/heads\//, "", d)
+      if (d == "main") print "deny"                           # main, +main, HEAD:main, HEAD:refs/heads/main, :main
+    }
+    if (pos < 2 && ENVIRON["CUR"] == "main") print "deny"     # no refspec: pushes the current branch
+  }
+')"
+[ -n "$verdict" ] && printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked: push a branch and open a pull request instead of pushing to main."}}'
 exit 0
 ```
 
-Then prove it can fail, the kit way: run the hook once with a push to `main` (it must deny) and once with a push to a feature branch (it must stay silent), as `skills/falsify/SKILL.md` describes. Skills and rules follow the same pattern: write the rule, make it opt-in, prove it red.
+Registration entry for `.claude/settings.json`:
+
+```json
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash",
+  "hooks": [ { "type": "command", "command": "bash .claude/hooks/no-push-main.sh" } ] } ] } }
+```
+
+What it does **not** catch: `git -C <dir> push`, aliases, scripts that push, and `git push <remote>` from a branch whose upstream is `main`. A quoted `;` or `&&` is respected, so a commit message that merely mentions the phrase is not blocked. Like `hooks/git-guard.sh`, it is a speed bump for an agent, not a sandbox.
+
+Then prove it can fail, the kit way: run the hook with a push to `main` (it must deny) and with a push to a feature branch (it must stay silent), as `skills/falsify/SKILL.md` describes. Skills and rules follow the same pattern: write the rule, make it opt-in, prove it red.
 
 ## The honest version
 
-- **"Without conflict" means "without surprises".** When two rows must touch the same file, the dry-run merge shows it ahead of time and the seat settles it by a written rule. What never happens is a session silently overwriting someone else's work.
+- **"Without conflict" means "without surprises".** When two rows must touch the same file, the conflict shows up when the second one is merged and the seat settles it by a written rule. What never happens is a session silently overwriting someone else's work.
 - **There is a cap.** Your machine's memory sets how many sessions can run at once. A session that runs low on context writes down what it learned and restarts fresh; the board and the build log carry everything forward.
 - **Every knob is changeable.** Nothing here is fixed: ask Claude to change any setting, any time.
+
+> verify at merge
+
+With the v0.8 train skills the dry-run merge shows such a conflict ahead of time, before anything is merged.
 
 ## Where to go next
 
