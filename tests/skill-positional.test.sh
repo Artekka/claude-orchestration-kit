@@ -114,11 +114,12 @@ hasnt "kit-init second run: creates nothing" "CREATE docs/orchestration/AGENT_BO
 
 # 2c. kit-init setkey, rendered with arguments: placeholders filled, the commit line dropped.
 setk="$(block "$TMP/kit-init.md" "Persist the worktree answer" | grep -v '^git add' \
-  | sed -e 's/<advised|enforced>/enforced/' -e 's/<on if a team was started, else off>/on/')"
+  | sed -e 's/<advised|enforced>/enforced/' -e 's/<on if a team was started, else off>/on/g')"
 (cd "$INIT" && bash -c "$setk") >/dev/null 2>&1
 C="$INIT/docs/orchestration/ORCHESTRATION.md"
 grep -Eq '^[[:space:]]+worktrees:[[:space:]]*enforced[[:space:]]*$' "$C" && ok || bad "kit-init setkey: worktrees not set to enforced: $(grep -n 'worktrees' "$C")"
 grep -Eq '^[[:space:]]+git_guard:[[:space:]]*on[[:space:]]*$' "$C" && ok || bad "kit-init setkey: git_guard not set to on: $(grep -n 'git_guard' "$C")"
+grep -Eq '^[[:space:]]+ctx_guard:[[:space:]]*on[[:space:]]*$' "$C" && ok || bad "kit-init setkey: ctx_guard not set to on: $(grep -n 'ctx_guard' "$C")"
 
 echo "skill-positional: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

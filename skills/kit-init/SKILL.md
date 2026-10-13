@@ -59,7 +59,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
    `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
-   Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on`; **Not now** (solo mode) → `git_guard: off`. Then commit that path:
+   Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on` and `ctx_guard: on`; **Not now** (solo mode) → both `off`. Then commit that path:
    ```bash
    C=docs/orchestration/ORCHESTRATION.md
    setkey() {  # KEY=<key> VAL=<value> setkey   (named variables: the skill loader eats dollar-digit tokens)
@@ -67,8 +67,8 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $KEY:        $VAL" "$C"
      else printf '\nteam:\n  %s:        %s\n' "$KEY" "$VAL" >> "$C"; fi
    }
-   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=<on if a team was started, else off> setkey
-   git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard settings"
+   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=<on if a team was started, else off> setkey; KEY=ctx_guard VAL=<on if a team was started, else off> setkey
+   git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard + ctx_guard settings"
    ```
    Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
 8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked — on by default in team mode/not blocked — off in solo mode; say "turn on the git guard" when you add more sessions] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
@@ -76,4 +76,4 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 ## Rules
 
 - Idempotent: never overwrite; re-running reports SKIP for everything that exists.
-- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`) and PreToolUse `git-guard.sh` on Bash (a no-op unless `git_guard: on`). All run only in repos carrying `.kit-hooks`.
+- The plugin ships its hooks itself — nothing to install in `.claude/settings.json`: SessionStart (fresh sessions are told to orient + send READY) PreToolUse `worktree-guard.sh` (a no-op unless `worktrees: enforced`) PreToolUse `git-guard.sh` on Bash (a no-op unless `git_guard: on`), and the context guard `ctx-guard.py` on PostToolUse + UserPromptSubmit (a no-op unless `ctx_guard: on`; needs `python3`). All run only in repos carrying `.kit-hooks`.

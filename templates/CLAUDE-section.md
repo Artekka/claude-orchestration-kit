@@ -44,7 +44,8 @@ Open or refill the team with `bash scripts/start-team.sh` (skips sessions alread
 
 ### Context lifecycle
 
-Never `/compact`. Measure fill with `python3 scripts/ctx-fill.py` (never `bytes ÷ 4`; the
+Never `/compact`. With `ctx_guard: on` a hook measures for you: a `CONTEXT GUARD:` line is an
+order (report at the report mark; stop and hand over at the handover mark). Otherwise measure fill with `python3 scripts/ctx-fill.py` (never `bytes ÷ 4`; the
 window comes from your own env block, not the transcript: `ctx-fill.py <uuid> --window 1m|200k`).
 1M window: self-report at ~350K, hand over by ~400K; 200K window: ~120K / ~150K. Report your
 fill AND your model with every hand-off. Then the handshake: seat orders `/orchestration-kit:retro` →

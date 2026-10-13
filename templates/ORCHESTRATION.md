@@ -71,6 +71,13 @@ hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` wi
 `git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
 `off` in solo mode; kit-init sets `on` when it starts a team (seat + siblings). A human can still
 run those in their own terminal.
+`ctx_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's context guard
+(PostToolUse + UserPromptSubmit) measures each session's fill on every tool call and prompt and,
+from the warn mark up, injects one line: approaching (300K), report now (350K), hand over now
+(400K); on a 200K window 100K/120K/150K. It repeats every ~15K of growth (8K on 200K) and on
+every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
+`on` for a team, `off` solo. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
+the guard; a session whose transcript names a Haiku model always gets the 200K marks.
 `model` / `effort` (both optional) set the default for every launch: `model` is `opus[1m]`, `sonnet[1m]`, `haiku` or a full model id (default `opus[1m]`), `effort` one of `low|medium|high|xhigh|max` (default: not passed). The launch scripts ALWAYS pass `--model` and never inherit the old session's, so a recycled session starts on the model its lane needs, not on whatever the terminal had. `--model` / `--effort` flags override the block; a bad value in the block is ignored with a warning, a bad flag exits 64. Per-lane choices: orchestrate skill, "Model per lane".
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
 `tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
@@ -86,6 +93,8 @@ team:
   permission_mode:  normal
   worktrees:        advised
   git_guard:        off
+  ctx_guard:        off
+  context_window:   1m
   terminal:         auto
 ```
 
