@@ -1,0 +1,130 @@
+{
+  "name": "status-hud",
+  "version": "0.1.0",
+  "author": {
+    "name": "Artekka"
+  },
+  "description": "Pixel-style status HUD: every session's context fill, host load, memory, disks, GPU, the Windows commit limit and mode chips, as a band above the prompt or a side pane.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "variant": {
+      "type": "string",
+      "title": "Variant",
+      "description": "band draws the 10-row band above the prompt, pane opens the side pane, off draws nothing (sessions still report).",
+      "default": "band",
+      "options": [
+        "band",
+        "pane",
+        "off"
+      ]
+    },
+    "contextAmberMark": {
+      "type": "number",
+      "title": "Context amber mark (tokens)",
+      "description": "A session at or above this many context tokens turns amber.",
+      "default": 300000
+    },
+    "contextReportMark": {
+      "type": "number",
+      "title": "Context report mark (tokens)",
+      "description": "At or above this the session turns red, and flashes red when it crosses.",
+      "default": 350000
+    },
+    "flashSeconds": {
+      "type": "number",
+      "title": "Report flash seconds",
+      "description": "How long a session flashes red after crossing the report mark. 0 disables the flash.",
+      "default": 6
+    },
+    "commitWarnPct": {
+      "type": "number",
+      "title": "Windows commit warn %",
+      "description": "Amber at this percent of the Windows commit limit, red at commitCritPct.",
+      "default": 85
+    },
+    "commitCritPct": {
+      "type": "number",
+      "title": "Windows commit critical %",
+      "description": "Red at this percent of the Windows commit limit.",
+      "default": 95
+    },
+    "commitCmd": {
+      "type": "string",
+      "title": "Commit-limit command",
+      "description": "Shell command that prints '<limitKB> <freeKB>' (Windows TotalVirtualMemorySize and FreeVirtualMemory). Empty disables the warning. Slow (about a second), so it runs at most every commitSeconds.",
+      "default": "P=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe; [ -x \"$P\" ] || P=powershell.exe; \"$P\" -NoProfile -Command '$o=Get-CimInstance Win32_OperatingSystem; \"$($o.TotalVirtualMemorySize) $($o.FreeVirtualMemory)\"'"
+    },
+    "commitSeconds": {
+      "type": "number",
+      "title": "Commit check seconds",
+      "description": "Minimum seconds between Windows commit readings.",
+      "default": 30
+    },
+    "mounts": {
+      "type": "string",
+      "title": "Disk mounts",
+      "description": "Comma-separated mount points to show, e.g. /,/data.",
+      "default": "/"
+    },
+    "showForNames": {
+      "type": "string",
+      "title": "Show in sessions",
+      "description": "Comma-separated session names that draw the HUD, e.g. Orca,Vali (kit-init sets it to your seat). Exact and case-sensitive. Empty shows it in every session. Every session still writes its heartbeat either way.",
+      "default": "Orca"
+    },
+    "statusDir": {
+      "type": "string",
+      "title": "Status directory",
+      "description": "Shared directory for heartbeats and host.json. Empty means ~/.claude-status-hud.",
+      "default": ""
+    },
+    "sessionName": {
+      "type": "string",
+      "title": "Session name",
+      "description": "Overrides the name detected from the claude command line (--name).",
+      "default": ""
+    },
+    "refreshSeconds": {
+      "type": "number",
+      "title": "Refresh seconds",
+      "description": "Seconds between heartbeat writes and redraws.",
+      "default": 3
+    },
+    "staleSeconds": {
+      "type": "number",
+      "title": "Stale seconds",
+      "description": "A session whose heartbeat is older than this is shown as gone and then dropped.",
+      "default": 120
+    },
+    "cpuRedLoad": {
+      "type": "number",
+      "title": "CPU red load",
+      "description": "1-minute load average at which the CPU bar turns red. 0 means 90% of the thread count.",
+      "default": 0
+    },
+    "quietModeFlagFile": {
+      "type": "string",
+      "title": "Quiet mode flag file",
+      "description": "If set, this file existing means quiet mode is on (cheap check). The default is the orchestration kit's flag (scripts/quiet-mode.sh writes it; a leading ~ means your home). Empty uses quietModeStatusCmd.",
+      "default": "~/.orchestration-kit/runtime/quiet-mode"
+    },
+    "quietModeStatusCmd": {
+      "type": "string",
+      "title": "Quiet mode status command",
+      "description": "Shell command whose exit code 0 means quiet mode is on. Empty with no flag file hides the quiet mode chip.",
+      "default": ""
+    },
+    "quietModeOnCmd": {
+      "type": "string",
+      "title": "Quiet mode on command",
+      "description": "Shell command run when the Quiet Mode chip switches it on. Runs in the session's directory, so the default finds the kit's scripts/quiet-mode.sh in your repo.",
+      "default": "bash scripts/quiet-mode.sh on"
+    },
+    "quietModeOffCmd": {
+      "type": "string",
+      "title": "Quiet mode off command",
+      "description": "Shell command run when the Quiet Mode chip switches it off.",
+      "default": "bash scripts/quiet-mode.sh off"
+    }
+  }
+}

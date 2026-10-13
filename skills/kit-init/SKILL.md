@@ -73,6 +73,34 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    ```
    Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
 8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked — on by default in team mode/not blocked — off in solo mode; say "turn on the git guard" when you add more sessions] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
+9. **Status HUD (optional) — ONE `AskUserQuestion`**, after the summary: "Install the status HUD? It draws every session's context fill, model and activity (plus host load) above the seat's prompt. Change it any time — just ask Claude." → **No (Recommended)** · **Yes**. Put the answer in `HUD=` and run (it needs the `claude` CLI; it installs for the default account and every logged-in `~/.claude-acctN`, and shows the HUD only in the seat named in the `team:` block):
+   ```bash
+   HUD=<yes|no>
+   if [ "$HUD" != yes ]; then echo "SKIP status HUD (not installed; say \"install the status HUD\" any time)"; else
+     SEAT=$(sed -nE 's/^[[:space:]]+seat:[[:space:]]*([^[:space:]#]+).*/\1/p' docs/orchestration/ORCHESTRATION.md | head -1)
+     QF="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}/quiet-mode"
+     VALS=$(printf '{"showForNames":"%s","quietModeFlagFile":"%s","quietModeOnCmd":"bash scripts/quiet-mode.sh on","quietModeOffCmd":"bash scripts/quiet-mode.sh off"}' "${SEAT:-Orca}" "$QF")
+     for D in default "$HOME"/.claude-acct*; do
+       # an extra account counts when logged in; macOS keeps logins in the Keychain, so there every dir counts
+       if [ "$D" = default ]; then unset CLAUDE_CONFIG_DIR; SJ="$HOME/.claude/settings.json"; WHO="the default account"
+       elif [ -d "$D" ] && { [ "$(uname -s)" = Darwin ] || [ -e "$D/.credentials.json" ]; }; then export CLAUDE_CONFIG_DIR="$D"; SJ="$D/settings.json"; WHO="$D"
+       else continue; fi
+       # a status HUD already loaded from a folder (CLAUDE_CODE_PLUGIN_DIRS, in this shell or that account's settings env)
+       PD="$(grep -o '"CLAUDE_CODE_PLUGIN_DIRS"[^,}]*' "$SJ" 2>/dev/null) ${CLAUDE_CODE_PLUGIN_DIRS:-}"
+       case "$PD" in *status-hud*)
+         echo "SKIP status HUD for $WHO: a status HUD already loads there through CLAUDE_CODE_PLUGIN_DIRS (${PD# }); two copies would both draw and the configure step fails. Remove that entry from the settings env, then ask again."
+         continue ;; esac
+       if claude plugin install status-hud@artekka-kits --scope project \
+         && printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin; then
+         echo "status HUD installed for $WHO (shown in: ${SEAT:-Orca})"
+       else
+         echo "status HUD install FAILED for $WHO (claude's own message is above; tell the human, nothing else was changed)"
+       fi
+     done
+     unset CLAUDE_CONFIG_DIR
+   fi
+   ```
+   On Yes, commit `.claude/settings.json` if the install changed it (explicit path), and tell the human: "The HUD appears in the seat's window from its next start; `/hud band`, `/hud pane` or `/hud off` switch it, `/hud quiet` toggles quiet mode."
 
 ## Rules
 

@@ -47,7 +47,12 @@ high-risk get an AUTO independent verification before reconcile.
 vehicle:      <the ONE command the seat runs for a wave train, e.g. make deploy | gh workflow run deploy>
 exclusivity:  claim the DEPLOY slot on the board first; under an ORCHESTRATOR ACTIVE banner only the seat deploys
 post-deploy:  <how to verify the deploy actually took, e.g. bundle marker / health URL>
+deploy_policy: ask             # ask | auto-when-green
 ```
+
+- `deploy_policy: ask` (default): the seat asks the human before every deploy. `auto-when-green`: the seat
+  deploys a train whose rows all passed their READ and whose gate is green without asking, then tells the
+  human what shipped. Hotfixes the human asked for ship at once under either policy.
 
 ## Locked
 
