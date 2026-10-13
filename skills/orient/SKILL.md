@@ -18,7 +18,7 @@ For a builder the seat assigned a row that has a brief file (`docs/orchestration
 | 1 | `git fetch origin \|\| { sleep 2; git fetch origin; }`, then `git show origin/main:docs/orchestration/briefs/<ROW>.md` — the row's whole contract, as the seat pushed it (substitute your default branch for `main`; a plain `cat` of your own checkout misses a brief it has not rebased onto yet). Not on origin/main → `cat docs/orchestration/briefs/<ROW>.md`; in neither → tell the seat, then fall back to the full mode |
 | 2 | `git show origin/main:docs/orchestration/AGENT_BOARD.md \| awk '/^## /{ if (on) exit; if (/ORCHESTRATOR ACTIVE/ && !/[Ss][Uu][Pp][Ee][Rr][Ss][Ee][Dd][Ee][Dd]/) on=1 } on' \| head -60` — the CURRENT banner's own section, from its `ORCHESTRATOR ACTIVE` heading to the next `## ` (who the seat is, the era's rows, the standing rules it names; a header that says `superseded` is never taken for the live banner, so a board holding only superseded banners prints nothing). Anchored on the banner, not on line counts: the archive table and `---` rulers above it are skipped. No output = no banner = no seat: ask the human |
 | 3 | `python3 scripts/ctx-fill.py <uuid> --window <1m\|200k>` as its own command — the window your OWN env block names |
-| 4 | `ListAgents` (first line = your name + ref), then the READY signal of Step 7 |
+| 4 | `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails), then `ListAgents` (first line = your name + ref), then the READY signal of Step 7 |
 
 Skip: the status doc, the log, `git log`, the overlay (unless the brief names no gate command — then read `ORCHESTRATION.md` → Gate only), the test-health check and the five-bullet summary. `CLAUDE.md` loads with the session, so the Step 0 rules (worktree, refresh before claiming, row prefix) still apply: follow them and restate them in one line in READY.
 
@@ -59,7 +59,7 @@ Skip: the status doc, the log, `git log`, the overlay (unless the brief names no
 | Sibling · no banner | Ask the human what to work on |
 | The seat | Re-run `ListAgents` at the end of orientation, then WAIT for READY signals — never infer readiness from the listing |
 
-**READY signal** (`SendMessage` to the seat; board note `AVAILABLE <prefix>` under the banner only if SendMessage fails):
+**READY signal** (load the tools with `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails); `SendMessage` to the seat; board note `AVAILABLE <prefix>` under the banner only if SendMessage fails):
 ```
 READY <PREFIX> [<ref>] · model <id> · fill <current from ctx-fill, verbatim> · marks <prompt>/<handover> · saw <seat Name [ref]> era-<N> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
 ```

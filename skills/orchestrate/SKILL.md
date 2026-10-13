@@ -19,7 +19,7 @@ git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main
 1. Read the board top to bottom (archives: grep only, never whole). Another `ORCHESTRATOR ACTIVE` banner with a live seat → do NOT take it; ask the human.
 2. Post the banner at the TOP of the board (shape: the board's "Seat banner — SHAPE ONLY" section, or `${CLAUDE_PLUGIN_ROOT}/templates/AGENT_BOARD.md`): seat name + `[ref]`, era/date, your row prefix, model + window **from your own env block**, measured fill, standing rules. **Commit + push immediately** (board-write recipe, §6) — an unpushed banner is invisible.
 3. Measure yourself: `python3 scripts/ctx-fill.py` → paste `current` into the banner.
-4. `ListAgents` shows who is **reachable**, never who is **ready** — terminal uptime survives `/clear`. Build the roster from READY signals only (§3). Re-run `ListAgents` right before publishing any roster/dispatch plan.
+4. Load the cross-session tools: `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails). `ListAgents` shows who is **reachable**, never who is **ready** — terminal uptime survives `/clear`. Build the roster from READY signals only (§3). Re-run `ListAgents` right before publishing any roster/dispatch plan.
 5. **Siblings not running?** Offer the human `bash scripts/start-team.sh` (opens any missing seat/sibling window; skips names already running; `--dry-run` to preview) and run it on a yes.
 
 ## 1 · Single-allocator (while the banner stands)
@@ -161,4 +161,12 @@ Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro com
 
 - Siblings **never** ask the human in their terminal. A permission prompt/denial or design question → the sibling stops and messages the seat → the seat asks the human HERE (batched) → relays the ruling (or runs the action itself). Restate this in every READY ack.
 - Irreducible human work: design forks (surface BEFORE building), on-device checks, secrets, activations, and relaunching a terminal (`claude --name <Name> --model <lane model> …`, never a bare `/clear`) when recycling isn't available.
+- **How the seat asks** (ORCHESTRATION.md → `questions:`):
+
+| Mode | Do |
+|---|---|
+| `blocking` (default) | `AskUserQuestion`, batched. Most people expect and prefer the prompt |
+| `non-blocking` (the human opted in) | While any sibling work is in flight, never block: ask in plain text (options, a recommendation, what waits on it), send a push notification, and keep everything that does not depend on the answer moving. Keep open questions on a `HUMAN QUEUE` line in the banner; lead your next reply with it when the human types anything. A blocking prompt is still fine when the human is at the terminal and nothing else waits |
+
+- **Permission requests are a command, not prose.** First check the rule is not already there (`jq '.permissions.allow' .claude/settings.local.json`), then give ONE idempotent command the human pastes as `! <command>`, e.g. `jq '.permissions.allow |= (. + ["Bash(npm test:*)"] | unique)' .claude/settings.local.json > .claude/s.tmp && mv .claude/s.tmp .claude/settings.local.json`, plus one line on what it allows. Sessions never edit permission settings themselves, and never ask a sibling to run what their own permissions blocked.
 - The seat writes: board, briefs, reconciles, deploys, logs. It does **not** write feature code.

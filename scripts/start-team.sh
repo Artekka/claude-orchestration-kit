@@ -100,6 +100,10 @@ else
   echo "terminal   $LAUNCH_BACKEND ($LAUNCH_REASON)"
 fi
 
+# Session cap: count the names this run would actually open (running ones are skipped below).
+adding=0; for nm in "${names[@]}"; do [ -n "$(launch_pids "$nm")" ] || adding=$((adding + 1)); done
+launch_cap_warn "$adding"
+
 failed=0
 for i in "${!names[@]}"; do
   name="${names[$i]}"; prompt="${prompts[$i]}"

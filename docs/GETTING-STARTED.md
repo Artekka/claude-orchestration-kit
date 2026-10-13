@@ -18,7 +18,12 @@ New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](G
 - The launch script picks how to open windows on your machine — see the per-OS notes below.
 - **A recent Claude Code** — run `claude update` first. The seat and siblings talk to each other
   with Claude Code's **built-in** SendMessage / ListAgents tools (nothing to install); they are
-  newer features, so an old version may not have them.
+  newer features, so an old version may not have them. **Tested on Claude Code 2.1.296.** The kit
+  relies on: cross-session SendMessage / ListAgents, plugin skills that run a command before the
+  skill text loads (`/orchestration-kit:orient-brief`), and hooks that add context
+  (PostToolUse / UserPromptSubmit, for the context guard).
+- **python3** (context measurement and the context guard) and **flock** (the gate throttle; on
+  macOS `brew install flock`; without it the throttle warns and runs your gate unthrottled).
 
 ### Windows (WSL)
 
@@ -303,7 +308,15 @@ turn of every session.
 | Your edit shows up inside someone else's commit | Someone ran `git add -A` or edited outside a worktree. Stage explicit paths only |
 | Work disappeared after `git stash pop` | Stashes are shared between worktrees. Never stash; commit instead |
 | Tests green in a sibling, red on main | The gate ran from the wrong folder. Run it from inside your own worktree |
-| A session gets vague or repeats itself | Context is full. Measure with `ctx-fill.py`; retro and recycle |
+| A session gets vague or repeats itself | Context is full. Measure with `ctx-fill.py`; retro and recycle. Turn on the context guard (`ctx_guard: on`) so sessions are told for you |
+| "SendMessage / ListAgents is not available" | They are deferred tools: load them first with ToolSearch (`select:ListAgents,SendMessage`). Still missing → `claude update` |
+| A message fails with "N agents are named X" | `ListAgents` shows several sessions with that name (old ones linger in the list). Resend to `X [ref]`, the ref from the listing |
+| `orient-brief` prints `NO BANNER` | No live `ORCHESTRATOR ACTIVE` section on the pushed board (only superseded ones, or the seat never pushed). Ask the seat to push its banner |
+| `orient-brief` prints `NO BRIEF` | The brief is neither on origin nor in this checkout. The seat must commit + push `docs/orchestration/briefs/<ROW>.md` before assigning |
+| `recycle-sibling.sh` exits 3 | The old session still has live shells (a background gate, a loop); a recycle would kill or orphan them. Wait, or have that session stop them; `--force` only if they are disposable |
+| A recycle opened a new tab instead of reusing the old one | The old session was started by hand (not under `sibling-shell.sh`), or no `setsid` (macOS) for a seat self-recycle, or Git Bash. It moves over at its next recycle |
+| Gates never start | Quiet mode is on (`bash scripts/quiet-mode.sh status`), the load is above `GATE_MAX_LOAD`, or all `gate_slots` are busy (status lists who) |
+| The hooks do nothing | They are opt-in: the repo needs `docs/orchestration/.kit-hooks`, plus `git_guard: on` / `ctx_guard: on` / `worktrees: enforced` for each guard |
 
 ## 8. Changing things later
 

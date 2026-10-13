@@ -64,6 +64,8 @@ board path:     docs/orchestration/AGENT_BOARD.md
 archive dir:    docs/orchestration/archive/   (BOARD_ARCHIVE_<YYYY-MM-DD>.md; archive past ~60 KB)
 tag scheme:     <Name> [<ref>]  — Name = the terminal's `claude --name`, ref = from ListAgents
 context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~120K / ~150K
+evidence dir:   ~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/   (probe scripts, gate/run logs, READ evidence, mutant outputs)
+questions:      blocking   (blocking | non-blocking — see the orchestrate skill §11)
                 measure: python3 scripts/ctx-fill.py <uuid> --window 1m|200k   (never bytes ÷ 4)
 start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips names already running)
 recycle:        bash scripts/recycle-sibling.sh <Name> [prompt] [--model M] [--effort E]   (prints commands + exits 2 where no terminal can be opened)
@@ -90,6 +92,11 @@ from the warn mark up, injects one line: approaching (300K), report now (350K), 
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
 `on` for a team, `off` solo. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
 the guard; a session whose transcript names a Haiku model always gets the 200K marks.
+`max_sessions` (unset = no check): the most Claude sessions this machine should run, the seat and every
+verifier included. `start-team.sh` and `recycle-sibling.sh` warn (never refuse) before passing it. Each
+session holds several GB of RAM; on WSL, Windows kills the whole VM when it runs out of commit, with
+nothing logged inside Linux. After such a crash, relaunch ONE session at a time and check it is up
+before the next. Lower it if the machine struggles; raise it only with RAM to spare.
 `gate_slots` (default 2) is how many throttled runs (`scripts/gate-throttle.sh`) may run at once on
 this machine, plus one priority slot for the paths the seat lists in
 `~/.orchestration-kit/runtime/gate-priority.txt` (release/train gates). Lower it if gates flake under load.
@@ -111,8 +118,16 @@ team:
   ctx_guard:        off
   context_window:   1m
   gate_slots:       2
+  max_sessions:     8
   terminal:         auto
 ```
+
+`evidence dir`: every scratch file a session makes (probes, logs it will quote, a verifier's evidence)
+goes here, never under `/tmp` or a per-session temp dir: a reboot or a crashed VM wipes `/tmp`, and with
+it the evidence a verdict rests on. Quote the path in reports so the next reader can open it.
+`questions` is how the seat asks the human: `blocking` (the prompt waits for the answer; most people
+prefer it) or `non-blocking` (for a human who steps away: text + a push notification, work that does not
+depend on the answer keeps moving).
 
 ## Docs (institutional memory)
 

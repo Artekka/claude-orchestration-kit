@@ -620,13 +620,13 @@ launch_recycle_inplace() {
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
-  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""
+  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""
   [ -f "$conf" ] || return 0
   while IFS='=' read -r k v; do
     case "$k" in
       seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;;
       permission_mode) TEAM_MODE="$v" ;; terminal) TEAM_TERMINAL="$v" ;;
-      model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;;
+      model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;; max_sessions) TEAM_MAX="$v" ;;
     esac
   done < <(awk '
     /^team:[[:space:]]*$/ { on=1; next }
@@ -635,6 +635,7 @@ launch_team_conf() {  # <repo>
   launch_valid_name "$TEAM_SEAT" || TEAM_SEAT=""
   launch_valid_name "$TEAM_PREFIX" || TEAM_PREFIX=""
   [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
+  [[ "$TEAM_MAX" =~ ^[1-9][0-9]*$ ]] || TEAM_MAX=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
   if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
     echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
@@ -643,6 +644,19 @@ launch_team_conf() {  # <repo>
     echo "team block: effort '$TEAM_EFFORT' is not valid (low|medium|high|xhigh|max; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
   fi
   if [ "$TEAM_TERMINAL" != auto ] && ! launch_known_backend "$TEAM_TERMINAL"; then TEAM_TERMINAL=""; fi
+}
+
+# Session cap (team block `max_sessions:`; unset = no check). Every Claude session holds GBs of RAM, and a
+# host that runs out does not slow down politely: a WSL VM is killed by Windows with nothing logged inside
+# Linux. This WARNS (it never refuses: the human may know better) when launching <adding> more sessions would
+# pass the cap. The count is every `claude` process on this host, any repo, any account.
+launch_cap_warn() {  # <adding>
+  [ -n "${TEAM_MAX:-}" ] || return 0
+  local n; n="$(pgrep -f '^claude( |$)' 2>/dev/null | wc -l | tr -d ' ')"
+  if [ $((n + $1)) -gt "$TEAM_MAX" ]; then
+    echo "warning: ${n} Claude sessions already run on this host; launching ${1} more passes max_sessions (${TEAM_MAX}). Retire one first (retro, then close it), or raise max_sessions in the team block." >&2
+  fi
+  return 0
 }
 
 # launch_resolve_model <flag-model> <model-given 0|1> <flag-effort> <effort-given 0|1>

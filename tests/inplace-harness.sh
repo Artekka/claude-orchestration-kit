@@ -10,6 +10,10 @@
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WRAPPER="$ROOT/scripts/sibling-shell.sh"; RECYCLE="$ROOT/scripts/recycle-sibling.sh"
+# A kit path with whitespace: the WSL launcher refuses such repo paths by design (wt.exe/conhost command lines),
+# and these suites pass the kit's own path through those command lines, so they would FAIL for that reason
+# alone. Say so and skip instead; run them from a checkout whose path has no spaces.
+case "$ROOT" in *[[:space:]]*) echo "${SUITE:-inplace}: SKIP (the kit's path has a space: $ROOT; launch command lines refuse it by design. Run from a path without spaces)"; exit 0 ;; esac
 if [ ! -r /proc/self/status ] || ! command -v pgrep >/dev/null 2>&1; then
   echo "${SUITE:-inplace}: SKIP (needs /proc and pgrep: Linux)"; exit 0
 fi

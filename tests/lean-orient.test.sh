@@ -195,7 +195,7 @@ while IFS= read -r f; do
     left="$(f5_left "$l")"
     [ -z "$left" ] || bad "F5 ${f#"$ROOT"/} still says clear/reset/new after the allowed phrases are removed: $(printf '%s' "$left" | cut -c1-240)"
   done < <(grep -Ei -- "$F5_HIT" "$f" || true)   # only candidate lines pay for the per-phrase strip
-done < <(find "$ROOT" \( -name '*.md' -o -path "$ROOT/scripts/*.sh" -o -path "$ROOT/hooks/*.sh" \) -not -path '*/.git/*' | LC_ALL=C sort)
+done < <(find -H "$ROOT" \( -name '*.md' -o -path "$ROOT/scripts/*.sh" -o -path "$ROOT/hooks/*.sh" \) -not -path '*/.git/*' | LC_ALL=C sort)
 [ "$n_scan" -ge 45 ] && ok || bad "F5 scan found only $n_scan files (the find is broken?)"
 # The scan must REACH the files that matter most, by name (a bare count floor would let one drop out).
 for must in templates/memory-starter/feedback_retro_before_clear_handshake.md skills/orchestrate/SKILL.md \

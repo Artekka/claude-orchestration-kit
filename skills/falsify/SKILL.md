@@ -18,7 +18,7 @@ git diff HEAD --quiet || { echo 'UNCOMMITTED — commit GREEN first'; exit 1; }
 #    Prove the instrument SEES the subject: the file is collected by the runner, derived artifacts
 #    are built, the filter matches ≥1 test. A blind instrument scores every mutant as a survivor.
 
-# 2. PREDICT — write it down BEFORE running (in the row, a scratch file, or your reply):
+# 2. PREDICT — write it down BEFORE running (in the row, a file in the evidence dir, or your reply):
 #    tests that must go RED (names + count) AND tests that must stay GREEN (incl. a positive control).
 
 # 3. APPLY — anchored, with a match-count assert. Never a bare sed you hope matched.
@@ -67,7 +67,7 @@ git checkout -- <file> && git diff HEAD --quiet && echo CLEAN
 ## Rules
 
 - **Anchor by line or a unique block, never first grep match.** A wrong anchor gives a false survivor; an escaped char gives an unapplied mutant. Print the resolved line.
-- **Probe the fixtures before predicting.** On the unmutated tree, count how many runs reach the mutated line with a non-trivial input; zero reach ⇒ predict SURVIVOR. Keep probes out of the tree (scratch dir) so they can't inflate counts.
+- **Probe the fixtures before predicting.** On the unmutated tree, count how many runs reach the mutated line with a non-trivial input; zero reach ⇒ predict SURVIVOR. Keep probes out of the tree (the evidence dir from ORCHESTRATION.md, never `/tmp`) so they can't inflate counts and survive a reboot.
 - **Re-run the battery after adding any default/fallback.** A fixture whose value equals the fallback makes forwarding and defaulting indistinguishable.
 - **A scan for undefined VALUES can't see ABSENT keys.** State the guard as an obligation: what each variant owes, asserted present, tied to the live registry.
 

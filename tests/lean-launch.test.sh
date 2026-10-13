@@ -6,6 +6,10 @@
 # process has to be findable; everything else reads the real command line the script would run.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; RS="$ROOT/scripts/recycle-sibling.sh"; ST="$ROOT/scripts/start-team.sh"
+# A kit path with whitespace: the WSL launcher refuses such repo paths by design (wt.exe/conhost command lines),
+# and these suites pass the kit's own path through those command lines, so they would FAIL for that reason
+# alone. Say so and skip instead; run them from a checkout whose path has no spaces.
+case "$ROOT" in *[[:space:]]*) echo "lean-launch: SKIP (the kit's path has a space: $ROOT; launch command lines refuse it by design. Run from a path without spaces)"; exit 0 ;; esac
 TMP="$(mktemp -d)"; pids=""
 trap 'for p in $pids; do kill "$p" 2>/dev/null; done; rm -rf "$TMP"' EXIT
 pass=0; fail=0

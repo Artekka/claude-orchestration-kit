@@ -59,6 +59,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
    `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). "Not now" → show the same command for later. Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
+   **Platform check (say it before launching, from the dry run's `backend` line):** `gitbash-cmd` or `manual` → recycling cannot happen in place (no `pgrep`): each recycle opens a new window and the human closes the old one. `wsl-*` with a space or `;`/quote in the repo path → refused by the WSL launcher; move the repo to a plain path (`~/projects/<name>`). macOS → a seat self-recycle opens a new tab (no `setsid`). Claude Code older than the tested version (`claude --version`, GETTING-STARTED §0) → `claude update` first.
    Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on` and `ctx_guard: on`; **Not now** (solo mode) → both `off`. Then commit that path:
    ```bash
    C=docs/orchestration/ORCHESTRATION.md

@@ -92,6 +92,8 @@ launch_check_args "$name" "$prompt"
 launch_set_mode "${MODE:-${TEAM_MODE:-normal}}"
 launch_resolve_model "$MODEL" "$MODEL_SET" "$EFFORT" "$EFFORT_SET"
 launch_init "$REPO" "${TERM_OPT:-${TEAM_TERMINAL:-}}"
+# A recycle replaces a session; only one with no old process adds one to the host.
+[ -n "$(launch_pids "${args[0]}")" ] || launch_cap_warn 1
 
 manual_help() {
   cat >&2 <<HELP
