@@ -77,6 +77,11 @@ hasnt "trial: ...not RIDER" "RIDER a.txt" "$out"
 hasnt "trial: a cherry-pick is not an ancestor" "ALREADY-ON-TRAIN" "$out"
 out="$(B=$T7 C=$R1 bash "$ASM/cptrial.sh" 2>&1)"
 has "cptrial: a commit the base already holds reads SAME" "SAME a.txt" "$out"
+# READ 4b LOW: a commit that is an ANCESTOR of the base (T6 holds r1 by merge) is flagged and its SYNTH is the base
+out="$(B=$T6 C=$R1 bash "$ASM/cptrial.sh" 2>&1)"; rc=$?
+has "cptrial: an ancestor commit is flagged" "ALREADY-ON-TRAIN" "$out"
+has "cptrial: ...and its SYNTH is the base itself" "SYNTH $T6" "$out"
+[ "$rc" -eq 0 ] && ok || bad "cptrial: ALREADY-ON-TRAIN must exit 0, got $rc"
 
 # READ MED-2: non-ASCII paths (git quotes them in --name-only output unless told not to)
 git checkout -q -b b8 "$BASE0"; seq 1 9 > "é.txt"; git add "é.txt"; git commit -qm b8; B8=$(git rev-parse HEAD)
@@ -150,6 +155,21 @@ eq_rc() { [ "$2" = "$3" ] && ok || bad "$1: want rc $2, got $3"; }
 eq_rc "audit: a resolved merge (not last) makes the sweep exit 1" 1 "$rc"
 BASE=$TIP0 TIP=$M3 bash "$AUD/audit.sh" >/dev/null 2>&1; rc=$?
 eq_rc "audit: all merges tree-equal exits 0" 0 "$rc"
+
+# READ 4b LOW: the "resolved:" list prints a non-ASCII path as written (git quotes it as "\303\251.txt" unless told not to)
+git checkout -q -b t9 "$T8"; git merge -q --no-ff -m "merge(train): r8" "$R8" >/dev/null 2>&1 || bad "setup: t9 merge of r8 failed"
+echo hand-edit >> "é.txt"; git commit -qa --amend --no-edit; T9=$(git rev-parse HEAD)
+out="$(BASE=$T8 TIP=$T9 bash "$AUD/audit.sh" 2>&1)"; rc=$?
+has "audit non-ASCII: the merge is not tree-equal" "tree_eq=NO" "$out"
+has "audit non-ASCII: the resolved path is listed as written" "resolved: é.txt" "$out"
+eq_rc "audit non-ASCII: exits 1" 1 "$rc"
+# READ 4b LOW: an octopus merge is never swept silently: it prints OCTOPUS and the sweep exits 1
+git checkout -q -b t10 "$BASE0"; git merge -q --no-ff -m "octopus r1 r3" "$R1" "$R3" >/dev/null 2>&1 || bad "setup: octopus merge failed"
+T10=$(git rev-parse HEAD)
+out="$(BASE=$BASE0 TIP=$T10 bash "$AUD/audit.sh" 2>&1)"; rc=$?
+has "audit octopus: flagged" "OCTOPUS ${T10:0:9} parents=3" "$out"
+eq_rc "audit octopus: exits 1" 1 "$rc"
+git checkout -q train
 
 # approved list: every p2 must be named in it
 printf '%s\n' "$R1" "$R3" > "$TMP/approved"
