@@ -9,14 +9,14 @@ has() { case "$3" in *"$2"*) pass=$((pass+1)) ;; *) fail=$((fail+1)); echo "FAIL
 hasnt() { case "$3" in *"$2"*) fail=$((fail+1)); echo "FAIL $1: did not want '$2' in: $3" ;; *) pass=$((pass+1)) ;; esac; }
 rc_is() { [ "$2" = "$3" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL $1: want exit $2, got $3"; }; }
 H="$TMP/home"; P="$H/work"; S="$H/.orchestration-kit"
-mkdir -p "$P/Kit App/docs/orchestration" "$P/Kit App/scripts" "$P/plain" "$P/Kit App-Test" "$H/ws"
+mkdir -p "$P/Kit App/docs/orchestration" "$P/Kit App/scripts" "$P/plain" "$P/Kit App-Test" "$P/_archive" "$H/ws"
 : > "$P/Kit App/docs/orchestration/ORCHESTRATION.md"; : > "$P/Kit App/scripts/start-team.sh"
 mkdir -p "$S"; printf 'projects_dir=~/work\nword=zzgo\n' > "$S/launcher.conf"
 pick() { printf '%b' "$1" | env HOME="$H" KIT_LAUNCH_DRY=1 bash "$L" "${@:2}" 2>&1; }
 
 # --- kit-launch.sh
 out="$(pick '' --list)"
-has "list: kit project" "kit  Kit App" "$out"; has "list: plain project" "-    plain" "$out"; hasnt "list: no trial copies" "Kit App-Test" "$out"
+has "list: kit project" "kit  Kit App" "$out"; has "list: plain project" "-    plain" "$out"; hasnt "list: no trial copies" "Kit App-Test" "$out"; hasnt "list: no _ folders" "_archive" "$out"
 out="$(pick 'q\n')"; has "menu: titled with the word" "zzgo — pick a project" "$out"; hasnt "menu: no workshop unless set" "[t]" "$out"
 out="$(pick '1\n')"; has "kit project: its own start-team.sh" "RUN in $P/Kit App: bash $P/Kit App/scripts/start-team.sh" "$out"
 out="$(pick '' 'Kit App')"; has "named project skips the menu" "start-team.sh" "$out"; hasnt "named: no menu" "pick a project" "$out"

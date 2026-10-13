@@ -14,7 +14,8 @@
 #   projects_dir=~/projects           where projects live (default ~/projects)
 #   workshop=~/kit-test               optional: the test copy of the kit [t] opens
 #   workshop_label=kit-test           optional: the name [t] shows
-# Folders ending in -Test (trial copies) and the kit's own folder are not listed.
+# Folders ending in -Test (trial copies), folders starting with _ (e.g. _archive) and the kit's own folder
+# are not listed.
 # Exit 0 done or quit, 1 no such project, 64 usage.
 set -uo pipefail
 
@@ -88,12 +89,12 @@ list_projects() {
     case "$d" in *-Test) continue ;; esac
     [ "$(cd "$d" && pwd -P)" = "$(cd "$KIT" && pwd -P)" ] && continue
     PROJ+=("$d")
-  done < <(find "$PROJECTS" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print0 | sort -z)
+  done < <(find "$PROJECTS" -mindepth 1 -maxdepth 1 -type d ! -name '.*' ! -name '_*' -print0 | sort -z)
 }
 
 list_projects
 case "${1:-}" in
-  -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n "2,20p" "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   --list)
     for d in "${PROJ[@]+"${PROJ[@]}"}"; do if has_kit "$d"; then echo "kit  $(basename "$d")"; else echo "-    $(basename "$d")"; fi; done
     exit 0 ;;
