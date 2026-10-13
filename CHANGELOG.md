@@ -2,6 +2,22 @@
 
 Newest first.
 
+## 0.7.1 — 2026-10-13
+
+A bug fix and the first piece of the 0.8.0 catch-up, released early.
+
+- **Fixed: `/orchestration-kit:orient --brief <ROW>` showed no seat banner on a live team.** The skill
+  loader replaces positional tokens (`$0`, `$1`, …) inside skill bodies with the skill's own arguments,
+  so the banner filter matched nothing and a new session concluded there was no seat. `orient` step 2 and
+  `kit-init` no longer use positional tokens, an extras example uses a named placeholder, and
+  `tests/skill-positional.test.sh` bans them in every loader-rendered file (rendering the real blocks
+  with arguments, the way the loader does, then running them).
+- **New, opt-in: context guard hook** (`hooks/ctx-guard.py`, PostToolUse + UserPromptSubmit). With
+  `ctx_guard: on` in your team config (kit-init turns it on for a team start, off for solo) and the
+  `docs/orchestration/.kit-hooks` marker, each session gets a `CONTEXT GUARD:` line as it nears its
+  report and hand-over marks (`context_window: 1m|200k`). It reads the main checkout's config, so
+  worktrees work, and it fails silent: it can never break a session.
+
 ## 0.7.0 — 2026-10-03
 
 Recycling in place. A recycled session now restarts in the SAME terminal tab instead of opening a new
