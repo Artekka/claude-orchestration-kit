@@ -13,7 +13,7 @@ Golden rule: **never mutate prod from a script that writes the DB directly.** Co
 2. **Dump → JSON** (read-only): everything the recompute needs AND the current values you'll validate against.
 3. **Count the impact** (read-only): how many rows the condition matches. Surface it.
 4. **Compute deterministically — REUSE the live functions.** A one-off script reads the JSON, calls the same shared function the live path uses, and WRITES SQL to a temp file — it never touches the DB. **Determinism guard:** re-derive each row's CURRENT state first; a mismatch (user progressed past the seed, hand-edit, model drift) means SKIP that row — the change stays purely additive, never overwrites real progress.
-5. **Emit GUARDED, idempotent SQL** in one transaction. Every statement guarded by the old value (`WHERE col < floor`, `WHERE id=$1 AND template_id='<old>'`); update only the columns you mean to; honor invariants the change touches.
+5. **Emit GUARDED, idempotent SQL** in one transaction. Every statement guarded by the old value (`WHERE col < floor`, `WHERE id=:id AND template_id='<old>'`); update only the columns you mean to; honor invariants the change touches.
 6. **Review gate.** SQL statement count vs the impact count; show the human a sample; get the explicit go-ahead before applying.
 7. **Apply via staged file** (`psql -v ON_ERROR_STOP=1 < file`), each statement reporting `UPDATE N` matching the count — an `UPDATE 0` means a guard didn't match: investigate, don't assume.
 8. **Read-back verify:** the Step-3 count must now be 0; spot-check rows. **Fixpoint rule:** if the recompute's inputs include rows the backfill itself raises (lineage chains), loop dump→compute→apply until the read-back is 0 — guarded statements make each pass safe.

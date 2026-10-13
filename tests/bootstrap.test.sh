@@ -36,7 +36,7 @@ grep -q 'templates/CLAUDE-slimness.md' "$P/CLAUDE.md" && bad "installed CLAUDE.m
 # a dry run lists it, and kit-init's copy block installs it too
 bash "$BS" "$TMP/dry2" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE docs/orchestration/CLAUDE-slimness.md' && ok || bad "dry-run did not list CLAUDE-slimness.md"
 grep -q 'CLAUDE-slimness.md' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install CLAUDE-slimness.md"
-grep -q 'put "$K/templates/CLAUDE-slimness.md" *docs/orchestration/CLAUDE-slimness.md' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init put line for CLAUDE-slimness.md missing or wrong destination"
+grep -q 'templates/CLAUDE-slimness.md:docs/orchestration/CLAUDE-slimness.md' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init put line for CLAUDE-slimness.md missing or wrong destination"
 # a live copy is never overwritten
 echo "# my slimness note" > "$P/docs/orchestration/CLAUDE-slimness.md"
 bash "$BS" "$P" >/dev/null 2>&1

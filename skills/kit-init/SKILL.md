@@ -12,16 +12,19 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 1. **Copy what's missing** (prints CREATE/SKIP per file):
    ```bash
    K="${CLAUDE_PLUGIN_ROOT}"
-   put() { if [ -e "$2" ]; then echo "SKIP   $2 (exists)"; else mkdir -p "$(dirname "$2")" && cp "$1" "$2" && echo "CREATE $2"; fi; }
-   put "$K/templates/AGENT_BOARD.md"   docs/orchestration/AGENT_BOARD.md
-   put "$K/templates/ORCHESTRATION.md" docs/orchestration/ORCHESTRATION.md
-   put "$K/templates/briefs/README.md" docs/orchestration/briefs/README.md
-   put "$K/templates/briefs/_TEMPLATE.md" docs/orchestration/briefs/_TEMPLATE.md
-   put "$K/templates/CLAUDE-slimness.md" docs/orchestration/CLAUDE-slimness.md
-   put "$K/templates/AI_CONTEXT.md"    docs/AI_CONTEXT.md
-   put "$K/templates/build-log.md"     docs/timeline/build-log.md
+   # Named variables only: the skill loader replaces dollar-digit tokens in this file with the invocation's args.
+   put() { if [ -e "$DST" ]; then echo "SKIP   $DST (exists)"; else mkdir -p "$(dirname "$DST")" && cp "$SRC" "$DST" && echo "CREATE $DST"; fi; }
+   for p in templates/AGENT_BOARD.md:docs/orchestration/AGENT_BOARD.md \
+            templates/ORCHESTRATION.md:docs/orchestration/ORCHESTRATION.md \
+            templates/briefs/README.md:docs/orchestration/briefs/README.md \
+            templates/briefs/_TEMPLATE.md:docs/orchestration/briefs/_TEMPLATE.md \
+            templates/CLAUDE-slimness.md:docs/orchestration/CLAUDE-slimness.md \
+            templates/AI_CONTEXT.md:docs/AI_CONTEXT.md \
+            templates/build-log.md:docs/timeline/build-log.md; do
+     SRC="$K/${p%%:*}" DST="${p#*:}" put
+   done
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh; do put "$K/scripts/$f" "scripts/$f"; done
+   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
    chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
@@ -59,12 +62,12 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on`; **Not now** (solo mode) → `git_guard: off`. Then commit that path:
    ```bash
    C=docs/orchestration/ORCHESTRATION.md
-   setkey() {  # <key> <value>
-     if grep -Eq "^[[:space:]]+$1:" "$C"; then sed -i -E "s/^([[:space:]]+$1:[[:space:]]*).*/\1$2/" "$C"
-     elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $1:        $2" "$C"
-     else printf '\nteam:\n  %s:        %s\n' "$1" "$2" >> "$C"; fi
+   setkey() {  # KEY=<key> VAL=<value> setkey   (named variables: the skill loader eats dollar-digit tokens)
+     if grep -Eq "^[[:space:]]+$KEY:" "$C"; then sed -i -E "s/^([[:space:]]+$KEY:[[:space:]]*).*/\1$VAL/" "$C"
+     elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $KEY:        $VAL" "$C"
+     else printf '\nteam:\n  %s:        %s\n' "$KEY" "$VAL" >> "$C"; fi
    }
-   setkey worktrees <advised|enforced>; setkey git_guard <on if a team was started, else off>
+   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=<on if a team was started, else off> setkey
    git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard settings"
    ```
    Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
