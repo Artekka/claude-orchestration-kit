@@ -526,6 +526,26 @@ launch_is_ancestor() {  # <pid>
   return 1
 }
 
+# Live shells under the old session(s): `<pid> <elapsed> <args>` per line, else nothing. A recycle SIGTERMs
+# the old claude, and its background shells (a gate run, a loop, a long prune) die with it or run on orphaned
+# with nobody to read their result; "retro complete" says the work is committed, not that nothing still runs.
+# Shell children (bash/sh/zsh/dash/ksh/fish) are what Claude Code's Bash tool leaves running; MCP servers
+# (node, python, npm …) are permanent children and are not counted. A shell that is OUR ancestor is the
+# seat's own tool call running this script (a self-recycle), so it is skipped. Subagents run inside the
+# claude process and are invisible here: the retro reply has to say none are running.
+launch_live_shells() {  # <pid>...
+  local table p c comm
+  table="$(ps -A -o pid=,ppid=,comm= 2>/dev/null)" || return 0
+  for p in "$@"; do
+    for c in $(printf '%s\n' "$table" | awk -v p="$p" '$2 == p { print $1 }'); do
+      comm="$(printf '%s\n' "$table" | awk -v c="$c" '$1 == c { print $3 }')"; comm="${comm##*/}"; comm="${comm#-}"
+      case "$comm" in bash|sh|zsh|dash|ksh|fish) ;; *) continue ;; esac
+      launch_is_ancestor "$c" && continue
+      printf '%s %s %s\n' "$c" "$(ps -o etime= -p "$c" 2>/dev/null | tr -d ' ')" "$(ps -o args= -p "$c" 2>/dev/null | cut -c1-160)"
+    done
+  done
+}
+
 # The hand-off, written tmp + mv so the wrapper never reads half of it. The prompt travels as base64 on
 # one line, so no quote, `;`, `$` or newline needs escaping between here and claude's argv.
 launch_write_handoff() {  # <name> <prompt> — model/effort/mode/account come from the LAUNCH_* globals

@@ -24,7 +24,7 @@
 #
 # Usage:
 #   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
-#                              [--model M] [--effort E] [--new-tab]
+#                              [--model M] [--effort E] [--new-tab] [--force]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
 #     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
 #     mode / terminal default to the team block (ORCHESTRATION.md), else normal / auto-detect.
@@ -35,6 +35,10 @@
 #     team block's `model:`, else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
 #     given. Bad values exit 64. The lane -> model table is in skills/orchestrate ("Model per lane").
 #     --new-tab: skip the in-place path and open a new window, as before v0.7.0.
+#     Live work: the old session's live shells (background gate runs, loops) die or run on orphaned when
+#     it is SIGTERMed, so the script REFUSES (exit 3) and lists them while any are running. Wait for them,
+#     or have the session stop them; --force recycles anyway. Subagents are invisible to this check: the
+#     session's "retro complete" must say none are running. --dry-run lists the live shells too.
 #   scripts/recycle-sibling.sh Orca          # seat self-recycle
 #   scripts/recycle-sibling.sh Sib2 --model 'sonnet[1m]' --effort high
 #   DRY_RUN=1 scripts/recycle-sibling.sh <Name>   # same as --dry-run; prints `mode: in-place|new-tab`
@@ -52,13 +56,14 @@ orig_args=("$@")   # the detached copy of a self-recycle re-runs with exactly th
 
 usage() { sed -n '/^# Usage:/,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
-DRY=0; [ -z "${DRY_RUN:-}" ] || DRY=1; FORCE_NEW_TAB=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; MODEL=""; EFFORT=""; MODEL_SET=0; EFFORT_SET=0; args=()
+DRY=0; [ -z "${DRY_RUN:-}" ] || DRY=1; FORCE_NEW_TAB=0; FORCE=0; REPO=""; MODE=""; TERM_OPT=""; ACCOUNT=""; MODEL=""; EFFORT=""; MODEL_SET=0; EFFORT_SET=0; args=()
 # A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
 need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --new-tab) FORCE_NEW_TAB=1 ;;
+    --force) FORCE=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
@@ -137,18 +142,41 @@ if [ -n "$wrapper_pid" ] && launch_is_ancestor "$old"; then
 fi
 [ -z "$wrapper_pid" ] || mode=in-place
 
+# Live work under the old session (see launch_live_shells). The detached copy of a self-recycle skips it:
+# the parent already checked, and the seat's own tool shell, an ancestor then, is no longer one now.
+live=""
+if [ -n "$old" ] && [ -z "${RECYCLE_DETACHED:-}" ] && [ "${LAUNCH_CAN_VERIFY:-0}" = 1 ]; then
+  # shellcheck disable=SC2086  # $old is a newline-separated pid list
+  live="$(launch_live_shells $old)"
+fi
+
 if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or killed"
   launch_describe_env
   launch_describe "$name" "$prompt"
   echo "mode: ${mode}"
   echo "detach: ${detach}"
+  if [ -n "$live" ]; then
+    printf 'live work  %s\n' "$(printf '%s\n' "$live" | head -1)"; printf '%s\n' "$live" | sed 1d | sed 's/^/           /'
+    if [ "$FORCE" = 1 ]; then echo "           --force: a real run recycles anyway"; else echo "           a real run refuses (exit 3) without --force"; fi
+  else
+    echo "live work  none"
+  fi
   if [ "$LAUNCH_CAN_VERIFY" = 1 ]; then
     echo "old pids   ${old:-none} (matched: pgrep -f '$(launch_pattern "$name")') -> SIGTERM after the fresh one appears"
   else
     echo "old pids   unknown (no pgrep) -> nothing is killed; close the old '$name' window by hand"
   fi
   exit 0
+fi
+
+if [ -n "$live" ] && [ "$FORCE" = 0 ]; then
+  {
+    echo "refusing to recycle '${name}': its session still has live shells, which a SIGTERM would kill or orphan:"
+    printf '%s\n' "$live" | sed 's/^/  pid /'
+    echo "Wait for them to finish (or have '${name}' stop them), then run this again. --force recycles anyway."
+  } >&2
+  exit 3
 fi
 
 if [ "$detach" = yes ]; then
