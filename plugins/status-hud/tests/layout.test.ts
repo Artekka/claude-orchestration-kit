@@ -71,3 +71,44 @@ test('chips: quiet mode (clickable only when both commands are set), commit warn
   const calm = { ...snap, host: { ...snap.host!, commit: { ...snap.host!.commit!, usedPct: 40 } } }
   expect(chips(view({ snap: calm })).some(x => x.label.includes('commit'))).toBe(false)
 })
+
+// ---- ORCA175-4 ----------------------------------------------------------------------------------------------------
+
+const labelsOf = (v: View): string[] => chips(v).map(c => c.label.trim())
+const hasMode = (v: View): boolean => labelsOf(v).some(l => l.includes('mode'))
+
+test('chip visibility: hidden when the toggle script is missing, unless quiet mode is already ON', () => {
+  expect(hasMode(view({ snap: { ...snap, quietAvail: false } }))).toBe(false)
+  expect(hasMode(view({ snap: { ...snap, quietAvail: true } }))).toBe(true)
+  expect(hasMode(view({ snap: { ...snap, quietAvail: undefined } }))).toBe(true)
+  const on = chips(view({ snap: { ...snap, quietMode: true, quietAvail: false } }))
+  expect(on[0]?.label).toContain('QUIET mode')
+  expect(on[0]?.press).toBe('quiet')
+})
+
+test('a failed press paints a red "failed" chip until the error expires, and it stays pressable', () => {
+  const err = { wanted: true, msg: 'exit 127', until: 61_000 }
+  const c = chips(view({ snap: { ...snap, quietErr: err }, now: 2_000 }))[0]!
+  expect(c.label).toContain('✖ failed')
+  expect(c.label).toContain('QUIET')
+  expect(c.bg).toBe('#6a1c22')
+  expect(c.press).toBe('quiet')
+  const off = chips(view({ snap: { ...snap, quietErr: { ...err, wanted: false } }, now: 2_000 }))[0]!
+  expect(off.label).toContain('WORK')
+  expect(off.label).toContain('✖ failed')
+  const gone = chips(view({ snap: { ...snap, quietErr: err }, now: 61_000 }))[0]!
+  expect(gone.label).not.toContain('failed')
+  expect(gone.label).toContain('WORK mode')
+})
+
+test('an error on a chip the visibility rule hides does not resurrect it', () => {
+  expect(hasMode(view({ snap: { ...snap, quietAvail: false, quietErr: { wanted: true, msg: 'x', until: 99_000 } } }))).toBe(false)
+})
+
+test('the pane explains the chip in one caption line; the band does not spend a row on it', () => {
+  const pane = drawPane(view(), 60).map(lineText).join('\n')
+  expect(pane).toContain('QUIET holds NEW test/gate runs while you use the machine; running ones finish')
+  expect(drawBand(view(), 180, 10).map(lineText).join('\n')).not.toContain('holds NEW')
+  const hidden = drawPane(view({ snap: { ...snap, quietAvail: false } }), 60).map(lineText).join('\n')
+  expect(hidden).not.toContain('holds NEW')
+})

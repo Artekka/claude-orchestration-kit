@@ -75,3 +75,25 @@ test('flashSeconds 0 disables the flash', async () => {
   await tick(f.io, c, hb({ id: 'me', tokens: 400_000 }), ts, async () => false)
   expect(ts.flash).toEqual({})
 })
+
+// ---- ORCA175-4 ----------------------------------------------------------------------------------------------------
+
+test('tick: quietAvail follows the toggle script in the session directory', async () => {
+  const f = fakeIo({ now: 10_000_000, runs: a => (a[0] === 'sh' ? { exitCode: 0, stdout: SAMPLE_OUT } : undefined) })
+  const c = parseConfig({ statusDir: '/s', commitCmd: '', quietModeOnCmd: 'a', quietModeOffCmd: 'b', quietModeFlagFile: '/f/q' }, '/h')
+  const there = await tick(f.io, c, hb({ id: 'me' }), newTickState(), async p => p === '/proj/scripts/quiet-mode.sh', '/proj')
+  expect(there.quietAvail).toBe(true)
+  const missing = await tick(f.io, c, hb({ id: 'me' }), newTickState(), async () => false, '/proj')
+  expect(missing.quietAvail).toBe(false)
+})
+
+test('tick: a recorded press failure rides the snapshot until it expires, then is dropped', async () => {
+  const f = fakeIo({ now: 10_000_000, runs: a => (a[0] === 'sh' ? { exitCode: 0, stdout: SAMPLE_OUT } : undefined) })
+  const c = parseConfig({ statusDir: '/s', commitCmd: '' }, '/h')
+  const ts = newTickState()
+  ts.quietErr = { wanted: true, msg: 'exit 2', until: 10_030_000 }
+  expect((await tick(f.io, c, hb({ id: 'me' }), ts, async () => false)).quietErr).toEqual({ wanted: true, msg: 'exit 2', until: 10_030_000 })
+  f.setNow(10_030_000)
+  expect((await tick(f.io, c, hb({ id: 'me' }), ts, async () => false)).quietErr).toBe(null)
+  expect(ts.quietErr).toBe(null)
+})
