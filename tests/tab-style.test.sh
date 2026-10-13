@@ -33,12 +33,14 @@ has "colors recorded" "$A" "$(cat "$TMP/.orchestration-kit/runtime/tab-colors")"
 # 3. The team block overrides: a fixed color and profile, or none.
 C="$TMP/c"; mkrepo "$C" '  tab_profile:      Ubuntu-22.04\n  tab_color:        #123456\n'
 out="$(st "$C")"; has "fixed profile" "-p Ubuntu-22.04" "$out"; has "fixed color" "--tabColor \\#123456" "$out"
+# The tab tells its session its color (the HUD's dot) and that Windows Terminal draws 24-bit color.
+has "tab color reaches the session" "CLAUDE_TAB_COLOR=#123456" "$out"; has "truecolor declared" "COLORTERM=truecolor" "$out"
 D="$TMP/d"; mkrepo "$D" '  tab_profile:      none\n  tab_color:        none\n'
-out="$(st "$D")"; hasnt "profile none" "new-tab -p" "$out"; hasnt "color none" "--tabColor" "$out"
+out="$(st "$D")"; hasnt "profile none" "new-tab -p" "$out"; hasnt "color none" "--tabColor" "$out"; hasnt "no color, no CLAUDE_TAB_COLOR" "CLAUDE_TAB_COLOR" "$out"
 E="$TMP/e"; mkrepo "$E" '  tab_color:        red;evil\n'
 out="$(st "$E")"; hasnt "invalid color ignored (not passed through)" "red;evil" "$out"
 # 4. Other backends are unchanged.
-out="$(T=tmux st "$A")"; hasnt "tmux: no wt flags" "--tabColor" "$out"
+out="$(T=tmux st "$A")"; hasnt "tmux: no wt flags" "--tabColor" "$out"; hasnt "tmux: no tab color" "CLAUDE_TAB_COLOR" "$out"
 
 if [ -e "$TMP/REAL-TOOL-CALLED" ]; then fail=$((fail+1)); echo "FAIL a real-tool stand-in was executed: $(cat "$TMP/REAL-TOOL-CALLED")"; else pass=$((pass+1)); fi
 echo "tab-style: $pass passed, $fail failed"

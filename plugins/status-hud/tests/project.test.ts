@@ -22,6 +22,10 @@ test('tab color: the recorded one first, else the team block, else none', async 
   expect(projectColor('/p/b', rec, '')).toBe('#d35400')
   expect(projectColor('/p/c', rec, 'team:\n  tab_color:        #27ae60\n')).toBe('#27ae60')
   expect(projectColor('/p/c', rec, 'team:\n  tab_color:        none\n')).toBe('')
+  // The session's own tab color (CLAUDE_TAB_COLOR) wins over the project's, so the dot matches the tab it sits in.
+  expect(projectColor('/p/b', rec, '', '#8e44ad')).toBe('#8e44ad')
+  expect(projectColor('', '', '', '#8e44ad ')).toBe('#8e44ad')
+  expect(projectColor('/p/b', rec, '', 'purple')).toBe('#d35400')
 })
 
 test('versions and test slots from ORCHESTRATION.md', async () => {

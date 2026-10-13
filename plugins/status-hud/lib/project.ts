@@ -15,8 +15,12 @@ export function repoFromCommonDir(out: string): string {
   return d.endsWith('/.git') ? d.slice(0, -5) : ''
 }
 
-/** A project's tab color: the kit's recorded color for the repo, else the team block's `tab_color:`, else ''. */
-export function projectColor(repo: string, tabColors: string, overlay: string): string {
+/**
+ * A session's dot color: its own tab's color (CLAUDE_TAB_COLOR, set by whatever opened the tab), else the kit's
+ * recorded color for the repo, else the team block's `tab_color:`, else ''.
+ */
+export function projectColor(repo: string, tabColors: string, overlay: string, tabColor = ''): string {
+  if (/^#[0-9a-fA-F]{6}$/.test(tabColor.trim())) return tabColor.trim()
   for (const line of tabColors.split('\n')) {
     const [path, color] = line.split('\t')
     if (path === repo && color && /^#[0-9a-fA-F]{6}$/.test(color.trim())) return color.trim()

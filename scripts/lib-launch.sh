@@ -438,7 +438,14 @@ launch_cmd() {
   case "$LAUNCH_BACKEND" in wsl-*) q=_launch_q_wsl ;; esac
   local cd="${LAUNCH_CD:-$LAUNCH_REPO}" phys=""
   [ "$cd" = "$LAUNCH_REPO" ] || phys="cd -P . && "   # a safe-name link (see _launch_safe_cd): land in the real path
-  printf 'cd %s && %s%s%s' "$(printf '%q' "$cd")" "$phys" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
+  # Windows Terminal draws 24-bit color but does not say so (no COLORTERM), so Claude Code would round every hex
+  # color to the 256-color palette (the HUD's #16a085 dot turns cyan). CLAUDE_TAB_COLOR tells the HUD the tab's color.
+  local style=""
+  if [ "$LAUNCH_BACKEND" = wsl-wt ]; then
+    style="export COLORTERM=truecolor && "
+    [ -z "${LAUNCH_TAB_COLOR:-}" ] || style="export COLORTERM=truecolor CLAUDE_TAB_COLOR=$LAUNCH_TAB_COLOR && "
+  fi
+  printf 'cd %s && %s%s%s%s' "$(printf '%q' "$cd")" "$phys" "$style" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
 }
 
 # Git Bash: a cmd.exe command line (Windows path, native Windows claude).

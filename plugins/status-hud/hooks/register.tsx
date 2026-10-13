@@ -34,6 +34,8 @@ const S: {
   /** This session's project facts (versions, slots), read at start and every minute. */
   local: Local
   repo: string
+  /** CLAUDE_TAB_COLOR: the color of the terminal tab this session runs in, when its launcher said. */
+  tabColor: string
   /** When this session last made progress, and what it is waiting on you for ('' = nothing). */
   progressAt: number
   waitingOn: string
@@ -54,6 +56,7 @@ const S: {
   last: null,
   local: { mode: 'normal', live: '', next: '', slots: 2 },
   repo: '',
+  tabColor: '',
   progressAt: 0,
   waitingOn: '',
   localAt: 0,
@@ -136,8 +139,10 @@ async function refreshLocal(c: Config, io: Io, now: number): Promise<void> {
   if (S.repo) {
     const overlay = (await io.read(`${S.repo}/docs/orchestration/ORCHESTRATION.md`)) ?? ''
     const colors = (await io.read(`${c.kitRuntimeDir}/tab-colors`)) ?? ''
-    S.me.color = projectColor(S.repo, colors, overlay)
+    S.me.color = projectColor(S.repo, colors, overlay, S.tabColor)
     S.local = localFromOverlay(overlay, S.me.mode ?? 'normal')
+  } else {
+    S.me.color = projectColor('', '', '', S.tabColor)
   }
 }
 
@@ -238,6 +243,7 @@ export const register: Register = (on, options) => {
     const common = cwd ? await S.io.run(['git', '-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir']) : { exitCode: 1, stdout: '' }
     S.repo = common.exitCode === 0 ? repoFromCommonDir(common.stdout) : ''
     me.project = S.repo ? (S.repo.split('/').pop() ?? '') : ''
+    S.tabColor = (await $.env.get('CLAUDE_TAB_COLOR')) ?? ''
     S.localAt = 0
     me.account = accountFromConfigDir(env.trim().replace(/^CLAUDE_CONFIG_DIR=/, '') || (await $.env.get('CLAUDE_CONFIG_DIR')))
     await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet' })
