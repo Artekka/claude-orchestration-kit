@@ -1,11 +1,12 @@
 ---
 name: release-review
-description: Harden a project before a release, run by the SEAT once fast iteration is done — freeze features, review the human's decisions for staleness, check every request against the code, have a non-builder write LOCKED release tests from the decisions, prove each test can fail, attack the build, give every area a fresh-eyes code review, fix everything found through normal rows, refresh the README and docs, write an optional acceptance checklist for the human, then release. Use when the human says "release review", "get ready for release", "harden this", "ship-ready check".
+description: Harden a project before a release, run by the SEAT once fast iteration is done — freeze features, review the human's decisions for staleness, check every request against the code, have a non-builder write LOCKED release tests from the decisions, prove each test can fail, attack the build, give every area a fresh-eyes code review, fix everything found through normal rows, refresh the README and docs, write an optional acceptance checklist for the human, then release. Runs ONLY when the human types /orchestration-kit:release-review — never on Claude's own judgment.
+disable-model-invocation: true
 ---
 
 # release-review
 
-Iteration rows are judged by a reviewing session; a release is judged by **tests nobody who builds can edit**. This skill turns a fast-built project into a release the seat can stand behind. It runs as a **train of rows** on the normal board: every step below is one or more rows, briefed, assigned, verified and reconciled exactly as `/orchestration-kit:orchestrate` says. Only the seat runs this skill.
+Iteration rows are judged by a reviewing session; a release is judged by **tests nobody who builds can edit**. This skill turns a fast-built project into a release the seat can stand behind. It starts only from the human's explicit `/orchestration-kit:release-review` (optionally with the version); a request in plain words ("are we ready to ship?") gets the command named back, not a review. It runs as a **train of rows** on the normal board: every step below is one or more rows, briefed, assigned, verified and reconciled exactly as `/orchestration-kit:orchestrate` says. Only the seat runs this skill.
 
 Paths come from `docs/orchestration/ORCHESTRATION.md` → **Release** (defaults in brackets): the decisions log [`docs/orchestration/DECISIONS.md`], the release tests dir [`tests/release/`], the review dir [`docs/orchestration/release/<version>/`]. `H` below = this skill's base directory (printed above this text when it loads); `lock.sh` lives there and takes NAMED variables only.
 
@@ -69,10 +70,10 @@ Write `<review dir>/CHECKLIST.md`: numbered, plain-language things the human can
 
 ## 10 · Release
 
-When every release test passes, the lock check is clean, every finding is fixed or deferred, and the docs row has landed: bump the version, tag it, and deploy per ORCHESTRATION.md → Deploy (`deploy_policy`). Close REVIEW.md with a summary (rows run, findings fixed, findings deferred, tests locked and their kill counts, known risks), lift the freeze line from the banner, and tell the human in a few lines with the review dir's path.
+When every release test passes, the lock check is clean, every finding is fixed or deferred, and the docs row has landed: bump the version, tag it, and deploy per ORCHESTRATION.md → Deploy (`deploy_policy`). Close REVIEW.md with a summary (rows run, findings fixed, findings deferred, tests locked and their kill counts, known risks), then **unlock**: remove the `RELEASE REVIEW` line from the banner (that is what switches off the lock check in reconcile and lifts the feature freeze) and keep `LOCKED.sha256` in the review dir only as the record. Tell the human in a few lines with the review dir's path.
 
 ## Rules
 
 - No step is skipped silently: a skipped step is a line in REVIEW.md saying why and who agreed.
 - Roles never mix within the review: the test-author does not fix, the attacker and reviewers do not fix, builders do not edit locked tests.
-- The locked tests stay. After release they become part of the normal gate, and the next release review starts from them.
+- The lock lasts for the review only. After release the code and the release tests are open again: the release tests stay in the normal gate, so later work must keep them passing, and changing one is an ordinary row whose brief says why (a release test pins a decision the human made). The next release review re-locks them.

@@ -64,6 +64,8 @@ pin "kit-init copies the decisions log" skills/kit-init/SKILL.md "templates/DECI
 pin "overlay Release section" templates/ORCHESTRATION.md "release tests:  tests/release/"
 pin "checklist never blocks" skills/release-review/SKILL.md "**The release never waits on it**"
 pin "questions as plain text" skills/release-review/SKILL.md "Never a pop-up menu."
+pin "explicit command only" skills/release-review/SKILL.md "disable-model-invocation: true"
+pin "unlocks after release" skills/release-review/SKILL.md "then **unlock**"
 grep -q 'AskUserQuestion' "$ROOT/skills/release-review/SKILL.md" && no "release-review names AskUserQuestion" || ok
 
 echo "release-review: $pass passed, $fail failed"
