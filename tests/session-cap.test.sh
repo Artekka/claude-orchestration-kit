@@ -36,6 +36,21 @@ conf "  max_sessions:     100000"
 run_in_sb FAKE_TERM_MODE=forbid KIT_CLAUDE_COUNT=5 -- bash "$START" --repo "$SB/repo" --terminal linux-xterm --dry-run
 hasnt "start-team under the cap: no warning" "max_sessions" "$ERR"
 
+# start-team counts only the names it will ADD: with the seat already running, 5 + 1 sibling = 6 is at the
+# cap of 6 and must not warn, and the plan says SKIP for the running seat. Without it, 5 + 2 = 7 warns.
+sn=$(nameFor SEAT)
+printf 'team:\n  seat:             %s\n  siblings:         1\n  max_sessions:     6\n' "$sn" > "$SB/repo/docs/orchestration/ORCHESTRATION.md"
+( exec -a "claude --name $sn x" sleep 120 ) </dev/null >/dev/null 2>&1 &
+RUNSEAT=$!; disown "$RUNSEAT"; PIDS+=("$RUNSEAT")
+wait_for "running seat stand-in" pgrep -f "^claude --name ${sn}( |\$)"
+run_in_sb FAKE_TERM_MODE=forbid KIT_CLAUDE_COUNT=5 -- bash "$START" --repo "$SB/repo" --terminal linux-xterm --dry-run
+hasnt "start-team: a name already running is not counted as added (no warning at the cap)" "passes max_sessions" "$ERR"
+has "start-team: the running seat is skipped" "SKIP   $sn" "$OUT"
+kill -KILL "$RUNSEAT" 2>/dev/null
+wait_for "running seat gone" bash -c "! pgrep -f '^claude --name ${sn}( |\$)'"
+run_in_sb FAKE_TERM_MODE=forbid KIT_CLAUDE_COUNT=5 -- bash "$START" --repo "$SB/repo" --terminal linux-xterm --dry-run
+has "start-team: with the seat not running, 5 + 2 > 6 warns" "passes max_sessions (6)" "$ERR"
+
 # recycle: a name with no old process adds one (warns); a name with an old process replaces it (no warning)
 conf "  max_sessions:     5"; n=$(nameFor CAP)
 recycle FAKE_TERM_MODE=forbid KIT_CLAUDE_COUNT=5 -- --dry-run "$n"

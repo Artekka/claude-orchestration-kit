@@ -17,6 +17,7 @@ pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
 has()   { case "$3" in *"$2"*) ok ;; *) bad "$1: want '$2' in: $3" ;; esac; }
+hasnt() { case "$3" in *"$2"*) bad "$1: did not want '$2' in: $3" ;; *) ok ;; esac; }
 
 # A payload that logs "start X", holds until $TMP/release-X exists, then logs "end X".
 HOLD="$TMP/hold.sh"
@@ -75,6 +76,13 @@ printf '%s\n%s\n' "$TMP/live" "$(ps -o lstart= -p "$squat" | tr -s ' ' | sed 's/
 GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo jumped >> "$LOG"' 2>/dev/null
 ! grep -qx jumped "$LOG" && ok || bad "a live waiter's ticket (right start time) was skipped"
 out="$(bash "$QM" status)"; has "quiet-mode status lists the live waiter with its dir" "pid $squat  $TMP/live" "$out"
+# a ticket whose pid is alive but whose recorded start time is someone else's must NOT be listed as waiting
+sleep 60 & sq2=$!; PIDS+=("$sq2")
+printf '%s\n%s\n' "$TMP/wrongstart" "Mon Jan  1 00:00:00 2001" > "$KIT_RUNTIME_DIR/queue/0000000001.$sq2"
+out="$(bash "$QM" status)"
+hasnt "quiet-mode status skips a ticket whose start time does not match its live pid" "$TMP/wrongstart" "$out"
+has "quiet-mode status still lists the real waiter beside it" "$TMP/live" "$out"
+rm -f "$KIT_RUNTIME_DIR/queue/0000000001.$sq2"; kill "$sq2" 2>/dev/null; wait "$sq2" 2>/dev/null
 kill "$squat" 2>/dev/null; wait "$squat" 2>/dev/null
 
 # 5. quiet mode: no new start while on; starts after off; GATE_IGNORE_QUIET=1 bypasses

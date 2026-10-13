@@ -52,6 +52,15 @@ printf 'local only brief\n' > "$BUILDER/local.md"; mkdir -p "$BUILDER/docs/orche
 cp "$BUILDER/local.md" "$BUILDER/docs/orchestration/briefs/L-1.md"
 run "$BUILDER" L-1; has "local-only brief is read" "local only brief" "$OUT"
 
+# 2b. the fix-round case: this checkout holds an OLDER copy of a brief that origin has since updated. Origin
+#     must win (a local-first read would hand the builder the stale contract).
+mkdir -p "$BUILDER/docs/orchestration/briefs"
+printf '# S3-1 brief\nacceptance: STALE LOCAL COPY\n' > "$BUILDER/docs/orchestration/briefs/S3-1.md"
+run "$BUILDER" S3-1
+has "older local brief: origin's copy wins" "acceptance: the brief text" "$OUT"
+hasnt "older local brief: the stale local text is not served" "STALE LOCAL COPY" "$OUT"
+rm -f "$BUILDER/docs/orchestration/briefs/S3-1.md"
+
 # 3. no brief anywhere: NO BRIEF, exit 0, banner still shown
 run "$BUILDER" S3-404; [ "$RC" = 0 ] && ok || bad "missing brief: exit $RC"
 has "missing brief says so" "NO BRIEF for S3-404" "$OUT"; has "missing brief: banner still shown" "era-3 · Seat" "$OUT"

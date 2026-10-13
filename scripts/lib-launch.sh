@@ -533,17 +533,39 @@ launch_is_ancestor() {  # <pid>
 # (node, python, npm …) are permanent children and are not counted. A shell that is OUR ancestor is the
 # seat's own tool call running this script (a self-recycle), so it is skipped. Subagents run inside the
 # claude process and are invisible here: the retro reply has to say none are running.
-launch_live_shells() {  # <pid>...
-  local table p c comm
+# One look: "<pid> <start time>" for every shell child of the given pids that is not our own ancestor.
+_launch_live_look() {  # <pid>...
+  local table p c comm st
   table="$(ps -A -o pid=,ppid=,comm= 2>/dev/null)" || return 0
   for p in "$@"; do
     for c in $(printf '%s\n' "$table" | awk -v p="$p" '$2 == p { print $1 }'); do
       comm="$(printf '%s\n' "$table" | awk -v c="$c" '$1 == c { print $3 }')"; comm="${comm##*/}"; comm="${comm#-}"
       case "$comm" in bash|sh|zsh|dash|ksh|fish) ;; *) continue ;; esac
       launch_is_ancestor "$c" && continue
-      printf '%s %s %s\n' "$c" "$(ps -o etime= -p "$c" 2>/dev/null | tr -d ' ')" "$(ps -o args= -p "$c" 2>/dev/null | cut -c1-160)"
+      st="$(ps -o lstart= -p "$c" 2>/dev/null | tr -s ' ' '_')"
+      printf '%s %s\n' "$c" "${st:-?}"   # no lstart on this ps: pid-only match, never drop the shell
     done
   done
+}
+
+launch_live_shells() {  # <pid>...
+  # Two looks, LAUNCH_LIVE_RECHECK seconds apart (default 1.5); a shell counts only if the SAME process (pid
+  # and start time) is there both times. Claude Code runs the statusline as a short-lived `sh -c` child of
+  # claude, so one look caught an idle session's statusline about 6% of the time and refused it. Work worth
+  # protecting (a gate run, a loop) lives far longer than the gap. No shell at the first look = no wait.
+  local first second c st et args
+  first="$(_launch_live_look "$@")"
+  [ -n "$first" ] || return 0
+  sleep "${LAUNCH_LIVE_RECHECK:-1.5}"
+  second="$(_launch_live_look "$@")"
+  while read -r c st; do
+    [ -n "$c" ] && [ -n "$st" ] || continue
+    printf '%s\n' "$second" | grep -qxF "$c $st" || continue
+    # gone since the second look: not live, and printing it would leave a bare pid with no time or command
+    et="$(ps -o etime= -p "$c" 2>/dev/null | tr -d ' ')"; [ -n "$et" ] || continue
+    args="$(ps -o args= -p "$c" 2>/dev/null | cut -c1-160)"
+    printf '%s %s %s\n' "$c" "$et" "${args:-?}"
+  done <<< "$first"
 }
 
 # The hand-off, written tmp + mv so the wrapper never reads half of it. The prompt travels as base64 on

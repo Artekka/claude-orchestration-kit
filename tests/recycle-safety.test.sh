@@ -100,4 +100,48 @@ if printf '%s\n' "$OUT" "$ERR" | grep -Eq '^ *(pid +)?[0-9]+ *$'; then bad "S6 a
 kill -KILL "$FC" 2>/dev/null; pkill -KILL -P "$FC" 2>/dev/null
 wait_for "fake claude gone" bash -c "! pgrep -f '^claude --name ${n}( |\$)'"
 
+# S7. launch_live_shells in isolation, with a fake `ps` that serves one process table per look. Pins what S6
+#     cannot see from outside: a shell counts only if the SAME process (pid + start time) is there at both
+#     looks, a shell that vanished is never printed as a bare pid, and a clean first look does not wait.
+S7="$(mktemp -d)"; PIDS+=()
+cat > "$S7/drv.sh" <<'DRV'
+. "$LIB"
+launch_is_ancestor() { return 1; }
+sleep() { echo "$1" >> "$S7/slept"; }
+ps() {
+  case "$*" in
+    "-A -o pid=,ppid=,comm=") n=$(( $(cat "$S7/n") + 1 )); echo "$n" > "$S7/n"; cat "$S7/table.$n" 2>/dev/null || cat "$S7/table.1" ;;
+    "-o lstart= -p "*)       cat "$S7/lstart.$(cat "$S7/n").$4" 2>/dev/null ;;
+    "-o etime= -p "*)        cat "$S7/etime.$4" 2>/dev/null ;;
+    "-o args= -p "*)         cat "$S7/args.$4" 2>/dev/null ;;
+  esac
+}
+launch_live_shells 100
+DRV
+s7() {  # <name> → output of launch_live_shells for the files currently in $S7
+  echo 0 > "$S7/n"; rm -f "$S7/slept"
+  LIB="$ROOT/scripts/lib-launch.sh" S7="$S7" bash "$S7/drv.sh" 2>&1
+}
+s7reset() { rm -f "$S7"/table.* "$S7"/lstart.* "$S7"/etime.* "$S7"/args.*; }
+s7live() {  # a shell 200 under pid 100 at both looks, same start time
+  s7reset
+  echo "200 100 sh" > "$S7/table.1"; echo "200 100 sh" > "$S7/table.2"
+  echo "Tue Oct 13 09:00:00 2026" > "$S7/lstart.1.200"; echo "Tue Oct 13 09:00:00 2026" > "$S7/lstart.2.200"
+  echo " 01:23" > "$S7/etime.200"; echo "bash gate.sh --all" > "$S7/args.200"
+}
+s7live;                  eq "S7 the same shell at both looks is live work" "200 01:23 bash gate.sh --all" "$(s7)"
+eq "S7 it waited the default 1.5 s between looks" "1.5" "$(cat "$S7/slept" 2>/dev/null)"
+s7live; echo "Tue Oct 13 09:00:07 2026" > "$S7/lstart.2.200"
+eq "S7 a REUSED pid (new start time at the second look) is not live" "" "$(s7)"
+s7live; echo "201 100 sh" > "$S7/table.2"
+eq "S7 a transient shell (a different pid at the second look) is not live" "" "$(s7)"
+s7live; rm -f "$S7/etime.200"
+eq "S7 a shell gone at print time prints nothing, not a bare pid" "" "$(s7)"
+s7reset; echo "300 100 node" > "$S7/table.1"
+eq "S7 no shell at the first look: nothing" "" "$(s7)"
+[ ! -e "$S7/slept" ] && ok || bad "S7 waited although the first look was empty"
+s7live; rm -f "$S7"/lstart.*
+eq "S7 a ps without lstart falls back to a pid-only match (never drops the shell)" "200 01:23 bash gate.sh --all" "$(s7)"
+rm -rf "$S7"
+
 finish
