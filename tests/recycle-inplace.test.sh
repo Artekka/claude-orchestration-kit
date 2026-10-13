@@ -24,7 +24,7 @@ eq "R0 the wt.exe the WSL probe would use is empty (no path can reach the real o
 [ -z "$wtpath" ] || [ ! -e "$wtpath" ] && ok || bad "R0 the resolved wt.exe path exists: $wtpath"
 
 # R1. --dry-run / DRY_RUN=1 name the mode they WOULD use: in-place only for a lone claude whose parent is
-#     the wrapper; --new-tab forces the old behaviour; a dry run changes nothing.
+#     the wrapper; --new-tab forces the old behavior; a dry run changes nothing.
 sandbox; n=$(nameFor R1)
 dry() { recycle "${FORBID[@]}" -- --dry-run "$@" "$n"; }
 dry;                         rematch "R1 no old process" '^mode: new-tab$' "$OUT"

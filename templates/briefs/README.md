@@ -16,4 +16,4 @@ gate · model · report protocol — so a fresh builder can start from it alone.
   says so in the report.
 - **A fix round appends** a `## Fix round <n>` section to the SAME file rather than a new brief.
 - **Keep it contract-only.** A brief that narrates how the seat reasoned briefs its own verifiers.
-- Older files here (seam maps, artefacts a row pointed at) predate the template and stay as they are.
+- Older files here (seam maps, artifacts a row pointed at) predate the template and stay as they are.

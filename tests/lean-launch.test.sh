@@ -229,7 +229,7 @@ for badargs in "--bogus" "-x" "extra"; do
   hasnt "start-team '$badargs' prints no command" "claude --name" "$out"
 done
 
-# The shared check is the last line of defence for a name or prompt a caller built itself (the flag
+# The shared check is the last line of defense for a name or prompt a caller built itself (the flag
 # parsers above refuse `-x` first, so only a direct call reaches it).
 for pair in "-x|/orchestration-kit:orient" "ZzNone|-x" "ZzNone|--dangerously-skip-permissions"; do
   out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args "$2" "$3"; echo ok' _ "$ROOT" "${pair%%|*}" "${pair#*|}" 2>&1; echo "rc=$?")"

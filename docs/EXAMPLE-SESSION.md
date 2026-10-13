@@ -85,14 +85,14 @@ answers design questions rather than polling for status.
 **The check-ins that mattered were the ones where a sibling stopped and asked:**
 
 - Sib3 traced a row's seam, proposed a fence, and asked two scoping questions **before
-  building**. One answer ("instructor-only, don't generalise") kept the row small; the other
+  building**. One answer ("instructor-only, don't generalize") kept the row small; the other
   approved a shared message builder.
 - Sib2 hit a design fork inside an engine change — a documented guard had become
   *uncomputable* under the new ordering — and asked before deleting it. That became a spec
   revision with the reasoning recorded, not a silent removal.
 - Sib1 found that the two code copies it had been asked to merge were **not identical**, and
   rather than pick a winner, made the difference an explicit required parameter so neither
-  caller's behaviour moved.
+  caller's behavior moved.
 
 The seat's job at each of these was to **rule, record the ruling, and say why** — so the next
 reader meets the argument and not just the outcome.
@@ -215,7 +215,7 @@ The moment a train ships, the seat re-assigns from the queue it has been accumul
 end of session the board carried **sixteen rows filed from verifier findings and sweep
 results** — none of them invented, every one traceable to evidence.
 
-Redistribution also honours dependencies. When one row's fix made another row's fix
+Redistribution also honors dependencies. When one row's fix made another row's fix
 *compile*, the seat sequenced them (`ORCE-15 → ORCE-24`) rather than running them in
 parallel.
 

@@ -28,7 +28,7 @@ for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md C
          docs/orchestration/CLAUDE-slimness.md; do
   [ -f "$P/$f" ] && ok || bad "first run did not create $f"
 done
-# F6 (ORCA106-5b): the CLAUDE.md section tells every adopter to keep the file slim and points at the
+# F6: the CLAUDE.md section tells every adopter to keep the file slim and points at the
 # slimness note, so the note must exist at the path the section names IN THE ADOPTING PROJECT.
 ptr="$(grep -o 'docs/orchestration/CLAUDE-slimness.md' "$P/CLAUDE.md" | head -1)"
 [ "$ptr" = docs/orchestration/CLAUDE-slimness.md ] && ok || bad "installed CLAUDE.md does not point at docs/orchestration/CLAUDE-slimness.md"

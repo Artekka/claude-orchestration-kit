@@ -93,7 +93,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
        if ! claude plugin install status-hud@artekka-kits --scope project; then
          echo "status HUD install FAILED for $WHO (claude's own message is above; tell the human)"
        elif ! printf '%s' "$VALS" | claude plugin configure status-hud@artekka-kits --values-stdin; then
-         echo "status HUD installed for $WHO, but configuring it FAILED (claude's own message is above): the plugin is installed and runs with its defaults (shown in every session). Tell the human, and offer to retry: printf '%s' '$VALS' | claude plugin configure status-hud@artekka-kits --values-stdin${CLAUDE_CONFIG_DIR:+ (with CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR)}"
+         echo "status HUD installed for $WHO, but configuring it FAILED (claude's own message is above): the plugin is installed and runs with its defaults (its default showForNames is the seat name, so it draws only in the seat's window; set showForNames to your seat). Tell the human, and offer to retry: printf '%s' '$VALS' | claude plugin configure status-hud@artekka-kits --values-stdin${CLAUDE_CONFIG_DIR:+ (with CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR)}"
        else
          echo "status HUD installed for $WHO (shown in: ${SEAT:-Orca})"
        fi

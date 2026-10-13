@@ -223,7 +223,7 @@ correcting the orchestrator, or a sibling correcting itself.*
     large repo returns mostly noise, so the reader **unconsciously filters by plausibility**
     and a hit in a file that looks like someone else's area is skipped without a decision
     being made. Forcing a typed verdict per hit removes the filter, because "unrelated"
-    must be *written* rather than assumed. Generalises to any audit-by-grep.
+    must be *written* rather than assumed. Generalizes to any audit-by-grep.
 
 44. **When a fact is documented more than once, fixing ONE copy makes the others harder to
     find** — the fixed copy stops matching your grep and reads as done. Work twin-first:
@@ -240,7 +240,7 @@ correcting the orchestrator, or a sibling correcting itself.*
 46. **A guard that compares NAMES cannot see TYPES.** An entire family of drift guards
     compared key sets; flipping a field's declared type in the *canonical schema* left the
     dedicated drift guard green at 47/47. The only backstop was the compiler, and only
-    *incidentally* — one file built typed literals while its neighbour used a cast. Decide
+    *incidentally* — one file built typed literals while its neighbor used a cast. Decide
     explicitly whether a guard covers types, and write down which backstop you are relying
     on. Relying on one without knowing it is the failure.
 
@@ -267,7 +267,7 @@ correcting the orchestrator, or a sibling correcting itself.*
 
 51. **A test file that overstates its own coverage is worse than a missing test, because
     the next reader stops looking.** A coverage claim is a claim: it needs the same evidence
-    as a behavioural one. *Provenance:* a header fixed an over-claim about code scope and
+    as a behavioral one. *Provenance:* a header fixed an over-claim about code scope and
     introduced a fresh one about test coverage **in the same edit** — the tidy sentence
     arrives first, and repairing a claim feels careful enough to skip checking the new one.
 
@@ -289,7 +289,7 @@ correcting the orchestrator, or a sibling correcting itself.*
     instruction.** "Don't clean the shared containers" was unachievable, because the gate
     invokes that cleanup at stage 1. The fix is a knob (an env var raising the liveness
     floor), not a rule. Corollary: **"I didn't run X" is not the same claim as "X didn't
-    run"** — report on the tooling's behaviour, not only your own actions.
+    run"** — report on the tooling's behavior, not only your own actions.
 
 55. **Couple two changes into one train when the INTERMEDIATE state is worse than either
     endpoint** — not merely because they are related. Shipping an ordering fix without its

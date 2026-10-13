@@ -27,8 +27,8 @@ because the data the comment promised was missing.
 — true on the client, silent about the server having no matching gate. Read as proof the
 whole mechanism was enforced, it led to a wrong "this can't happen" answer. The opposite error
 happened the same day: treating an *absence* as a bug when a comment elsewhere explicitly
-authorised it.
+authorized it.
 
 **Rule:** verify the **specific claim you are about to rely on**, not the sentence's general
-vicinity — and look for a comment authorising an absence before treating that absence as a
+vicinity — and look for a comment authorizing an absence before treating that absence as a
 defect. Both directions are the same mistake: substituting prose for a trace.

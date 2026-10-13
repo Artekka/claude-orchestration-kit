@@ -17,7 +17,7 @@ pin "questions key, default blocking" $T "questions:      blocking"
 pin "question modes table" $O "| \`blocking\` (default) |"
 pin "non-blocking keeps a HUMAN QUEUE" $O "\`HUMAN QUEUE\` line"
 pin "permission asks are a command" $O "Permission requests are a command, not prose."
-for f in skills/orient/SKILL.md $O skills/orient-brief/SKILL.md; do pin "ToolSearch preload in $f" "$f" "select:ListAgents,SendMessage"; done
+for f in skills/orient/SKILL.md $O skills/orient-brief/SKILL.md skills/assemble-train/SKILL.md; do pin "ToolSearch preload in $f" "$f" "select:ListAgents,SendMessage"; done
 pin "ToolSearch preload in retro" skills/retro/SKILL.md "select:SendMessage"
 pin "tested Claude Code version" $G "Tested on Claude Code 2.1.296."
 for row in "recycle-sibling.sh\` exits 3" "prints \`NO BANNER\`" "Gates never start" "The hooks do nothing" "SendMessage / ListAgents is not available"; do pin "troubleshooting: $row" $G "$row"; done

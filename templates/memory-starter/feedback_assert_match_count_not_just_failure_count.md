@@ -21,6 +21,6 @@ which read as a clean bill of health. It had matched **zero lines** — the rege
 
 **How to apply:** every regex/filter-based validation prints the number of items it actually inspected, and asserts it equals the expected population (`expect(matched).toBe(849)`). If a line was expected to parse and didn't, print it rather than skipping silently. The corrected pass also added a positive control (`SKILLS LOST vs today: 0`) that could only be computed if parsing genuinely worked.
 
-Generalises past SQL — same trap in any grep-the-output verification step.
+Generalizes past SQL — same trap in any grep-the-output verification step.
 
 Related: `feedback_verify_before_narrate`, `feedback_verify_test_gate_yourself`, `reference_prod_sql_write_via_staged_file`

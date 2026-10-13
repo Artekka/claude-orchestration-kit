@@ -57,7 +57,7 @@ account writer, ancestor guard and the seat's detached self-recycle), generalize
     the SAME name: write the hand-off file (model, effort, permission mode, account, and the prompt as
     one line of base64 so quotes, `;`, `$` and newlines survive), SIGTERM only the old `claude`, and
     wait for a fresh one that is a child of that very wrapper. No terminal is needed.
-  - **new-tab** (the old behaviour, now starting the wrapper) when there is no old process, the old one
+  - **new-tab** (the old behavior, now starting the wrapper) when there is no old process, the old one
     was started by hand, several match, `--new-tab` is passed, the seat recycles itself on a machine
     without `setsid` (or its Claude adopts orphaned processes, see below), or an in-place attempt times
     out after 60 s (`RECYCLE_INPLACE_TIMEOUT`).
@@ -208,7 +208,7 @@ The public-release pass: an easier first path, one more guard, and the tests to 
 
 - **Solo mode is the starting path.** README opens with a 5-minute "two terminals, one repo"
   quickstart; GETTING-STARTED §3 "Start small: solo mode" (board + cross-verification, no seat).
-  Team mode (seat + siblings) is labelled Advanced. kit-init's "Not now" answer routes to solo.
+  Team mode (seat + siblings) is labeled Advanced. kit-init's "Not now" answer routes to solo.
 - **Git guard hook (opt-in):** `hooks/git-guard.sh`, PreToolUse on Bash. With the `.kit-hooks`
   marker and `git_guard: on` in ORCHESTRATION.md it refuses `git stash` (except list/show),
   `git add -A` / `--all` / `.` / `:/` / `-u` without paths, `git commit -a` / `--all`, and

@@ -10,7 +10,7 @@ The seat owns the rider list, the order and every ruling. The assembler merges, 
 | name | meaning |
 |---|---|
 | `W` | the train worktree the seat names (never the shared checkout) |
-| `S` | your evidence dir: ORCHESTRATION.md → `evidence_dir` (default `~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` (a reboot wipes it) |
+| `S` | your evidence dir: ORCHESTRATION.md → `evidence dir:` (default `~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` (a reboot wipes it) |
 | `H` | this skill's base directory (printed above this text when the skill loads): `trial.sh`, `cptrial.sh`, `gsum.sh` live there |
 | gate | ORCHESTRATION.md → Gate `command`, run through the throttle (`bash scripts/gate-throttle.sh <command>`) |
 
@@ -100,7 +100,7 @@ git push -q origin <train-branch>    # IMMEDIATELY (a hand-resolved merge: only 
 - Riders approved mid-run stay out of the running loop: queue a follow-on script behind a waiter that polls the log for the previous loop's `ALL-LANDED` marker and exits on `STOP`.
 
 ## 4. Report at every landing
-- `SendMessage` to the seat WITH its `[ref]` from a fresh `ListAgents` (stale sessions can share the seat's name; the ref changes on every recycle). Include: merge SHA, the gate lines, deltas vs prediction, the blob result, your context fill.
+- Load the tools first: `ToolSearch` with `select:ListAgents,SendMessage` (deferred tools: calling one unloaded fails). Then `SendMessage` to the seat WITH its `[ref]` from a fresh `ListAgents` (stale sessions can share the seat's name; the ref changes on every recycle). Include: merge SHA, the gate lines, deltas vs prediction, the blob result, your context fill.
 - Board cell in the shared checkout (never `$W`), guard → edit → stage → commit → push as ONE command:
   ```bash
   git fetch -q origin && git merge -q --ff-only origin/main && git diff HEAD --quiet -- docs/orchestration/AGENT_BOARD.md \
