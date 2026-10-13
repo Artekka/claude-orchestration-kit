@@ -16,6 +16,17 @@
         "worktree"
       ],
       "version": "0.7.1"
+    },
+    {
+      "name": "status-hud",
+      "source": "./plugins/status-hud",
+      "description": "Optional pixel-style status HUD: every session's context fill, model and activity, plus host load, as a band above the prompt or a side pane.",
+      "category": "workflow",
+      "tags": [
+        "status",
+        "multi-session",
+        "hud"
+      ]
     }
   ]
 }
