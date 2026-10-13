@@ -126,7 +126,9 @@ json.dump(s, open(dst, 'w'), indent=2)
 PY
 if [ ! -e "$TRIAL_CFG/.credentials.json" ]; then
   echo "==> The trial's Claude folder needs its own login, once. Run this, log in, then /exit and run kit-trial.sh again:"
-  echo "      CLAUDE_CONFIG_DIR=$TRIAL_CFG claude /login"
+  echo "      CLAUDE_CONFIG_DIR=$TRIAL_CFG command claude /login"
+  echo "    (\`command claude\` runs Claude Code itself, in this tab: a shell function or alias named claude may open"
+  echo "     a new tab, and the folder setting would not reach it)"
   exit 1
 fi
 export CLAUDE_CONFIG_DIR="$TRIAL_CFG"

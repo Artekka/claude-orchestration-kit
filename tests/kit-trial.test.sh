@@ -33,7 +33,7 @@ trial() { env HOME="$H" bash "$TEST/scripts/kit-trial.sh" "$@" 2>&1; }
 # --- kit-trial.sh
 out="$(trial nope)"; rc_is "unknown project: refused" 1 $?
 out="$(trial 'My App')"; rc_is "first run stops at the login step" 1 $?
-has "says how to log in" "CLAUDE_CONFIG_DIR=$H/.orchestration-kit/trial-claude claude /login" "$out"
+has "says how to log in" "CLAUDE_CONFIG_DIR=$H/.orchestration-kit/trial-claude command claude /login" "$out"
 C="$P/My App-Test"
 [ -f "$C/.git/kit-trial" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL no trial marker"; }
 rc_is "copy has no remotes" 0 "$(g -C "$C" remote | wc -l | tr -d ' ')"
