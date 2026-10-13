@@ -5,7 +5,7 @@ import { SAMPLE_OUT } from './fakeio'
 type On = Parameters<typeof mock.clock>[0]
 
 /** A mocked machine beneath the plugin: files, processes, session facts, env, store, clock. */
-export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string } = {}) {
+export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string; placed?: boolean } = {}) {
   const files = new Map<string, string>()
   const ran: string[][] = []
   const usage = { tokens: 100_000, window: 1_000_000 }
@@ -25,7 +25,7 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
   const opened: string[] = []
   on('ui.open', async (_$, e) => {
     opened.push(e.id)
-    return { value: { isPlaced: true } }
+    return { value: (o.placed ?? true) ? { isPlaced: true } : ({ isPlaced: false, reason: 'narrow' } as never) }
   })
   on('ui.toast', async () => ({ value: undefined }))
   on('ui.status', async () => ({ value: undefined }))

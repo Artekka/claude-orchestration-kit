@@ -39,6 +39,8 @@ const S: {
   waitingOn: string
   localAt: number
   clockNow: number
+  /** The pane was asked for but the surface has not placed it (a terminal under 144 columns): draw the band meanwhile. */
+  paneWaiting: boolean
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
 } = {
@@ -54,6 +56,7 @@ const S: {
   waitingOn: '',
   localAt: 0,
   clockNow: 0,
+  paneWaiting: false,
   forceShow: null,
 }
 
@@ -160,6 +163,7 @@ async function setVariant($: Dollar, v: 'band' | 'pane' | 'off'): Promise<string
   if (shownByConfig()) await $.store.set('variant', v)
   if (v === 'pane') {
     const r = await $.ui.open({ id: PANE, title: 'Status HUD' })
+    S.paneWaiting = !r.isPlaced
     return r.isPlaced ? 'Status HUD: pane.' : 'Status HUD: the pane could not be seated (widen the terminal).'
   }
   await $.ui.close({ id: PANE })
@@ -235,7 +239,13 @@ export const register: Register = (on, options) => {
     await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet' })
     $.clock.every(500, () => void doTick($))
     void doTick($)
-    if ((saved ?? c.variant) === 'pane' && shown()) void $.ui.open({ id: PANE, title: 'Status HUD' })
+    if ((saved ?? c.variant) === 'pane' && shown()) {
+      // Opened unasked (at start) a pane waits undrawn below 144 columns; until it is placed the band stands in.
+      void $.ui.open({ id: PANE, title: 'Status HUD' }).then(r => {
+        S.paneWaiting = !r.isPlaced
+        if (!r.isPlaced) $.ui.toast('Status HUD: the side pane needs a wider window; showing the band. Type /hud pane to open it now.')
+      })
+    }
     return next(e)
   })
 
@@ -303,11 +313,13 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const variant = (await read($, variantA)) ?? S.cfg?.variant ?? 'band'
     const v = await viewOf($)
-    if (variant !== 'band' || e.props.hasSurvey || !v || !shown()) return next(e)
+    const band = variant === 'band' || (variant === 'pane' && S.paneWaiting)
+    if (!band || e.props.hasSurvey || !v || !shown()) return next(e)
     return paint($, $.ui.resolve(e) as unknown as Table, drawBand(v, e.props.bodyColumns, e.props.maxRows))
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    S.paneWaiting = false
     const v = await viewOf($)
     if (!v || !shown()) return next(e)
     return paint($, $.ui.resolve(e) as unknown as Table, drawPane(v, e.props.bodyColumns))

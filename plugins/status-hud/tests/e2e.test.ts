@@ -177,3 +177,15 @@ for (const name of ['Sib3', 'Orca'] as const) {
     expect(w.opened.includes('status-hud')).toBe(name === 'Orca')
   })
 }
+
+test('saved look "pane" in a narrow window: the band stands in until the pane is placed', async ($, on) => {
+  const w = world(on, { name: 'Orca', placed: false })
+  w.stored.variant = 'pane'
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const band = async (): Promise<string> => JSON.stringify((await (await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })).drawn()) ?? null)
+  expect(await band()).toContain('Orca')
+  // once the surface places the pane (the person opened it, or the window widened), the band steps aside
+  await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'Pane', requestId: 'status-hud', props: { bodyColumns: 60 } as never })
+  expect(await band()).not.toContain('Orca')
+})
