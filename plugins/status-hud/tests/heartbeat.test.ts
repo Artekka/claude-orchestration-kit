@@ -76,7 +76,7 @@ test('flashSeconds 0 disables the flash', async () => {
   expect(ts.flash).toEqual({})
 })
 
-// ---- ORCA175-4 ----------------------------------------------------------------------------------------------------
+// ---- ----------------------------------------------------------------------------------------------------
 
 test('tick: quietAvail follows the toggle script in the session directory', async () => {
   const f = fakeIo({ now: 10_000_000, runs: a => (a[0] === 'sh' ? { exitCode: 0, stdout: SAMPLE_OUT } : undefined) })

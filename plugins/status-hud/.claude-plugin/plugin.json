@@ -125,6 +125,12 @@
       "title": "Quiet mode off command",
       "description": "Shell command run when the Quiet Mode chip switches it off.",
       "default": "bash scripts/quiet-mode.sh off"
+    },
+    "quietModeRequiresFile": {
+      "type": "string",
+      "title": "Quiet mode script (chip visibility)",
+      "description": "The chip is shown only when this file exists in the session's directory (or quiet mode is already on), because the on/off commands need it. A relative path resolves against the session directory. Empty always shows the chip.",
+      "default": "scripts/quiet-mode.sh"
     }
   }
 }

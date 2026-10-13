@@ -81,6 +81,8 @@ workflow; upgrade it, get the newly distilled lessons.
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
 | `docs/EXAMPLE-SESSION.md` | **a real annotated 12-hour session** — one seat, three sibling builders, two deploy trains, and the six things the seat got wrong |
 
+**What the WORK/QUIET chip does and when you'll see it:** The chip is a switch for the kit's quiet mode. QUIET holds every NEW test/gate run started through `scripts/gate-throttle.sh` while you use the machine yourself; runs already going finish, and WORK lets new ones start normally. It only helps if your team runs its gate through that throttle, so the chip appears only when `scripts/quiet-mode.sh` exists in the session's directory (or quiet mode is already on). No throttle, no chip. If a press fails, the chip turns red and says `failed` for a minute, and the toast says why. `/hud help` repeats this, and `quietModeRequiresFile` changes the file it looks for (empty always shows the chip).
+
 **Generic vs project-specific:** the kit never hardcodes a gate or deploy command.
 Project specifics live in the consuming repo's `docs/orchestration/ORCHESTRATION.md`
 (created by kit-init); every kit skill reads it first. That split is what makes lessons

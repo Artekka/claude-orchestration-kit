@@ -179,7 +179,7 @@ for (const name of ['Sib3', 'Orca'] as const) {
   })
 }
 
-// ---- ORCA175-4: visible only where it can work, honest about a failed press ----------------------------------------
+// ---- visible only where it can work, honest about a failed press ----------------------------------------
 
 const QUIET_OPTS = { quietModeOnCmd: 'bash g.sh on', quietModeOffCmd: 'bash g.sh off', quietModeStatusCmd: 'false' }
 

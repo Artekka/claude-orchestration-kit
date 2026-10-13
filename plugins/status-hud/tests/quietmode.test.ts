@@ -42,7 +42,7 @@ test('a ~ in the quiet-mode flag file means home (the kit default is ~/.orchestr
   expect(parseConfig({ quietModeFlagFile: '~x/q' }, '/h').quietFlagFile).toBe('~x/q')
 })
 
-// ---- ORCA175-4: the chip shows only where it can work, says what it did, and a failed press stays visible -------------
+// ---- the chip shows only where it can work, says what it did, and a failed press stays visible -------------
 
 test('quietModeRequiresFile defaults to the kit script; an empty value turns the check off', () => {
   expect(parseConfig({}, '/h').quietRequiresFile).toBe('scripts/quiet-mode.sh')

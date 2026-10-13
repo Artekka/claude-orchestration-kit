@@ -72,7 +72,7 @@ test('chips: quiet mode (clickable only when both commands are set), commit warn
   expect(chips(view({ snap: calm })).some(x => x.label.includes('commit'))).toBe(false)
 })
 
-// ---- ORCA175-4 ----------------------------------------------------------------------------------------------------
+// ---- ----------------------------------------------------------------------------------------------------
 
 const labelsOf = (v: View): string[] => chips(v).map(c => c.label.trim())
 const hasMode = (v: View): boolean => labelsOf(v).some(l => l.includes('mode'))
