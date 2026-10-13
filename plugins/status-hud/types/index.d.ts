@@ -34,7 +34,13 @@ export type Snapshot = {
   host: Host | null
   /** null = no quiet mode configured. */
   quietMode: boolean | null
+  /** False = the toggle's script is missing where this session runs, so the chip is hidden (undefined counts as available). */
+  quietAvail?: boolean
+  /** The last failed press, shown as a red chip until `until` (epoch ms). */
+  quietErr?: QuietErr | null
 }
+
+export type QuietErr = { wanted: boolean; msg: string; until: number }
 
 declare module 'claude-code' {
   interface PluginState {

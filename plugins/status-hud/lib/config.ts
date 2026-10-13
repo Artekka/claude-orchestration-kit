@@ -21,6 +21,8 @@ export type Config = {
   quietStatusCmd: string
   quietOnCmd: string
   quietOffCmd: string
+  /** The file (relative to the session directory, or absolute) the on/off commands need; the chip is hidden without it. Empty skips the check. */
+  quietRequiresFile: string
 }
 
 const num = (v: unknown, d: number, min = 0): number =>
@@ -51,5 +53,6 @@ export function parseConfig(o: PluginOptions, home: string): Config {
     quietStatusCmd: str(o.quietModeStatusCmd).trim(),
     quietOnCmd: str(o.quietModeOnCmd).trim(),
     quietOffCmd: str(o.quietModeOffCmd).trim(),
+    quietRequiresFile: str(o.quietModeRequiresFile, 'scripts/quiet-mode.sh').trim(),
   }
 }

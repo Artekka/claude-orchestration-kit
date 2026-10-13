@@ -22,7 +22,7 @@ Switch while running with `/hud band`, `/hud pane` or `/hud off`. The choice is 
   A session that crosses the report mark **flashes red** for `flashSeconds`.
 - **Host**: CPU load against the thread count (with sparkline), RAM, disks, GPU utilization and temperature, VRAM.
 - **Windows commit limit** (WSL): amber at `commitWarnPct`, red at `commitCritPct`. This is a real failure mode: Windows hits its commit limit and stops the WSL VM while the Linux side looks fine, with nothing logged inside Linux.
-- **Chips**: Quiet Mode (clickable when both commands are configured), commit warning, sessions over the report mark, load high, session count.
+- **Chips**: WORK/QUIET (shown only where the kit's quiet-mode script exists; clickable when both commands are configured; red `failed` for a minute after a failed press), commit warning, sessions over the report mark, load high, session count.
 
 ## How it works
 
@@ -112,8 +112,11 @@ The quiet-mode values above are the defaults: the flag file the kit's `scripts/q
 | `quietModeFlagFile` | `~/.orchestration-kit/runtime/quiet-mode` | If this file exists, quiet mode is on (cheap check, preferred). A leading `~` means your home. |
 | `quietModeStatusCmd` | (none) | Alternative, used when the flag file is empty: exit code 0 means on. |
 | `quietModeOnCmd` / `quietModeOffCmd` | `bash scripts/quiet-mode.sh on` / `off` | Run by the Quiet Mode chip and `/hud quiet`. Both are needed for the chip to be clickable. |
+| `quietModeRequiresFile` | `scripts/quiet-mode.sh` | The chip shows only when this file exists in the session's directory (or quiet mode is already on). Empty always shows it. |
 
-The Quiet Mode chip is hidden unless a flag file or status command is configured. It is a button: click it while the band has focus (click the band, or ctrl+x then tab), or use `/hud quiet`.
+The Quiet Mode chip is hidden unless a flag file or status command is configured and the script above exists here. It is a button: click it while the band has focus (click the band, or ctrl+x then tab), or use `/hud quiet`. `/hud help` explains it. If you use your own on/off commands, set `quietModeRequiresFile` to an empty value to keep the chip.
+
+**What the WORK/QUIET chip does and when you'll see it:** The chip is a switch for the kit's quiet mode. QUIET holds every NEW test/gate run started through `scripts/gate-throttle.sh` while you use the machine yourself; runs already going finish, and WORK lets new ones start normally. It only helps if your team runs its gate through that throttle, so the chip appears only when `scripts/quiet-mode.sh` exists in the session's directory (or quiet mode is already on). No throttle, no chip. If a press fails, the chip turns red and says `failed` for a minute, and the toast says why. `/hud help` repeats this, and `quietModeRequiresFile` changes the file it looks for (empty always shows the chip).
 
 ## Develop
 

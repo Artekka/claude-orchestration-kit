@@ -54,6 +54,7 @@ test('the pane draws session rows as buttons; pressing one selects it', async ($
 
 test('Quiet Mode chip: press runs the configured command (mocked)', { options: { quietModeOnCmd: 'bash g.sh on', quietModeOffCmd: 'bash g.sh off', quietModeStatusCmd: 'false' } }, async ($, on) => {
   const w = world(on)
+  w.files.set('/x/scripts/quiet-mode.sh', '')
   await $.session.start(START)
   await w.clock.advance(500)
   const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
@@ -177,3 +178,67 @@ for (const name of ['Sib3', 'Orca'] as const) {
     expect(w.opened.includes('status-hud')).toBe(name === 'Orca')
   })
 }
+
+// ---- visible only where it can work, honest about a failed press ----------------------------------------
+
+const QUIET_OPTS = { quietModeOnCmd: 'bash g.sh on', quietModeOffCmd: 'bash g.sh off', quietModeStatusCmd: 'false' }
+
+test('Quiet Mode chip: no toggle script in the session directory means no chip at all', { options: QUIET_OPTS }, async ($, on) => {
+  const w = world(on)
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect(JSON.stringify(await band.drawn())).not.toContain('WORK mode')
+  expect(await band.find({ key: 'p-quiet' })).toBeUndefined()
+})
+
+test('Quiet Mode chip: a failing command turns the chip red with "failed" and toasts why', { options: { ...QUIET_OPTS, quietModeOnCmd: 'false' } }, async ($, on) => {
+  const w = world(on)
+  w.files.set('/x/scripts/quiet-mode.sh', '')
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await band.press({ key: 'p-quiet' })
+  await w.clock.advance(500)
+  const after = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const tree = JSON.stringify(await after.drawn())
+  expect(tree).toContain('failed')
+  expect(tree).toContain('#6a1c22')
+  expect(w.toasts.join(' ')).toContain('exit 1')
+  // It heals: 60 s later the red chip is gone even if nobody pressed again.
+  await w.clock.advance(61_000)
+  const healed = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect(JSON.stringify(await healed.drawn())).not.toContain('failed')
+})
+
+test('/hud help explains the chip; a good press toasts what quiet mode does', { options: QUIET_OPTS }, async ($, on) => {
+  const w = world(on)
+  w.files.set('/x/scripts/quiet-mode.sh', '')
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const help = await $.command.run({ command: 'hud', args: 'help' } as never)
+  expect(help.text).toContain('QUIET holds NEW test/gate runs')
+  expect(help.text).toContain('quietModeRequiresFile')
+  const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await band.press({ key: 'p-quiet' })
+  expect(w.toasts.join(' ')).toContain('running ones finish')
+})
+
+test('Quiet Mode chip: a failed press then a good one returns the chip to plain, and the toast names the stderr line', { options: QUIET_OPTS }, async ($, on) => {
+  const w = world(on)
+  w.files.set('/x/scripts/quiet-mode.sh', '')
+  w.failing.add('bash g.sh on')
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const mount = () => $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await (await mount()).press({ key: 'p-quiet' })
+  await w.clock.advance(500)
+  expect(JSON.stringify(await (await mount()).drawn())).toContain('failed')
+  expect(w.toasts.join(' ')).toContain('exit 127: bash: g.sh: No such file or directory')
+  w.failing.delete('bash g.sh on')
+  await (await mount()).press({ key: 'p-quiet' })
+  await w.clock.advance(500)
+  const tree = JSON.stringify(await (await mount()).drawn())
+  expect(tree).not.toContain('failed')
+  expect(tree).toContain('WORK mode')
+})
