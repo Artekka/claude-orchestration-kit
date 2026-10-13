@@ -2,6 +2,14 @@
 
 Newest first.
 
+## 0.8.1 — 2026-10-13
+
+Polish for the guide page and its troubleshooting notes. No behavior change in any script.
+
+- **Fixed: `docs/how-it-works.html` on a phone.** The loop diagram used to scroll sideways inside its box and cut off the Seat. Under 700 px wide the page now shows a stacked version of the same diagram (every node, nothing cut off, no sideways scrolling).
+- **Fixed: diagram labels.** The "PASS" label no longer sits on an arrow, and "fix round" is moved off its arrow in both diagrams. A new check in `tests/how-it-works.test.sh` fails if any label overlaps an arrow, if the stacked diagram loses a node, or if the phone layout stops being swapped in.
+- **Documented: `LAUNCH_LIVE_RECHECK`.** The guide explains the recycle refusal (exit 3), the two-look check that ignores short-lived shells, when to set `LAUNCH_LIVE_RECHECK=3`, and `--force`. A test pins the documented default to the one in `scripts/lib-launch.sh`.
+
 ## 0.8.0 — 2026-10-13
 
 The catch-up release: ten days of practice from the project that runs this kit daily, in generic form.

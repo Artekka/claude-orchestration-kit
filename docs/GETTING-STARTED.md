@@ -324,7 +324,7 @@ turn of every session.
 | A message fails with "N agents are named X" | `ListAgents` shows several sessions with that name (old ones linger in the list). Resend to `X [ref]`, the ref from the listing |
 | `orient-brief` prints `NO BANNER` | No live `ORCHESTRATOR ACTIVE` section on the pushed board (only superseded ones, or the seat never pushed). Ask the seat to push its banner |
 | `orient-brief` prints `NO BRIEF` | The brief is neither on origin nor in this checkout. The seat must commit + push `docs/orchestration/briefs/<ROW>.md` before assigning |
-| `recycle-sibling.sh` exits 3 | The old session still has live shells (a background gate, a loop); a recycle would kill or orphan them. Wait, or have that session stop them; `--force` only if they are disposable |
+| `recycle-sibling.sh` exits 3 | The old session still has live shells (a background gate, a loop); a recycle would kill or orphan them. Wait, or have that session stop them; `--force` only if they are disposable. An idle session refused over a shell that is gone a moment later: set `LAUNCH_LIVE_RECHECK=3` (the guide's "If a recycle is refused" explains the two-look check) |
 | A recycle opened a new tab instead of reusing the old one | The old session was started by hand (not under `sibling-shell.sh`), or no `setsid` (macOS) for a seat self-recycle, or Git Bash. It moves over at its next recycle |
 | Gates never start | Quiet mode is on (`bash scripts/quiet-mode.sh status`), the load is above `GATE_MAX_LOAD`, or all `gate_slots` are busy (status lists who) |
 | The hooks do nothing | They are opt-in: the repo needs `docs/orchestration/.kit-hooks`, plus `git_guard: on` / `ctx_guard: on` / `worktrees: enforced` for each guard |

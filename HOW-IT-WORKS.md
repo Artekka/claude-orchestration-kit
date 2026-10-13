@@ -101,6 +101,8 @@ Each piece has the same three parts.
 
 **The knob:** `ctx_guard` (`off` | `on`) and `context_window` (`1m` | `200k`) in the team block; `hooks/ctx-guard.py`, `scripts/recycle-sibling.sh`, `scripts/sibling-shell.sh`, `skills/retro/SKILL.md`. Marks: 350K report / 400K hand over on a 1M window; 120K / 150K on 200K.
 
+**If a recycle is refused:** `scripts/recycle-sibling.sh` exits 3 when the old session still has a live background shell (a gate run, a loop). It looks twice, `LAUNCH_LIVE_RECHECK` seconds apart (default 1.5), and counts a shell only if the same process (same id and start time) is there both times, so the short-lived shell Claude Code runs for its status line does not block an idle session. Set `LAUNCH_LIVE_RECHECK=3` in front of the command only if an idle session is refused over a shell that is gone a moment later; otherwise leave it alone, because real work lives far longer than the gap. `--force` recycles anyway.
+
 ### Multi-account and the session cap
 
 **What it does:** Optional: one team can use several Claude Code accounts (a config directory per account, `--account N` on the launch scripts). You also pick a cap on concurrent sessions that your machine can carry, and relaunch one session at a time after a crash.

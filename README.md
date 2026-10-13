@@ -143,6 +143,7 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.8.1: the guide's loop diagram fits phones, and the guide explains `LAUNCH_LIVE_RECHECK` (a refused recycle).
 v0.8.0: release trains (`assemble-train`, `audit-train`) and a `deploy_policy` setting (ask or auto-when-green),
 the gate throttle and quiet mode, a session cap (`max_sessions`), non-blocking questions, the lean
 `orient-brief` start, a recycle that refuses while the old session still has live shells, the optional
