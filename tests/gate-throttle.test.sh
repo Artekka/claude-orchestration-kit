@@ -55,10 +55,27 @@ release B; waitfor "start C" || bad "C never started"; release C; waitfor "end C
 # 4. a dead waiter's ticket is skipped (and deleted)
 reset
 bg A; waitfor "start A"
-mkdir -p "$KIT_RUNTIME_DIR/queue"; : > "$KIT_RUNTIME_DIR/queue/0000000000.999999"   # ticket 0 of a dead pid
+# a pid known to be dead: a child this shell started and reaped (a fixed number can be live on big pid_max hosts)
+sleep 0 & dead=$!; wait "$dead"
+mkdir -p "$KIT_RUNTIME_DIR/queue"; printf '%s\n%s\n' "$TMP" "Mon Jan  1 00:00:00 2001" > "$KIT_RUNTIME_DIR/queue/0000000000.$dead"
 bg B; sleep 0.3; release A; waitfor "start B" 5 && ok || bad "a dead ticket ahead blocked the line"
-[ ! -e "$KIT_RUNTIME_DIR/queue/0000000000.999999" ] && ok || bad "the dead ticket was not deleted"
+[ ! -e "$KIT_RUNTIME_DIR/queue/0000000000.$dead" ] && ok || bad "the dead ticket was not deleted"
 release B; waitfor "end B"
+
+# 4b. pid reuse: a ticket whose pid is LIVE but belongs to another process (its start time differs) is dead.
+#     Tickets survive a reboot by design, so after one a stale ticket's pid can be anyone's.
+reset
+sleep 60 & squat=$!; PIDS+=("$squat")
+mkdir -p "$KIT_RUNTIME_DIR/queue"; printf '%s\n%s\n' "$TMP/gone" "Mon Jan  1 00:00:00 2001" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
+GATE_SLOTS=1 timeout 10 bash "$GT" bash -c 'echo reuse-ok >> "$LOG"' 2>/dev/null
+grep -qx reuse-ok "$LOG" && ok || bad "a stale ticket on a reused (live) pid blocked the line"
+[ ! -e "$KIT_RUNTIME_DIR/queue/0000000000.$squat" ] && ok || bad "the stale reused-pid ticket was not deleted"
+# ...and a ticket with the RIGHT start time for that live pid still holds its place
+printf '%s\n%s\n' "$TMP/live" "$(ps -o lstart= -p "$squat" | tr -s ' ' | sed 's/^ //;s/ $//')" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
+GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo jumped >> "$LOG"' 2>/dev/null
+! grep -qx jumped "$LOG" && ok || bad "a live waiter's ticket (right start time) was skipped"
+out="$(bash "$QM" status)"; has "quiet-mode status lists the live waiter with its dir" "pid $squat  $TMP/live" "$out"
+kill "$squat" 2>/dev/null; wait "$squat" 2>/dev/null
 
 # 5. quiet mode: no new start while on; starts after off; GATE_IGNORE_QUIET=1 bypasses
 reset
@@ -106,6 +123,25 @@ bg C "$TMP/wt"; sleep 0.5; ! grep -q "start C" "$LOG" && ok || bad "gate_slots: 
 release A; waitfor "start C" 5 && ok || bad "gate_slots: C did not take the freed slot"
 release B; release C; waitfor "end C"
 reset; (cd "$R" && GATE_SLOTS=1 timeout 20 bash "$GT" bash -c 'echo env-ok >> "$LOG"' 2>/dev/null); grep -qx env-ok "$LOG" && ok || bad "GATE_SLOTS env did not run"
+
+# 9b. a daemon the command leaves behind does not keep the slot (the command runs with the lock fd closed)
+reset
+GATE_SLOTS=1 timeout 10 bash "$GT" bash -c 'sleep 30 & echo $! > "$(dirname "$LOG")/daemon.pid"' 2>/dev/null
+[ -s "$TMP/daemon.pid" ] && PIDS+=("$(cat "$TMP/daemon.pid")")
+GATE_SLOTS=1 timeout 5 bash "$GT" bash -c 'echo after-daemon >> "$LOG"' 2>/dev/null
+grep -qx after-daemon "$LOG" && ok || bad "a background child of the previous command still held the only slot"
+kill "$(cat "$TMP/daemon.pid")" 2>/dev/null
+
+# 9c. the default runtime dir is under HOME, never /tmp, and both scripts agree on it (quiet mode is a file
+#     they share: if they disagreed, quiet mode would silently do nothing)
+H="$TMP/home"; mkdir -p "$H"
+out="$(env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" on)"
+[ -f "$H/.orchestration-kit/runtime/quiet-mode" ] && ok || bad "quiet-mode default flag is not at \$HOME/.orchestration-kit/runtime/quiet-mode"
+env -u KIT_RUNTIME_DIR HOME="$H" GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo default-dir >> "$LOG"' 2>/dev/null
+! grep -qx default-dir "$LOG" 2>/dev/null && ok || bad "gate-throttle did not see quiet mode at the default dir (the two scripts disagree)"
+[ -d "$H/.orchestration-kit/runtime/locks" ] && ok || bad "gate-throttle default runtime dir is not under HOME"
+grep -n 'KIT_RUNTIME_DIR:-' "$GT" "$QM" | grep -q '/tmp' && bad "a default runtime dir names /tmp" || ok
+env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" off >/dev/null
 
 # 10. no flock: warns and runs unthrottled
 out="$(KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" bash -c 'echo ran' 2>&1)"

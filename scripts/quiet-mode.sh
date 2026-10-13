@@ -28,8 +28,10 @@ status() {
   local pos=0
   for f in $(ls "$RT/queue" 2>/dev/null | grep -E '^[0-9]{10}\.[0-9]+$' | sort); do
     pid="${f#*.}"
+    # the same liveness rule as gate-throttle.sh: the pid AND the start time recorded in the ticket
     kill -0 "$pid" 2>/dev/null || continue
-    pos=$((pos + 1)); printf '  #%s pid %s  %s\n' "$pos" "$pid" "$(cat "$RT/queue/$f" 2>/dev/null)"
+    [ "$(ps -o lstart= -p "$pid" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')" = "$(sed -n 2p "$RT/queue/$f" 2>/dev/null)" ] || continue
+    pos=$((pos + 1)); printf '  #%s pid %s  %s\n' "$pos" "$pid" "$(sed -n 1p "$RT/queue/$f" 2>/dev/null)"
   done
   [ "$pos" -gt 0 ] || echo "  none"
   if [ -r /proc/loadavg ]; then echo "--- load: $(cut -d' ' -f1-3 /proc/loadavg)"; fi

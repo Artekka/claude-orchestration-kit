@@ -52,6 +52,14 @@ if [ -f "$RT/gate-priority.txt" ]; then
 fi
 
 alive() { kill -0 "$1" 2>/dev/null; }
+# A process's start time ("Mon Oct 13 08:43:03 2026"): with the pid it names ONE process. A ticket whose
+# pid now belongs to a different process (pid reuse, often after a reboot, since tickets survive one)
+# has a different start time and counts as dead, instead of blocking the line forever.
+proc_start() { ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//'; }
+ticket_alive() {  # <ticket file> <pid>
+  local want; want="$(sed -n 2p "$1" 2>/dev/null)"
+  [ -n "$want" ] && alive "$2" && [ "$(proc_start "$2")" = "$want" ]
+}
 
 quiet_told=0
 quiet_wait() {
@@ -68,7 +76,9 @@ take_ticket() {
   exec 8>"$qdir/lock"; "$FLOCK" 8
   n="$(cat "$qdir/counter" 2>/dev/null || echo 0)"; n=$((n + 1)); echo "$n" > "$qdir/counter"
   my_ticket="$(printf '%010d.%d' "$n" "$$")"
-  printf '%s\n' "$(pwd -P)" > "$qdir/$my_ticket"
+  # line 1: the waiter's dir (for status), line 2: its start time (liveness). Written whole, then renamed
+  # into place, so a reader never sees a ticket without its start time and takes it for dead.
+  printf '%s\n%s\n' "$(pwd -P)" "$(proc_start $$)" > "$qdir/.new.$$" && mv -f "$qdir/.new.$$" "$qdir/$my_ticket"
   exec 8>&-
 }
 drop_ticket() { [ -n "$my_ticket" ] && rm -f "$qdir/$my_ticket"; my_ticket=""; }
@@ -77,7 +87,7 @@ am_head() {  # 0 = I am the oldest live waiter (dead waiters' tickets are delete
   for f in $(ls "$qdir" 2>/dev/null | grep -E '^[0-9]{10}\.[0-9]+$' | sort); do
     [ "$f" = "$my_ticket" ] && return 0
     pid="${f#*.}"
-    alive "$pid" && return 1
+    ticket_alive "$qdir/$f" "$pid" && return 1
     rm -f "$qdir/$f"
   done
   return 0
@@ -116,7 +126,9 @@ while :; do
       drop_ticket
       printf '%s\t%s\t%s\n' "$i" "$(pwd -P)" "$*" > "$rdir/$$"
       echo "gate-throttle: slot $i acquired $(date +%H:%M:%S) in $(pwd -P)" >&2
-      "$@"; rc=$?
+      # 9>&-: the command does not inherit the lock fd, so a daemon it leaves behind (a dev server, a
+      # watcher) cannot keep the slot after it returns. This shell's own fd 9 holds the lock until exit.
+      "$@" 9>&-; rc=$?
       exit $rc
     fi
     exec 9>&-
