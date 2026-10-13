@@ -46,6 +46,13 @@ grep -qi 'ABA' "$HUD/README.md" 2>/dev/null && ok || bad "README: the lock ABA k
 # no machine paths, project names, row ids, version strings from the original host, or dated incidents
 priv="$(grep -rnIE '/home/[a-z]+/|ORCA[0-9]|v0\.[0-9]{3}\.|20[0-9]{2}-[0-9]{2}-[0-9]{2}|claude-status-hud\b@' "$HUD" | grep -v '/home/u\b\|/home/u/' )"
 [ -z "$priv" ] && ok || bad "machine paths / project ids / dates under plugins/status-hud: $priv"
+# READ LOW-5: no host fingerprint in the examples (a second mount and its size), and the README reads cleanly
+fp="$(grep -rnIE '/mnt/n|10150' "$HUD")"
+[ -z "$fp" ] && ok || bad "host fingerprint in the HUD examples: $fp"
+hasnt "README: no doubled 'style'" "pixel-style terminal style" "$(cat "$HUD/README.md" 2>/dev/null)"
+# READ LOW-6: the README says where host readings come from and what other systems show
+has "README: host readings are /proc-based (Linux, WSL)" "Host readings come from /proc" "$(cat "$HUD/README.md" 2>/dev/null)"
+has "README: says what macOS shows" "macOS" "$(cat "$HUD/README.md" 2>/dev/null)"
 
 # ---- marketplace + run.sh ----------------------------------------------------------------------------
 mk="$(python3 - "$ROOT/.claude-plugin/marketplace.json" <<'PY' 2>&1
@@ -72,6 +79,10 @@ mkdir -p "$TMP/nobin"; for b in bash sh dirname cat grep sed head command; do p=
 out="$(cd "$ROOT/tests" && rc=0 PATH="$TMP/nobin" bash -c "$stage"'; echo "rc=$rc"' 2>&1)"
 has "run.sh stage without claude: SKIP with a reason" "SKIP status-hud" "$out"
 has "run.sh stage without claude: the run stays green" "rc=0" "$out"
+# READ LOW-4: a failing HUD suite fails the run
+mkdir -p "$TMP/failbin"; printf '#!/bin/sh\nexit 1\n' > "$TMP/failbin/claude"; chmod +x "$TMP/failbin/claude"
+out="$(cd "$ROOT/tests" && rc=0 PATH="$TMP/failbin:$PATH" bash -c "$stage"'; echo "rc=$rc"' 2>&1)"
+has "run.sh stage with a failing HUD suite: the run is red" "rc=1" "$out"
 
 # ---- kit-init's HUD step ----------------------------------------------------------------------------
 render() {  # <skill file> <args string>  → the rendered text (the loader's $ARGUMENTS / $N substitution)
@@ -113,6 +124,7 @@ cat > "$TMP/bin/claude" <<'STUB'
 #!/usr/bin/env bash
 { printf 'CALL dir=%s args=%s\n' "${CLAUDE_CONFIG_DIR:-default}" "$*"
   case "$*" in *--values-stdin*) printf 'STDIN %s\n' "$(cat)";; esac; } >> "$STUB_LOG"
+[ -z "${STUB_FAIL:-}" ] || { echo "stub: refused" >&2; exit 1; }
 STUB
 chmod +x "$TMP/bin/claude"
 runhud() {  # HUD answer → output; the stub's log is in $LOG
@@ -144,6 +156,27 @@ has "HUD Yes: quiet-mode on" "on=bash scripts/quiet-mode.sh on" "$v"
 has "HUD Yes: quiet-mode off" "off=bash scripts/quiet-mode.sh off" "$v"
 has "HUD Yes: values are single-line strings (configure --values-stdin)" "strings=True" "$v"
 has "HUD Yes: reports what it did" "status HUD" "$out"
+
+# READ LOW-2: a failing install says so (it used to fall through silently)
+out="$(STUB_FAIL=1 runhud yes)"
+has "HUD Yes, claude fails: says it failed" "FAILED" "$out"
+hasnt "HUD Yes, claude fails: no success line" "status HUD installed" "$out"
+# READ LOW-2: an account that already loads a status HUD through CLAUDE_CODE_PLUGIN_DIRS is explained and skipped
+printf '{ "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/opt/x/claude-status-hud" } }\n' > "$H/.claude-acct2/settings.json"
+out="$(runhud yes)"; calls="$(cat "$LOG")"
+has "HUD Yes, acct2 loads the upstream HUD: explained" "CLAUDE_CODE_PLUGIN_DIRS" "$out"
+hasnt "HUD Yes, acct2 loads the upstream HUD: not installed there" "dir=$H/.claude-acct2" "$calls"
+has "HUD Yes, acct2 loads the upstream HUD: the default account still gets it" "CALL dir=default args=plugin install" "$calls"
+rm -f "$H/.claude-acct2/settings.json"
+out="$(CLAUDE_CODE_PLUGIN_DIRS=/opt/y/status-hud runhud yes)"; calls="$(cat "$LOG")"
+has "HUD Yes, this shell loads a HUD dir: explained" "CLAUDE_CODE_PLUGIN_DIRS" "$out"
+# READ LOW-3: macOS keeps logins in the Keychain, so a second account has no .credentials.json there
+mkdir -p "$TMP/darwin"; printf '#!/bin/sh\necho Darwin\n' > "$TMP/darwin/uname"; chmod +x "$TMP/darwin/uname"
+: > "$LOG"
+out="$(cd "$P" && HOME="$H" STUB_LOG="$LOG" PATH="$TMP/darwin:$TMP/bin:$PATH" HUD_ANSWER=yes \
+  bash -c "$(printf '%s\n' "$hudblk" | sed "s/^HUD=<yes|no>.*/HUD=\$HUD_ANSWER/")" 2>&1)"
+n=$(grep -c 'args=plugin install' "$LOG")
+[ "$n" -eq 3 ] && ok || bad "HUD Yes on macOS: every ~/.claude-acctN dir counts (want 3 installs, got $n): $(cat "$LOG")"
 
 echo "status-hud: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

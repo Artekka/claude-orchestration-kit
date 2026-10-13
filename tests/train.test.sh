@@ -64,6 +64,29 @@ git checkout -q -b r5 "$BASE0"; sed -i 's/^5$/five/' a.txt; git commit -qam r5; 
 git checkout -q -b t5 "$BASE0"; sed -i -e 's/^5$/five/' -e 's/^7$/seven/' a.txt; git commit -qam t5; T5=$(git rev-parse HEAD)
 out="$(B=$T5 R=$R5 bash "$ASM/trial.sh" 2>&1)"
 has "trial: a rider edit the train already holds (plus more) shows TRAIN" "TRAIN a.txt" "$out"
+
+# READ MED-1: a rider that is ALREADY on the train. Merged: an ancestor of the base. Cherry-picked: every file's
+# merged blob = the rider's = the base's, which must not read as "the rider's blob landed".
+git checkout -q -b t6 "$TIP0"; git merge -q --no-ff -m "t6 has r1" "$R1" >/dev/null 2>&1; T6=$(git rev-parse HEAD)
+out="$(B=$T6 R=$R1 bash "$ASM/trial.sh" 2>&1)"
+has "trial: a rider merged into the base is flagged" "ALREADY-ON-TRAIN" "$out"
+git checkout -q -b t7 "$TIP0"; git cherry-pick -q "$R1" >/dev/null 2>&1; T7=$(git rev-parse HEAD)
+out="$(B=$T7 R=$R1 bash "$ASM/trial.sh" 2>&1)"
+has "trial: a cherry-picked rider's file reads SAME" "SAME a.txt" "$out"
+hasnt "trial: ...not RIDER" "RIDER a.txt" "$out"
+hasnt "trial: a cherry-pick is not an ancestor" "ALREADY-ON-TRAIN" "$out"
+out="$(B=$T7 C=$R1 bash "$ASM/cptrial.sh" 2>&1)"
+has "cptrial: a commit the base already holds reads SAME" "SAME a.txt" "$out"
+
+# READ MED-2: non-ASCII paths (git quotes them in --name-only output unless told not to)
+git checkout -q -b b8 "$BASE0"; seq 1 9 > "é.txt"; git add "é.txt"; git commit -qm b8; B8=$(git rev-parse HEAD)
+git checkout -q -b r8 "$B8"; sed -i 's/^8$/eight/' "é.txt"; echo u > "ü.txt"; git add "ü.txt"; git commit -qam r8; R8=$(git rev-parse HEAD)
+git checkout -q -b t8 "$B8"; sed -i 's/^1$/one/' "é.txt"; git commit -qam t8; T8=$(git rev-parse HEAD)
+out="$(B=$T8 R=$R8 bash "$ASM/trial.sh" 2>&1)"
+has "trial non-ASCII: a both-sides 3-way merge is NEITHER" "NEITHER é.txt" "$out"
+has "trial non-ASCII: a rider-only new file is RIDER" "RIDER ü.txt" "$out"
+out="$(B=$T8 C=$R8 bash "$ASM/cptrial.sh" 2>&1)"
+has "cptrial non-ASCII: NEITHER" "NEITHER é.txt" "$out"
 git checkout -q train
 
 out="$(R=$R1 bash "$ASM/trial.sh" 2>&1)"; rc=$?
@@ -71,6 +94,12 @@ out="$(R=$R1 bash "$ASM/trial.sh" 2>&1)"; rc=$?
 has "trial without B= names the variable" "B=" "$out"
 out="$(bash "$ASM/trial.sh" "$TIP0" "$R1" 2>&1)"; rc=$?
 [ "$rc" -ne 0 ] && ok || bad "trial must ignore positional args (got rc 0)"
+# READ LOW-4: no positional FALLBACK either (`B=${B:-<first arg>}` would pass the line above when R is unset)
+out="$(R=$R1 bash "$ASM/trial.sh" "$TIP0" 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "trial: B from a positional arg must not be taken (got rc 0)"
+has "trial: names B= even when an arg is given" "B=" "$out"
+out="$(B=$TIP0 bash "$ASM/cptrial.sh" "$R4B" 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "cptrial: C from a positional arg must not be taken (got rc 0)"
 
 # ---- cptrial.sh ----------------------------------------------------------------------------------
 out="$(B=$TIP0 C=$R4B bash "$ASM/cptrial.sh" 2>&1)"
@@ -115,12 +144,23 @@ first=$(printf '%s\n' "$out" | grep -E '^(MERGE|SINGLE) ' | head -1)
 has "audit: oldest first" "${M1:0:9}" "$first"
 # the rider ids are ordinary commits, not first-parent; they must not appear as lines
 hasnt "audit: rider commits are not swept" "SINGLE ${R1:0:9}" "$out"
+# READ LOW-1: the exit code reflects the WHOLE sweep: 0 = every merge tree-equal, 1 = something to explain
+BASE=$TIP0 TIP=$TIP bash "$AUD/audit.sh" >/dev/null 2>&1; rc=$?
+eq_rc() { [ "$2" = "$3" ] && ok || bad "$1: want rc $2, got $3"; }
+eq_rc "audit: a resolved merge (not last) makes the sweep exit 1" 1 "$rc"
+BASE=$TIP0 TIP=$M3 bash "$AUD/audit.sh" >/dev/null 2>&1; rc=$?
+eq_rc "audit: all merges tree-equal exits 0" 0 "$rc"
 
 # approved list: every p2 must be named in it
 printf '%s\n' "$R1" "$R3" > "$TMP/approved"
 out="$(BASE=$TIP0 TIP=$TIP APPROVED="$TMP/approved" bash "$AUD/audit.sh" 2>&1)"
 has "audit approved: r1 is approved" "p2=${R1:0:9} approved=YES" "$out"
 has "audit approved: r2 is NOT in the list" "p2=${R2:0:9} approved=NO" "$out"
+printf '%s\n' "$R1" > "$TMP/approved1"
+BASE=$TIP0 TIP=$M3 APPROVED="$TMP/approved1" bash "$AUD/audit.sh" >/dev/null 2>&1; rc=$?
+eq_rc "audit: a clean merge missing from the approved list exits 1" 1 "$rc"
+out="$(TIP=$TIP bash "$AUD/audit.sh" "$TIP0" 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "audit: BASE from a positional arg must not be taken (got rc 0)"
 
 # runs against the repo it is called in, never a fixed path
 out="$(cd "$TMP" && BASE=$TIP0 TIP=$TIP bash "$AUD/audit.sh" 2>&1)"; rc=$?
