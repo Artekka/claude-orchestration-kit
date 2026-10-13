@@ -126,7 +126,7 @@ The Quiet Mode chip is hidden unless a flag file or status command is configured
 
 ## Items
 
-Every drawn item has an id for `hideItems`. The field guide (`docs/status-hud-guide.html` in the kit) shows each one numbered on a picture, so a user can pick what to keep.
+Every drawn item has an id for `hideItems`. The setup page (`docs/status-hud-guide.html` in the kit, opened set to your current settings by `bash scripts/hud-guide.sh open`) shows each one numbered on a picture drawn by this plugin's own layout code: keep or remove each, pick the dot mode, and copy one line that `hud-guide.sh apply` saves. After a layout change, rebuild it with `bash scripts/hud-guide.sh build` (a test fails while it is out of date).
 
 | Area | Ids |
 |---|---|
