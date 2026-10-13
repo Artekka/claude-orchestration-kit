@@ -306,6 +306,8 @@ export function drawPane(v: View, cols: number): Line[] {
   const cur = ss[clamp(v.sel, 0, Math.max(0, ss.length - 1))]
   if (cur) {
     const lv = fillLevel(cur.tokens, v.cfg)
+    // A labelled block, so the selected session's detail is not read as a second copy of its row.
+    lines.push(sep(W, 'DETAIL · click a row above'))
     const t = new Scr(W, 3)
     t.put(1, 0, `▸ ${cur.name}`, C.gold, null, true)
     t.put(4 + cur.name.length, 0, `${cur.state} · ${kfmt(cur.tokens)} of ${kfmt(cur.window)} · acct ${cur.account} · ${cur.model}`, C.dim)

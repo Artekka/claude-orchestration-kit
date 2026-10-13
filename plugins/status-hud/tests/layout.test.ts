@@ -103,3 +103,10 @@ test('the pane header icon follows headerIcon: helm (default), astronaut or satu
   expect(s.includes('#e8b030')).toBe(true) // the amber planet
   for (const icon of ['helm', 'astronaut', 'saturn']) for (const l of drawPane(view({ cfg: parseConfig({ headerIcon: icon }, '/h') }), 60)) expect(widthOf(l)).toBeLessThanOrEqual(60)
 })
+
+test('the selected session detail sits under its own DETAIL heading', async () => {
+  const text = drawPane(view({ sel: 1 }), 60).map(l => lineText(l))
+  const i = text.findIndex(t => t.includes('DETAIL · click a row above'))
+  expect(i).toBeGreaterThan(0)
+  expect(text[i + 1]!.includes(`▸ ${sessions[1]!.name}`)).toBe(true)
+})
