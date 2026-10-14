@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Tests for scripts/team-defaults.sh (your own team defaults applied to a project's team: block).
+# Run: bash tests/team-defaults.test.sh   (sandboxed: temp state dir and repos)
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; TD="$ROOT/scripts/team-defaults.sh"
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+pass=0; fail=0
+has() { case "$3" in *"$2"*) pass=$((pass+1)) ;; *) fail=$((fail+1)); echo "FAIL $1: want '$2' in: $3" ;; esac; }
+hasnt() { case "$3" in *"$2"*) fail=$((fail+1)); echo "FAIL $1: did not want '$2' in: $3" ;; *) pass=$((pass+1)) ;; esac; }
+rc_is() { [ "$2" = "$3" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL $1: want exit $2, got $3"; }; }
+td() { env KIT_STATE_DIR="$TMP/state" bash "$TD" "$@" 2>&1; }
+mk() { mkdir -p "$1/docs/orchestration"; cp "$ROOT/templates/ORCHESTRATION.md" "$1/docs/orchestration/ORCHESTRATION.md"; }
+blk() { awk '/^team:/{on=1;next} on&&/^[[:space:]]/{print;next} on{exit}' "$1/docs/orchestration/ORCHESTRATION.md"; }
+
+R="$TMP/Book Shop"; mk "$R"
+out="$(td --repo "$R")"; rc_is "no defaults file: exit 0" 0 $?; has "says so" "nothing to apply" "$out"
+has "no file: block untouched" "seat:             Orca" "$(blk "$R")"
+
+mkdir -p "$TMP/state"
+printf 'seat_prefix:  Atlas   # the seat\nnames:        Mars,Venus,Vulcan\nnumbered:     w\npermission_mode: auto\n' > "$TMP/state/team-defaults"
+out="$(td --repo "$R" --dry-run)"; has "dry run lists" "team: seat -> Atlas-BS" "$out"
+has "dry run writes nothing" "seat:             Orca" "$(blk "$R")"
+out="$(td --repo "$R")"; rc_is "apply: exit 0" 0 $?
+b="$(blk "$R")"
+has "seat from the prefix and initials" "seat:             Atlas-BS" "$b"
+has "existing key replaced in place" "permission_mode:  auto" "$b"
+has "new key added" "names:            Mars,Venus,Vulcan" "$b"
+has "numbered added" "numbered:         w" "$b"
+hasnt "the old seat is gone" "Orca" "$b"
+has "other keys kept" "worktrees:        advised" "$b"
+out="$(td --repo "$R")"; [ "$(blk "$R" | grep -c '^  names:')" = 1 ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL rerun duplicated a key"; }
+
+A="$TMP/appleAndApricot"; mk "$A"; td --repo "$A" >/dev/null; has "camelCase initials" "Atlas-AAA" "$(blk "$A")"
+H="$TMP/hedgehog"; mk "$H"; td --repo "$H" >/dev/null; has "one word: two letters" "Atlas-HE" "$(blk "$H")"
+N="$TMP/none"; mkdir -p "$N"; out="$(td --repo "$N")"; rc_is "no overlay: exit 1" 1 $?
+
+# start-team reads the result: the seat and numbered pool names.
+out="$(env HOME="$TMP" KIT_STATE_DIR="$TMP/state" TEAM_NAMES_SHUFFLE=0 WSL_DISTRO_NAME= WSL_INTEROP= TMUX= bash "$ROOT/scripts/start-team.sh" --dry-run --terminal manual --repo "$R" 2>&1)"
+has "start-team: the seat" "LAUNCH Atlas-BS" "$out"; has "start-team: numbered" "LAUNCH w1-Mars" "$out"
+
+echo "team-defaults: $pass passed, $fail failed"
+[ "$fail" -eq 0 ]
