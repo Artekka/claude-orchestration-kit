@@ -1,23 +1,23 @@
-import type { Heartbeat, Snapshot } from '../types'
+import type { Heartbeat, QuietErr, Snapshot } from '../types'
 import type { Config } from './config'
 import { type Io } from './io'
 import { liveSessions, parseHeartbeat, serializeHeartbeat } from './heartbeat'
 import { refreshHost } from './hostRefresh'
 import { crossedReport } from './thresholds'
-import { quietModeOn } from './quietmode'
+import { quietAvailable, quietModeOn } from './quietmode'
 
 export const sessionsDir = (c: Config): string => `${c.statusDir}/sessions`
 const hbPath = (c: Config, id: string): string => `${sessionsDir(c)}/${id.replace(/[^A-Za-z0-9_-]/g, '_')}.json`
 
-export type TickState = { prevTokens: Map<string, number>; flash: Record<string, number> }
-export const newTickState = (): TickState => ({ prevTokens: new Map(), flash: {} })
+export type TickState = { prevTokens: Map<string, number>; flash: Record<string, number>; quietErr: QuietErr | null }
+export const newTickState = (): TickState => ({ prevTokens: new Map(), flash: {}, quietErr: null })
 
 /**
  * One refresh: write own heartbeat, refresh the host if stale (single writer), read every session, find report-mark
  * crossings. Everything the drawing needs ends up in the returned snapshot; drawing never touches disk.
  */
 export async function tick(
-  io: Io, c: Config, own: Heartbeat, ts: TickState, exists: (p: string) => Promise<boolean>,
+  io: Io, c: Config, own: Heartbeat, ts: TickState, exists: (p: string) => Promise<boolean>, cwd = '',
 ): Promise<Snapshot> {
   const now = await io.now()
   await io.writeAtomic(hbPath(c, own.id), serializeHeartbeat({ ...own, at: now }))
@@ -54,5 +54,6 @@ export async function tick(
     if (f.name.endsWith('.tmp') && now - f.mtimeMs > c.staleMs) await io.remove(`${c.statusDir}/${f.name}`)
   }
   const quietMode = await quietModeOn(io, c, exists)
-  return { now, selfId: own.id, sessions, host, quietMode }
+  if (ts.quietErr && ts.quietErr.until <= now) ts.quietErr = null
+  return { now, selfId: own.id, sessions, host, quietMode, quietAvail: await quietAvailable(c, cwd, exists), quietErr: ts.quietErr }
 }

@@ -27,7 +27,10 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
     opened.push(e.id)
     return { value: (o.placed ?? true) ? { isPlaced: true } : ({ isPlaced: false, reason: 'narrow' } as never) }
   })
-  on('ui.toast', async () => ({ value: undefined }))
+  const toasts: string[] = []
+  /** Commands (the `sh -c` text) that exit 1 with a stderr line, switchable mid-test. */
+  const failing = new Set<string>()
+  on('ui.toast', async (_$, e) => (toasts.push(JSON.stringify(e)), { value: undefined }))
   on('ui.status', async () => ({ value: undefined }))
   on('ui.close', async () => ({ value: undefined }))
   // The engine's own drawing beneath the mod: a pass-through (next) lands here and draws nothing of the HUD.
@@ -65,11 +68,12 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
       return out('')
     }
     if (script === 'false') return out('', 1)
+    if (failing.has(script)) return { value: { exitCode: 127, stdout: '', stderr: 'bash: g.sh: No such file or directory\nmore', isStdoutTruncated: false, isStderrTruncated: false } }
     if (script.includes('/proc/loadavg')) return out(SAMPLE_OUT)
     // The mode chip's check for WSL and Windows PowerShell: yes unless the test says this is not Windows.
     if (script.includes('microsoft') && script.includes('-x')) return out('', o.windows === false ? 1 : 0)
     if (script.includes('ps -o args=')) return out(`claude --name ${o.name ?? 'Orca'} --model opus::\nCLAUDE_CONFIG_DIR=${o.acct ?? '/home/u/.claude-acct2'}`)
     return out('')
   })
-  return { files, ran, usage, clock, stored, opened }
+  return { files, ran, usage, clock, stored, opened, toasts, failing }
 }

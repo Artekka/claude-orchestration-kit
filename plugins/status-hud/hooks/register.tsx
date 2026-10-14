@@ -8,7 +8,7 @@ import { flagReason, localFromOverlay, modeFromArgs, modeFromHook, projectColor,
 import type { Io } from '../lib/io'
 import { ensureStatusDirs } from '../lib/ensureDir'
 import { newTickState, tick } from '../lib/tick'
-import { toggleQuietMode } from '../lib/quietmode'
+import { QUIET_EXPLAIN, quietFailure, quietNote, toggleQuietMode } from '../lib/quietmode'
 import { drawBand, drawPane, type Line, type View } from '../lib/layout'
 
 const PANE = 'status-hud'
@@ -45,6 +45,8 @@ const S: {
   paneWaiting: boolean
   /** Some session is busy: redraw each tick so its mark turns. */
   anyBusy: boolean
+  /** The session directory (session.start's cwd): the chip's toggle script is looked up there. */
+  cwd: string
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
   /** WSL with Windows PowerShell: a click on the mode chip can press Shift+Tab. */
@@ -65,6 +67,7 @@ const S: {
   clockNow: 0,
   paneWaiting: false,
   anyBusy: false,
+  cwd: '',
   forceShow: null,
   canCycle: false,
 }
@@ -93,7 +96,7 @@ function makeIo($: Dollar): Io {
     },
     list: p => $.fs.list(p).then(es => es.filter(x => x.kind === 'file').map(x => ({ name: x.name, mtimeMs: x.mtimeMs })), () => []),
     remove: async p => void (await $.process.run(['rm', '-f', p]).catch(() => undefined)),
-    run: (argv, timeoutMs) => $.process.run(argv, timeoutMs ? { timeoutMs } : {}).then(r => ({ exitCode: r.exitCode, stdout: r.stdout }), () => ({ exitCode: 127, stdout: '' })),
+    run: (argv, timeoutMs) => $.process.run(argv, timeoutMs ? { timeoutMs } : {}).then(r => ({ exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr }), () => ({ exitCode: 127, stdout: '' })),
     now: () => $.clock.now(),
   }
 }
@@ -118,7 +121,7 @@ async function doTick($: Dollar): Promise<void> {
       const flag = flagReason(await io.read(`${c.statusDir}/flags/${S.me.name.replace(/[^A-Za-z0-9_-]/g, '_')}.json`), S.progressAt)
       S.me.stuck = S.waitingOn || flag
       S.me.quietMs = S.me.state === 'busy' && S.progressAt > 0 ? Math.max(0, now - S.progressAt) : 0
-      const snap = { ...(await tick(io, c, S.me, S.ts, exists)), local: S.local }
+      const snap = { ...(await tick(io, c, S.me, S.ts, exists, S.cwd)), local: S.local }
       S.hasFlash = Object.keys(S.ts.flash).length > 0
       S.anyBusy = snap.sessions.some(x => x.state === 'busy')
       S.last = snap
@@ -186,10 +189,11 @@ async function flipQuiet($: Dollar): Promise<string> {
   const { cfg: c, io } = S
   if (!c || !io) return 'Status HUD is starting.'
   const r = await toggleQuietMode(io, c, S.last?.quietMode ?? null)
-  if (!r.ran) return 'Quiet mode needs quietModeOnCmd and quietModeOffCmd in the status-hud config.'
+  // A failure is state, not just a toast: the chip stays red until it expires or a press works.
+  S.ts.quietErr = r.ok ? null : quietFailure(r, await $.clock.now())
   S.lastFull = 0
   await doTick($)
-  const msg = r.ok ? `Quiet mode ${r.wanted ? 'ON' : 'OFF'}.` : `Quiet mode command failed (${r.wanted ? 'on' : 'off'}).`
+  const msg = r.ok ? quietNote(r.wanted) : `Quiet ${r.wanted ? 'on' : 'off'} failed (${S.ts.quietErr?.msg}). Run it by hand to see why: ${r.wanted ? c.quietOnCmd : c.quietOffCmd}`
   $.ui.toast(msg)
   return msg
 }
@@ -256,6 +260,7 @@ export const register: Register = (on, options) => {
     S.cfg = c
     S.io = makeIo($)
     S.exists = p => $.fs.exists(p)
+    S.cwd = e.cwd ?? ''
     const saved = await $.store.get('variant')
     if (saved === 'band' || saved === 'pane' || saved === 'off') await update($, variantA, () => saved)
     // Owner-only status dir, but only a directory we create ourselves (a configured shared dir keeps its mode).
@@ -278,7 +283,7 @@ export const register: Register = (on, options) => {
     S.tabColor = (await $.env.get('CLAUDE_TAB_COLOR')) ?? ''
     S.localAt = 0
     me.account = accountFromConfigDir(env.trim().replace(/^CLAUDE_CONFIG_DIR=/, '') || (await $.env.get('CLAUDE_CONFIG_DIR')))
-    await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet' })
+    await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet | help' })
     $.clock.every(500, () => void doTick($))
     void doTick($)
     if ((saved ?? c.variant) === 'pane' && shown()) {
@@ -360,10 +365,11 @@ export const register: Register = (on, options) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'band' || arg === 'pane' || arg === 'off') return { text: await setVariant($, arg) }
     if (arg === 'quiet') return { text: await flipQuiet($) }
+    if (arg === 'help') return { text: `${QUIET_EXPLAIN} The chip shows only where the toggle script (quietModeRequiresFile, default scripts/quiet-mode.sh) exists in the session directory, or while quiet mode is already on; set that option to an empty value to always show it.` }
     const snap = await read($, snapA)
     if (!snap) return { text: 'Status HUD: no reading yet.' }
     const over = snap.sessions.filter(x => S.cfg && x.tokens >= S.cfg.reportMark).map(x => x.name)
-    return { text: `Status HUD: ${snap.sessions.length} sessions${over.length ? `, over the report mark: ${over.join(', ')}` : ''}. Commands: /hud band | pane | off | quiet.` }
+    return { text: `Status HUD: ${snap.sessions.length} sessions${over.length ? `, over the report mark: ${over.join(', ')}` : ''}. Commands: /hud band | pane | off | quiet | help.` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

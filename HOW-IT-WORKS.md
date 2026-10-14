@@ -127,6 +127,8 @@ Each piece has the same three parts.
 
 **The knob:** the HUD's README under `plugins/status-hud/`, the `kit-init` question, `/hud band|pane|off|quiet` while running, and `claude plugin configure status-hud@artekka-kits --values-stdin` for `showForNames` (the seat name it highlights) and the `quietMode*` keys. A lighter option with no mod is the statusline script `scripts/statusline-ctx.sh`. Change it any time: just ask Claude.
 
+**What the WORK/QUIET chip does and when you'll see it:** The chip is a switch for the kit's quiet mode. QUIET holds every NEW test/gate run started through `scripts/gate-throttle.sh` while you use the machine yourself; runs already going finish, and WORK lets new ones start normally. It only helps if your team runs its gate through that throttle, so the chip appears only when `scripts/quiet-mode.sh` exists in the session's directory (or quiet mode is already on). No throttle, no chip. If a press fails, the chip turns red and says `failed` for a minute, and the toast says why. `/hud help` repeats this, and `quietModeRequiresFile` changes the file it looks for (empty always shows the chip).
+
 ## Make it your own flavor
 
 Nothing in the kit is sacred. This is the order to tune things, what to drop when you are small, and how to add your own.

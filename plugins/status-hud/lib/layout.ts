@@ -2,7 +2,7 @@ import type { Heartbeat, Host, Snapshot } from '../types'
 import type { Config } from './config'
 import { C, type Col, type Run, Scr, bar, clamp, graph2, lpad, pad, spark, sprite, trunc } from './cells'
 import { commitLevel, faceFor, fillLevel, flashPhase, isFlashing, loadLevel, modelLabel, type Level } from './thresholds'
-import { canToggle } from './quietmode'
+import { canToggle, QUIET_EXPLAIN } from './quietmode'
 
 export type View = { snap: Snapshot; cfg: Config; flash: Record<string, number>; sel: number; now: number }
 /** One drawn piece of a line; `press` makes it a Button (`quiet`, `mode`, or `sel:<index>`). */
@@ -16,6 +16,18 @@ const one = (text: string, fg: Col, bg: Col | null = null, bold = false, press?:
   const runs = [{ text, fg, bg, bold }]
   return press ? { runs, press } : { runs }
 }
+/** Word wrap to `n` columns (a single word longer than that is cut by the line's own truncation). */
+function wrap(text: string, n: number): string[] {
+  const out: string[] = []
+  let cur = ''
+  for (const w of text.split(' ')) {
+    if (cur !== '' && cur.length + 1 + w.length > n) {
+      out.push(cur)
+      cur = w
+    } else cur = cur === '' ? w : `${cur} ${w}`
+  }
+  return cur === '' ? out : [...out, cur]
+}
 export const kfmt = (t: number): string => `${Math.round(t / 1000)}K`
 const gb = (v: number, d = 1): string => v.toFixed(d)
 
@@ -25,14 +37,20 @@ export type Chip = { label: string; fg: Col; bg: Col; press?: string; alert?: nu
 // `changed`: the chip was just clicked; Claude Code's own line below the prompt says the new mode until a hook reports it.
 const MODE_LABEL: Record<string, string> = { normal: 'normal mode', acceptEdits: 'accept-edits mode', auto: 'auto mode on', bypass: 'bypass mode on', plan: 'plan mode', changed: 'mode changed ↓' }
 
+/** Hidden when quiet mode is not configured, or when its script is missing here and it is not already ON (so an ON flag can still be turned off). */
+const quietChipShown = (snap: Snapshot): boolean => snap.quietMode !== null && (snap.quietAvail !== false || snap.quietMode === true)
+
 export function chips(v: View): Chip[] {
   const out: Chip[] = []
   const { snap, cfg } = v
   const on = (id: string): boolean => !cfg.hide.has(id)
-  if (snap.quietMode !== null && on('work-mode')) {
-    const qm = snap.quietMode
+  if (quietChipShown(snap) && on('work-mode')) {
+    const qOn = snap.quietMode === true
     const tog = canToggle(cfg)
-    out.push({ label: ` ${qm ? 'QUIET mode' : 'WORK mode'}${tog ? ' ⏻' : ''} `, fg: qm ? C.white : C.bg, bg: qm ? C.orange : C.green, ...(tog ? { press: 'quiet' } : {}) })
+    // A failed press stays on the chip (red, still pressable to retry) until it expires or the next press works.
+    const err = snap.quietErr && v.now < snap.quietErr.until ? snap.quietErr : null
+    const name = err ? (err.wanted ? 'QUIET' : 'WORK') : qOn ? 'QUIET mode' : 'WORK mode'
+    out.push({ label: ` ${name}${err ? ' ✖ failed' : ''}${tog ? ' ⏻' : ''} `, fg: err || qOn ? C.white : C.bg, bg: err ? C.rD : qOn ? C.orange : C.green, ...(tog ? { press: 'quiet' } : {}) })
   }
   const local = snap.local
   if (local && on('perm-mode')) {
@@ -457,6 +475,7 @@ export function drawPane(v: View, cols: number): Line[] {
     used += w
   }
   lines.push(row)
+  if (quietChipShown(v.snap)) for (const t of wrap(QUIET_EXPLAIN, W - 2)) lines.push([one(` ${t}`, C.dim)])
   return lines
 }
 
