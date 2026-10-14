@@ -124,7 +124,7 @@ The Quiet Mode chip is hidden unless a flag file or status command is configured
 
 ## Items
 
-Every drawn item has an id for `hideItems`. Unknown ids are ignored.
+Every drawn item has an id for `hideItems`. Unknown ids are ignored. The setup page (`docs/status-hud-guide.html` in the kit, opened set to your current settings by `bash scripts/hud-guide.sh open`) shows each one numbered on a picture drawn by this plugin's own layout code: keep or remove each, pick the dot mode, and copy one line that `bash scripts/hud-guide.sh apply '<line>'` saves (only `dotMode` and known `hideItems` ids). After a layout change, rebuild the page with `bash scripts/hud-guide.sh build` (node 22.18 or later; `tests/hud-guide.test.sh` fails while it is out of date).
 
 | Area | Ids |
 |---|---|
@@ -141,6 +141,7 @@ tsc -p .                              # type-check (the engine lays .claude-plug
 claude plugin validate .
 claude plugin test .
 npx tsx scripts/preview.ts band 180   # print the band for sample data; also: pane 60, band 100 10, band 180 10 1
+bash ../../scripts/hud-guide.sh build # rebuild the setup page (docs/status-hud-guide.html) after a layout change
 ```
 
 Layout and logic are plain modules in `lib/`; `hooks/register.tsx` only wires them to the engine. Tests use fakes for files and processes, plus an engine-level mock world in `tests/world.ts`.
