@@ -9,6 +9,12 @@ export function modeFromArgs(args: string): string {
   return v === 'default' ? 'normal' : v
 }
 
+/** The mode a hook reports (`permission_mode`: default, acceptEdits, plan, auto, bypassPermissions) in the chip's words; '' when absent. */
+export function modeFromHook(v: unknown): string {
+  if (typeof v !== 'string' || v === '') return ''
+  return v === 'default' ? 'normal' : v === 'bypassPermissions' ? 'bypass' : v
+}
+
 /** The main checkout from `git rev-parse --path-format=absolute --git-common-dir` output; '' outside a repo. */
 export function repoFromCommonDir(out: string): string {
   const d = out.trim()

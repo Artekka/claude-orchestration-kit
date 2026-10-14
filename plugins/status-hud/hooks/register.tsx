@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Heartbeat, Local, Snapshot } from '../types'
 import { nameShown, parseConfig, type Config } from '../lib/config'
 import { accountFromConfigDir, nameFromArgs, oneLine } from '../lib/heartbeat'
-import { flagReason, localFromOverlay, modeFromArgs, projectColor, repoFromCommonDir } from '../lib/project'
+import { flagReason, localFromOverlay, modeFromArgs, modeFromHook, projectColor, repoFromCommonDir } from '../lib/project'
 import type { Io } from '../lib/io'
 import { ensureStatusDirs } from '../lib/ensureDir'
 import { newTickState, tick } from '../lib/tick'
@@ -47,6 +47,8 @@ const S: {
   anyBusy: boolean
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
+  /** WSL with Windows PowerShell: a click on the mode chip can press Shift+Tab. */
+  canCycle: boolean
 } = {
   me: { id: '', name: '', model: '', account: 1, tokens: 0, window: 1_000_000, state: 'idle', activity: '', at: 0 },
   ts: newTickState(),
@@ -64,6 +66,7 @@ const S: {
   paneWaiting: false,
   anyBusy: false,
   forceShow: null,
+  canCycle: false,
 }
 
 /**
@@ -140,10 +143,37 @@ async function refreshLocal(c: Config, io: Io, now: number): Promise<void> {
     const overlay = (await io.read(`${S.repo}/docs/orchestration/ORCHESTRATION.md`)) ?? ''
     const colors = (await io.read(`${c.kitRuntimeDir}/tab-colors`)) ?? ''
     S.me.color = projectColor(S.repo, colors, overlay, S.tabColor)
-    S.local = localFromOverlay(overlay, S.me.mode ?? 'normal')
+    S.local = { ...localFromOverlay(overlay, S.me.mode ?? 'normal'), cycle: S.canCycle }
   } else {
     S.me.color = projectColor('', '', '', S.tabColor)
+    S.local = { ...S.local, mode: S.me.mode ?? 'normal', cycle: S.canCycle }
   }
+}
+
+/** The mode as a hook reports it (each prompt and tool call): the chip follows Shift+Tab, not only the launch flag. */
+function noteMode(e: unknown): void {
+  const m = modeFromHook((e as { permission_mode?: unknown }).permission_mode)
+  if (!m || m === S.me.mode) return
+  S.me.mode = m
+  S.local = { ...S.local, mode: m }
+  S.lastFull = 0
+}
+
+/** Claude Code lets no plugin set the mode, so a click asks Windows to press Shift+Tab in the window just clicked. */
+const POWERSHELL = '/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe'
+async function cycleMode($: Dollar): Promise<void> {
+  if (!S.canCycle || !S.io) return
+  const r = await S.io.run([POWERSHELL, '-NoProfile', '-NonInteractive', '-Command',
+    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('+{TAB}')"], 10_000)
+  if (r.exitCode !== 0) {
+    $.ui.toast('Status HUD: could not press Shift+Tab; press it yourself.')
+    return
+  }
+  // The new mode is on Claude Code's own line below the prompt; the chip says so until the next hook reports it.
+  S.me.mode = 'changed'
+  S.local = { ...S.local, mode: 'changed' }
+  S.lastFull = 0
+  await doTick($)
 }
 
 const progress = (): void => {
@@ -187,6 +217,7 @@ async function viewOf($: Dollar): Promise<View | null> {
 
 function press($: Dollar, id: string): void {
   if (id === 'quiet') void flipQuiet($)
+  else if (id === 'mode') void cycleMode($)
   else if (id.startsWith('sel:')) void update($, selA, () => Number(id.slice(4)))
 }
 
@@ -237,6 +268,7 @@ export const register: Register = (on, options) => {
     const [args = '', env = ''] = ps.stdout.split('::')
     me.name = c.sessionName || (await $.env.get('CLAUDE_HUD_NAME')) || nameFromArgs(args) || `s-${me.id.slice(0, 6)}`
     me.mode = modeFromArgs(args)
+    S.canCycle = (await S.io.run(['sh', '-c', 'grep -qi microsoft /proc/version && [ -x "$1" ]', 'sh', POWERSHELL])).exitCode === 0
     // The project: the main checkout of the directory the session runs in. A host without session.cwd (or no repo)
     // leaves it empty, and the HUD shows the session without a project.
     const cwd = await $.session.cwd().catch(() => '')
@@ -285,6 +317,20 @@ export const register: Register = (on, options) => {
     progress()
     return ran
   }).catch(($, e, next) => next(e))
+
+  // Each prompt and tool call reports the mode in force, so the chip catches up with Shift+Tab (or a click on it).
+  on('classic.UserPromptSubmit', ($, e, next) => {
+    noteMode(e)
+    return next(e)
+  })
+  on('classic.PreToolUse', ($, e, next) => {
+    noteMode(e)
+    return next(e)
+  })
+  on('classic.PostToolUse', ($, e, next) => {
+    noteMode(e)
+    return next(e)
+  })
 
   // Waiting on the person: a permission prompt or a question dialog is open. Cleared by the next progress.
   on('classic.PermissionRequest', ($, e, next) => {

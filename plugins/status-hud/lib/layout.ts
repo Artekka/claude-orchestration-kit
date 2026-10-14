@@ -5,7 +5,7 @@ import { commitLevel, faceFor, fillLevel, flashPhase, isFlashing, loadLevel, mod
 import { canToggle } from './quietmode'
 
 export type View = { snap: Snapshot; cfg: Config; flash: Record<string, number>; sel: number; now: number }
-/** One drawn piece of a line; `press` makes it a Button (`quiet`, or `sel:<index>`). */
+/** One drawn piece of a line; `press` makes it a Button (`quiet`, `mode`, or `sel:<index>`). */
 export type Seg = { runs: Run[]; press?: string }
 export type Line = Seg[]
 
@@ -22,7 +22,8 @@ const gb = (v: number, d = 1): string => v.toFixed(d)
 /** `alert`: a warning to act on, its urgency (1 = most urgent); alerts are drawn apart, at the right, most urgent first. */
 export type Chip = { label: string; fg: Col; bg: Col; press?: string; alert?: number }
 
-const MODE_LABEL: Record<string, string> = { normal: 'normal mode', acceptEdits: 'accept-edits mode', auto: 'auto mode on', bypass: 'bypass mode on', plan: 'plan mode' }
+// `changed`: the chip was just clicked; Claude Code's own line below the prompt says the new mode until a hook reports it.
+const MODE_LABEL: Record<string, string> = { normal: 'normal mode', acceptEdits: 'accept-edits mode', auto: 'auto mode on', bypass: 'bypass mode on', plan: 'plan mode', changed: 'mode changed ↓' }
 
 export function chips(v: View): Chip[] {
   const out: Chip[] = []
@@ -34,7 +35,10 @@ export function chips(v: View): Chip[] {
     out.push({ label: ` ${qm ? 'QUIET mode' : 'WORK mode'}${tog ? ' ⏻' : ''} `, fg: qm ? C.white : C.bg, bg: qm ? C.orange : C.green, ...(tog ? { press: 'quiet' } : {}) })
   }
   const local = snap.local
-  if (local && on('perm-mode')) out.push({ label: ` ${MODE_LABEL[local.mode] ?? `${local.mode} mode`} `, fg: C.tx, bg: C.bD })
+  if (local && on('perm-mode')) {
+    const label = ` ${MODE_LABEL[local.mode] ?? `${local.mode} mode`}${local.cycle ? ' ⇆' : ''} `
+    out.push({ label, fg: C.tx, bg: C.bD, ...(local.cycle ? { press: 'mode' } : {}) })
+  }
   const host = snap.host
   // The slots are the project's setting, shown even before the first test run creates the limiter's queue.
   if (local?.kit && on('gates')) out.push({ label: ` gates ${local.slots}+1 slots `, fg: C.tx, bg: C.gray })

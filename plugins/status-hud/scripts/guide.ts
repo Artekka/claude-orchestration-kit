@@ -34,7 +34,7 @@ export const ITEMS: { id: string; area: string; name: string; what: string; when
   { id: 'column2', area: 'Sessions', name: 'Second column', what: 'With more than five sessions, a second column of rows (otherwise "+N more").', when: 'more than five sessions' },
   { id: 'frame-title', area: 'Sessions', name: 'STATUS HUD label', what: 'The name on the top-right corner of the frame.' },
   { id: 'work-mode', area: 'Bottom chips', name: 'Work/Quiet mode', what: 'A button: Quiet mode pauses heavy work (test runs) so the machine stays responsive; Work mode is normal.' },
-  { id: 'perm-mode', area: 'Bottom chips', name: 'Permission mode', what: 'How this session asks before acting: normal, accept-edits, auto or bypass.' },
+  { id: 'perm-mode', area: 'Bottom chips', name: 'Permission mode', what: 'How this session asks before acting: normal, accept-edits, plan, auto or bypass. It follows Shift+Tab. On Windows (⇆) it is a button: a click presses Shift+Tab for you.' },
   { id: 'gates', area: 'Bottom chips', name: 'Test slots', what: 'How many test runs may go at once in this project.' },
   { id: 'queue', area: 'Bottom chips', name: 'Test queue', what: 'Test runs waiting for a free slot.', when: 'when tests wait' },
   { id: 'holding', area: 'Bottom chips', name: 'Holding', what: 'The queue is held back because the machine is too busy; it moves again when the load drops.', when: 'when the machine is too busy' },

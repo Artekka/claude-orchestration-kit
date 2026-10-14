@@ -5,7 +5,7 @@ import { SAMPLE_OUT } from './fakeio'
 type On = Parameters<typeof mock.clock>[0]
 
 /** A mocked machine beneath the plugin: files, processes, session facts, env, store, clock. */
-export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string; placed?: boolean } = {}) {
+export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string; placed?: boolean; windows?: boolean } = {}) {
   const files = new Map<string, string>()
   const ran: string[][] = []
   const usage = { tokens: 100_000, window: 1_000_000 }
@@ -66,6 +66,8 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
     }
     if (script === 'false') return out('', 1)
     if (script.includes('/proc/loadavg')) return out(SAMPLE_OUT)
+    // The mode chip's check for WSL and Windows PowerShell: yes unless the test says this is not Windows.
+    if (script.includes('microsoft') && script.includes('-x')) return out('', o.windows === false ? 1 : 0)
     if (script.includes('ps -o args=')) return out(`claude --name ${o.name ?? 'Orca'} --model opus::\nCLAUDE_CONFIG_DIR=${o.acct ?? '/home/u/.claude-acct2'}`)
     return out('')
   })

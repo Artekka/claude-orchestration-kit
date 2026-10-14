@@ -64,6 +64,29 @@ test('Quiet Mode chip: press runs the configured command (mocked)', { options: {
   expect(seen()).toBe(true)
 })
 
+test('mode chip: a click presses Shift+Tab through Windows; the chip follows the mode each hook reports', async ($, on) => {
+  const w = world(on)
+  on('classic.UserPromptSubmit', async () => ({}) as never)
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const mount = () => $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const band = await mount()
+  expect(await band.find({ key: 'p-mode' })).toBeDefined()
+  await band.press({ key: 'p-mode' })
+  expect(w.ran.some(a => a[0]?.endsWith('powershell.exe') && a.join(' ').includes("SendWait('+{TAB}')"))).toBe(true)
+  expect(JSON.stringify(await (await mount()).drawn())).toContain('mode changed')
+  await $.classic.UserPromptSubmit({ permission_mode: 'plan' } as never)
+  await w.clock.advance(3000)
+  expect(JSON.stringify(await (await mount()).drawn())).toContain('plan mode')
+})
+
+test('mode chip: off Windows it is a label, not a button', async ($, on) => {
+  world(on, { windows: false })
+  await $.session.start(START)
+  const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect(await band.find({ key: 'p-mode' }).catch(() => undefined)).toBeUndefined()
+})
+
 test('the heartbeat never carries the prompt text, a raw command, a path or a URL; the file is chmod 600 and the dir 700', { options: { refreshSeconds: 1 } }, async ($, on) => {
   let during = ''
   let w!: ReturnType<typeof world>

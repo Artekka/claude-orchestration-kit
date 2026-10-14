@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { nameShown } from '../lib/config'
-import { flagReason, localFromOverlay, modeFromArgs, projectColor, repoFromCommonDir } from '../lib/project'
+import { flagReason, localFromOverlay, modeFromArgs, modeFromHook, projectColor, repoFromCommonDir } from '../lib/project'
 
 test('permission mode from the claude command line', async () => {
   expect(modeFromArgs('claude --name Mars --permission-mode auto --model opus')).toBe('auto')
@@ -9,6 +9,11 @@ test('permission mode from the claude command line', async () => {
   expect(modeFromArgs('claude --permission-mode bypassPermissions')).toBe('bypass')
   expect(modeFromArgs('claude --permission-mode=acceptEdits')).toBe('acceptEdits')
   expect(modeFromArgs('claude --name Mars')).toBe('normal')
+  // what a hook reports, in the chip's words
+  expect(modeFromHook('default')).toBe('normal')
+  expect(modeFromHook('bypassPermissions')).toBe('bypass')
+  expect(modeFromHook('plan')).toBe('plan')
+  expect(modeFromHook(undefined)).toBe('')
 })
 
 test('the project is the main checkout, also from inside a worktree', async () => {

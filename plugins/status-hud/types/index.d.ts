@@ -44,7 +44,11 @@ export type Host = {
 }
 
 /** Facts about the project of the session drawing the HUD: its permission mode, versions and test slots. */
-export type Local = { mode: string; live: string; next: string; slots: number; /** the project has a kit overlay */ kit?: boolean }
+export type Local = {
+  mode: string; live: string; next: string; slots: number; /** the project has a kit overlay */ kit?: boolean
+  /** The mode chip is a button: a click presses Shift+Tab (Windows only, through PowerShell). */
+  cycle?: boolean
+}
 
 export type Snapshot = {
   now: number
