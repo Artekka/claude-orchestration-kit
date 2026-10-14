@@ -36,6 +36,10 @@ for stale in "Solo** (start here)" "recommended first time" "recommended start" 
     grep -qiF -- "$stale" "$ROOT/$f" && { fail=$((fail+1)); echo "FAIL stale default wording '$stale' still in $f"; } || pass=$((pass+1))
   done
 done
+pin "guide page #pick names Solo as practice" docs/how-it-works.html "<b>Solo (practice):</b> two terminals, no seat"
+pin "guide page flavor table names Solo practice" docs/how-it-works.html "<td>Solo practice (two terminals)</td>"
+pin "HOW-IT-WORKS.md names Solo as practice" HOW-IT-WORKS.md "- **Solo (practice):** two terminals, no seat"
+pin "HOW-IT-WORKS.md flavor table names Solo practice" HOW-IT-WORKS.md "| Solo practice (two terminals) |"
 t="$(grep -n '^| \*\*Team' "$ROOT/$R" | head -1 | cut -d: -f1)"; s="$(grep -n '^| \*\*Solo' "$ROOT/$R" | head -1 | cut -d: -f1)"
 [ -n "$t" ] && [ -n "$s" ] && [ "$t" -lt "$s" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL README mode table: Team row must come before the Solo row"; }
 echo "docs-pins: $pass passed, $fail failed"
