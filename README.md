@@ -68,6 +68,11 @@ workflow; upgrade it, get the newly distilled lessons.
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
 | `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) · `git-guard.sh` (PreToolUse on Bash): with `git_guard: on`, blocks `git stash` (except list/show), `git add -A`/`.`/`--all`, `git commit -a`, `git pull --rebase` with the safe alternative; no-op otherwise (default `off`). Tests: `bash tests/run.sh` |
 | `scripts/start-team.sh` | open the seat + N siblings, each in its own window (terminal auto-detected), default names, skips any already running; `--dry-run`, `--terminal <backend>` / `--terminal list`, `--model` / `--effort` (always passed explicitly) |
+| `scripts/kit-word.sh` · `scripts/kit-launch.sh` | **optional:** your own start word (e.g. `team`): typing it lists your projects, starts a project's team, offers kit-init on one without the kit, or makes a new one; worktree folders and `_` folders stay off the list; `before_start=` in `~/.orchestration-kit/launcher.conf` runs your own command first (e.g. to mark the folder trusted) |
+| `scripts/team-defaults.sh` | your own team names for every project: kit-init asks once per machine (the kit's `Orca`/`Sib1` or your own orchestrator name plus a worker pool, optionally numbered `w1-Mars`) and applies the answer to each project it sets up |
+| `scripts/kit-trial.sh` · `scripts/kit-promote.sh` | **for kit developers:** try a kit change on a cut-off copy of a project (no remotes, renamed team, grey tabs), then fast-forward the installed kit only when both trees are clean and the suite passes |
+| `scripts/hud-flag.sh` | mark a session STUCK on the status HUD (a sibling that reported itself blocked, or one the seat pinged with no answer); the flag lifts at its next progress |
+| `scripts/hud-guide.sh` · `docs/status-hud-guide.html` | the status HUD's setup page: every item numbered on the HUD's own picture (built from its drawing code), keep or remove each, copy one line back to Claude to apply |
 | `scripts/recycle-sibling.sh` | replace a session with a fresh `claude --name X`: **in the same tab** when it runs under `sibling-shell.sh`, else a new window first and then SIGTERM the old one (`--new-tab` forces that); `--dry-run` (prints `mode:`), `--terminal`, `--account` (keeps each session on its own Claude Code account), `--model` / `--effort` (always passed, never inherited: the lane picks the model) |
 | `scripts/sibling-shell.sh` | the respawn loop every tab the kit opens runs: starts `claude` as a child and, when `recycle-sibling.sh` leaves it a hand-off file, starts the next one in the same tab (crash-loop guard: two instant exits in a row stop it) |
 | `scripts/lib-launch.sh` | the shared launcher both scripts source: detects the terminal backend — `tmux` (already inside tmux), `wsl-wt` / `wsl-conhost` (Windows + WSL), `macos-iterm` / `macos-terminal`, `gitbash-cmd`, `linux-<emulator>` (gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, foot, xterm, `$TERMINAL`, x-terminal-emulator), `tmux-detached` (SSH / headless), else `manual` (prints the commands, exits 2). Override: `--terminal` flag > `terminal:` in the team block > auto |
@@ -146,6 +151,13 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+Unreleased: numbered siblings (`numbered: w` → `w1-Mars`, `w2-Venus`), your own team names asked once by kit-init
+(`scripts/team-defaults.sh`), a start word and project picker (`scripts/kit-word.sh`), trial copies and safe promotion
+for kit development (`kit-trial.sh`, `kit-promote.sh`), Windows Terminal tabs in the distro's profile with one colour per
+project, repo paths with spaces on WSL, several projects' teams on one machine, the `release-review` skill and a
+decisions log, a sibling name pool (`names:`), and a fuller status HUD: project-coloured dots in 24-bit colour, STUCK
+flags, model badges, faces, a permission-mode chip that follows Shift+Tab (on Windows a click presses it), alerts kept
+apart at the right, a switch for every item (`hideItems`) and a setup page (`bash scripts/hud-guide.sh open`).
 v0.8.2: the status HUD's WORK/QUIET chip shows only where the quiet-mode script exists, explains itself, and shows a failed press in red.
 v0.8.1: the guide's loop diagram fits phones, and the guide explains `LAUNCH_LIVE_RECHECK` (a refused recycle).
 v0.8.0: release trains (`assemble-train`, `audit-train`) and a `deploy_policy` setting (ask or auto-when-green),
