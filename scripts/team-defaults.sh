@@ -11,20 +11,58 @@
 # kit-init runs this on a project it has just set up; run it yourself on an older project. Without the file
 # it does nothing.
 #
-# Usage: scripts/team-defaults.sh [--repo DIR] [--dry-run]
+# Usage: scripts/team-defaults.sh [--repo DIR] [--dry-run]           apply the file to a project
+#        scripts/team-defaults.sh --save-own SEAT NAMES [--numbered PFX] [--mode MODE]
+#                                       save your own: seat prefix, worker names (comma list), e.g.
+#                                       --save-own Atlas Ceres,Juno,Vesta --numbered w
+#        scripts/team-defaults.sh --save-kit    save "the kit's names" (Orca, Sib1, Sib2): the file then holds no keys
+#        scripts/team-defaults.sh --show        print the saved choice, or nothing when none is saved yet
+# kit-init asks once per machine (no file yet) and saves the answer with --save-own or --save-kit.
 # Exit 0 applied (or nothing to do), 1 no overlay in the repo, 64 usage.
 set -euo pipefail
 REPO="."; DRY=0
+DEF="${KIT_STATE_DIR:-$HOME/.orchestration-kit}/team-defaults"
+valid() { [[ "$1" =~ ^[A-Za-z0-9_]+(-[A-Za-z0-9_]+)*$ ]]; }
+case "${1:-}" in
+  --show) [ ! -f "$DEF" ] || cat "$DEF"; exit 0 ;;
+  --save-kit)
+    mkdir -p "$(dirname "$DEF")"
+    printf '# Team names: the kit'"'"'s own (seat Orca, siblings Sib1, Sib2). Asked once by kit-init; edit or delete to change.\n' > "$DEF"
+    echo "saved: the kit's names (Orca, Sib1, Sib2) in $DEF"; exit 0 ;;
+  --save-own)
+    seat="${2:-}"; names="${3:-}"; shift 3 2>/dev/null || { echo "--save-own needs SEAT and NAMES" >&2; exit 64; }
+    valid "$seat" || { echo "seat '$seat': letters, digits, _ and - only" >&2; exit 64; }
+    IFS=',' read -ra ns <<<"$names"
+    [ "${#ns[@]}" -ge 1 ] || { echo "names: a comma list, e.g. Ceres,Juno,Vesta" >&2; exit 64; }
+    for n in "${ns[@]}"; do valid "$n" || { echo "name '$n': letters, digits, _ and - only" >&2; exit 64; }; done
+    num=""; mode=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --numbered) num="${2:?--numbered needs letters, e.g. w}"; [[ "$num" =~ ^[A-Za-z]{1,4}$ ]] || { echo "numbered: 1-4 letters" >&2; exit 64; }; shift ;;
+        --mode) mode="${2:?--mode needs normal|accept-edits|auto}"; shift ;;
+        *) echo "unknown argument: $1" >&2; exit 64 ;;
+      esac
+      shift
+    done
+    mkdir -p "$(dirname "$DEF")"
+    {
+      echo "# Team names: your own. kit-init applies them to every project it sets up; edit or delete to change."
+      echo "seat_prefix:     $seat"
+      echo "names:           $names"
+      [ -z "$num" ] || echo "numbered:        $num"
+      [ -z "$mode" ] || echo "permission_mode: $mode"
+    } > "$DEF"
+    echo "saved your team names in $DEF:"; sed -n '2,$p' "$DEF"; exit 0 ;;
+esac
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 64 ;;
   esac
   shift
 done
-DEF="${KIT_STATE_DIR:-$HOME/.orchestration-kit}/team-defaults"
 CONF="$REPO/docs/orchestration/ORCHESTRATION.md"
 [ -f "$DEF" ] || { echo "no team defaults ($DEF): nothing to apply"; exit 0; }
 [ -f "$CONF" ] || { echo "no $CONF: set the kit up first (/orchestration-kit:kit-init)" >&2; exit 1; }

@@ -34,6 +34,17 @@ A="$TMP/appleAndApricot"; mk "$A"; td --repo "$A" >/dev/null; has "camelCase ini
 H="$TMP/hedgehog"; mk "$H"; td --repo "$H" >/dev/null; has "one word: two letters" "Atlas-HE" "$(blk "$H")"
 N="$TMP/none"; mkdir -p "$N"; out="$(td --repo "$N")"; rc_is "no overlay: exit 1" 1 $?
 
+# Saving the choice (kit-init asks once per machine).
+S2="$TMP/state2"; t2() { env KIT_STATE_DIR="$S2" bash "$TD" "$@" 2>&1; }
+out="$(t2 --show)"; [ -z "$out" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL --show with nothing saved printed: $out"; }
+out="$(t2 --save-kit)"; rc_is "save-kit: exit 0" 0 $?; has "save-kit: --show now prints" "the kit" "$(t2 --show)"
+K="$TMP/kitnames"; mk "$K"; out="$(t2 --repo "$K")"; has "kit names: nothing applied" "nothing to apply" "$out"; has "kit names: Orca stays" "seat:             Orca" "$(blk "$K")"
+out="$(t2 --save-own Atlas Ceres,Juno,Vesta --numbered w --mode auto)"; rc_is "save-own: exit 0" 0 $?
+f="$(cat "$S2/team-defaults")"; has "save-own: seat" "seat_prefix:     Atlas" "$f"; has "save-own: names" "names:           Ceres,Juno,Vesta" "$f"; has "save-own: numbered" "numbered:        w" "$f"
+O="$TMP/Lunch Diary"; mk "$O"; t2 --repo "$O" >/dev/null; has "own names applied" "seat:             Atlas-LD" "$(blk "$O")"
+out="$(t2 --save-own 'Od in' Ceres)"; rc_is "save-own: bad seat refused" 64 $?
+out="$(t2 --save-own Atlas 'Ceres,Ju no')"; rc_is "save-own: bad name refused" 64 $?
+
 # start-team reads the result: the seat and numbered pool names.
 out="$(env HOME="$TMP" KIT_STATE_DIR="$TMP/state" TEAM_NAMES_SHUFFLE=0 WSL_DISTRO_NAME= WSL_INTEROP= TMUX= bash "$ROOT/scripts/start-team.sh" --dry-run --terminal manual --repo "$R" 2>&1)"
 has "start-team: the seat" "LAUNCH Atlas-BS" "$out"; has "start-team: numbered" "LAUNCH w1-Mars" "$out"
