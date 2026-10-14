@@ -5,7 +5,7 @@ lost work, or confabulated green: a shared claimable board, one git worktree per
 and every piece of work verified by a session that didn't build it. Proven on the origin
 project: three concurrent sessions, ~15 workstreams, one evening, zero collisions.
 
-## Quickstart — two terminals, one repo (5 minutes)
+## Quickstart — a seat and two siblings (5 minutes)
 
 ```bash
 # 1. Install into your repo (normal shell, not inside Claude; on Windows run `wsl` first)
@@ -13,13 +13,45 @@ cd ~/projects/myapp
 claude plugin marketplace add Artekka/claude-orchestration-kit
 claude plugin install orchestration-kit@artekka-kits --scope project
 
-# 2. Set up the repo — inside Claude; tell it your test command, answer "Not now" to starting a team
+# 2. Set up the repo and start the team — inside Claude; tell it your test command,
+#    then accept "Seat + 2 siblings" and approve the one command it runs
 claude
 /orchestration-kit:kit-init
+```
 
-# 3. Open two sessions (two terminals, both in the repo)
-claude --name Dev1 /orchestration-kit:orient
-claude --name Dev2 /orchestration-kit:orient
+Three windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). Talk only to the seat:
+
+```text
+You> add rows for: <task A>; <task B>, and get them built
+Orca> filed rows, assigned A to Sib1 and B to Sib2 (disjoint file fences)
+      ... Sib1 and Sib2 each build in their own worktree and report ...
+Orca> Sib2 verifies Sib1's row, Sib1 verifies Sib2's (contract only); both PASS; merged one at a time, gate green
+```
+
+That's **team mode**, the default: the seat plans, assigns, routes verification and merges; the siblings build.
+Walkthrough, Windows/macOS/Linux notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**.
+How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Terms:
+[`docs/GLOSSARY.md`](docs/GLOSSARY.md).
+
+## Two modes
+
+| Mode | Who coordinates | Start with |
+|---|---|---|
+| **Team** (default) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | the Quickstart above; reopen later with `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-team-mode--who-does-what-the-default) |
+| **Solo** (practice) | You, by hand, in the orchestrator's chair, with two sibling terminals and no seat. A practice ground for learning the loop, not the way to begin | [Practice mode](#practice-mode-solo-be-the-orchestrator-yourself) below |
+
+## Practice mode (Solo): be the orchestrator yourself
+
+Answer **Practice mode (Solo)** in `kit-init` (it starts nothing) and open two terminals yourself. You do what the seat
+would do: file rows on the board, hand one to each sibling, let each verify the *other's* row, and reconcile.
+You learn how rows are claimed with file fences, why every session builds in its own worktree, and why the verifier
+sees only the contract. Once you trust the loop, graduate to a seat: when you are the one relaying between
+windows or deciding who takes what, say "turn on the git guard" and run `bash scripts/start-team.sh`.
+
+```bash
+cd ~/projects/myapp
+claude --name Dev1 /orchestration-kit:orient    # terminal 1
+claude --name Dev2 /orchestration-kit:orient    # terminal 2
 ```
 
 ```text
@@ -30,16 +62,7 @@ Dev2> verify Dev1-1 against its row — contract only, don't fix anything
 Dev1> /orchestration-kit:reconcile Dev1-1
 ```
 
-That's **solo mode**: board + cross-verification, you coordinate. Walkthrough, Windows/macOS/Linux
-notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**. How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Terms:
-[`docs/GLOSSARY.md`](docs/GLOSSARY.md).
-
-## Two modes
-
-| Mode | Who coordinates | Start with |
-|---|---|---|
-| **Solo** (start here) | You, via the board. Sessions claim rows, build in their own worktrees, verify each other's rows | the Quickstart above |
-| **Team** (Advanced) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §5](docs/GETTING-STARTED.md#5-advanced-team-mode--who-does-what) |
+The guided demo, step by step: [`docs/GETTING-STARTED.md`, Practice](docs/GETTING-STARTED.md#4-practice-mode-solo-be-the-orchestrator-yourself).
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the

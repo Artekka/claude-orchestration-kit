@@ -2,6 +2,15 @@
 
 Newest first.
 
+## Unreleased
+
+Team mode is now the default; Solo is a practice mode.
+
+- **Changed: the README quickstart, GETTING-STARTED and the guide lead with Team mode** (seat + siblings). The 5-minute path is `kit-init`, accept "Seat + 2 siblings", talk to the seat.
+- **Changed: Solo becomes "Practice mode (Solo)"**, the third answer of kit-init's start question (was "Not now"). It starts nothing and routes as before (git guard and context guard off). GETTING-STARTED §4 is a practice ground with a guided demo: you play the orchestrator, file two rows, hand one to each sibling terminal, and let each verify the other's. Sections moved: Team is now §3, Practice §4, "What you get" §5.
+- **Added: a docs pin** (`tests/docs-pins.test.sh`) that fails if kit-init's first start option stops being the team start, if the last option is not "Practice mode (Solo)", or if the docs call Solo the recommended start again.
+- Script behavior is unchanged; only the default answer and the wording moved.
+
 ## 0.8.2 — 2026-10-13
 
 The status HUD's WORK/QUIET chip now shows only where it can work, says what it does, and no longer fails silently.
