@@ -28,6 +28,12 @@ export function parseHeartbeat(text: string): Heartbeat | null {
     state,
     activity: typeof o.activity === 'string' ? o.activity : '',
     at: o.at,
+    // The optional fields travel too: without them another session's row loses its project, dot color and STUCK flag.
+    ...(typeof o.project === 'string' ? { project: o.project } : {}),
+    ...(typeof o.color === 'string' && /^(#[0-9a-fA-F]{6})?$/.test(o.color) ? { color: o.color } : {}),
+    ...(typeof o.mode === 'string' ? { mode: o.mode } : {}),
+    ...(typeof o.stuck === 'string' ? { stuck: o.stuck } : {}),
+    ...(typeof o.quietMs === 'number' ? { quietMs: o.quietMs } : {}),
   }
 }
 
