@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New: a sibling name pool.** `names: Mars,Venus,Vulcan` in the `team:` block (or `--names` on `start-team.sh`) names siblings from your own list instead of `Sib1`, `Sib2`. Names already running are kept, the rest are drawn at random (`TEAM_NAMES_SHUFFLE=0` keeps list order), the seat's name is never drawn, and a pool too small for `siblings` exits 64. With `numbered: w` (or `--numbered w`) they are numbered, `w1-Mars`, `w2-Venus`: a running sibling keeps its number and a new one takes the lowest free number. Tests: `tests/sibling-names.test.sh`.
 - **New: Windows Terminal tab style on WSL.** Tabs now open with the distro's own profile (`-p Ubuntu`), so they look like your other Linux tabs instead of a plain console (the `C:\` icon), and with one tab color per repo (`--tabColor`), shared by the seat and its siblings and different between projects. The color is picked once and recorded in `~/.orchestration-kit/runtime/tab-colors` (one `<repo path><TAB>#rrggbb` line per repo), and each tab's session gets `CLAUDE_TAB_COLOR=#rrggbb` and `COLORTERM=truecolor` (Windows Terminal draws 24-bit color but does not say so). `tab_profile:` and `tab_color:` in the team block override either (`none` turns it off). Tests: `tests/tab-style.test.sh`.
 
 ## 0.9.0 — 2026-10-14
