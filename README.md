@@ -25,7 +25,7 @@ Three windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). Talk 
 You> add rows for: <task A>; <task B>, and get them built
 Orca> filed rows, assigned A to Sib1 and B to Sib2 (disjoint file fences)
       ... Sib1 and Sib2 each build in their own worktree and report ...
-Orca> Sib2 verifies Sib1's row, Sib1 verifies Sib2's (contract only); both PASS; merged one at a time, gate green
+Orca> Sib2 reads Sib1's row (contract only); B goes to a fresh verifier agent, because the seat never makes a mutual pair; both PASS; merged one at a time, gate green
 ```
 
 That's **team mode**, the default: the seat plans, assigns, routes verification and merges; the siblings build.
@@ -38,7 +38,7 @@ How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Term
 | Mode | Who coordinates | Start with |
 |---|---|---|
 | **Team** (default) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | the Quickstart above; reopen later with `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-team-mode--who-does-what-the-default) |
-| **Solo** (practice) | You, by hand, in the orchestrator's chair, with two sibling terminals and no seat. A practice ground for learning the loop, not the way to begin | [Practice mode](#practice-mode-solo-be-the-orchestrator-yourself) below |
+| **Solo** (practice) | You, by hand, in the orchestrator's chair, with two sibling terminals and no seat. A practice ground for learning the loop by hand | [Practice mode](#practice-mode-solo-be-the-orchestrator-yourself) below |
 
 ## Practice mode (Solo): be the orchestrator yourself
 

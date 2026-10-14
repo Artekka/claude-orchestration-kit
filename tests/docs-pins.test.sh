@@ -28,9 +28,13 @@ pin "max_sessions in the overlay" $T "max_sessions:     8"
 K=skills/kit-init/SKILL.md; R=README.md
 row="$(grep -F 'Start the team now?' "$ROOT/$K" | head -1)"
 case "$row" in *"| **Seat + 2 siblings (Recommended)** ·"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: first option is not '**Seat + 2 siblings (Recommended)**'";; esac
-case "$row" in *"· **Practice mode (Solo)**"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: last option is not '**Practice mode (Solo)**'";; esac
-for stale in "Solo** (start here)" "recommended first time" "recommended start" "Team** (Advanced)"; do
-  grep -qF -- "$stale" "$ROOT/$R" "$ROOT/$G" "$ROOT/docs/GLOSSARY.md" && { fail=$((fail+1)); echo "FAIL stale default wording '$stale' still present"; } || pass=$((pass+1))
+last="${row##*"· **"}"   # the text after the LAST option separator: must be the practice option, by position
+case "$last" in "Practice mode (Solo)**"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: the LAST option is not '**Practice mode (Solo)**'";; esac
+pin "practice route keeps the guards off" $K "**Practice mode (Solo)** → both \`off\`"
+for stale in "Solo** (start here)" "recommended first time" "recommended start" "Team** (Advanced)" "Not now" "The way to begin" "Start solo"; do
+  for f in $R $G docs/GLOSSARY.md HOW-IT-WORKS.md docs/how-it-works.html .claude-plugin/plugin.json $K; do
+    grep -qiF -- "$stale" "$ROOT/$f" && { fail=$((fail+1)); echo "FAIL stale default wording '$stale' still in $f"; } || pass=$((pass+1))
+  done
 done
 t="$(grep -n '^| \*\*Team' "$ROOT/$R" | head -1 | cut -d: -f1)"; s="$(grep -n '^| \*\*Solo' "$ROOT/$R" | head -1 | cut -d: -f1)"
 [ -n "$t" ] && [ -n "$s" ] && [ "$t" -lt "$s" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL README mode table: Team row must come before the Solo row"; }

@@ -167,7 +167,7 @@ It only reads Claude's Bash commands (quoted text and commit messages that merel
 are fine); you can still run anything yourself in your own terminal. Change it with "turn on the
 git guard" / "turn off the git guard", or `git_guard: on|off`.
 
-Started "Not now", or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
+Chose Practice mode (Solo), or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
 ## 3. Team mode — who does what (the default)
@@ -201,7 +201,7 @@ nobody gets pinged.
 
 ## 4. Practice mode (Solo): be the orchestrator yourself
 
-A practice ground for learning the loop, not the way to begin. Here **you** sit in the seat's chair, by hand, with two sibling
+A practice ground for learning the loop by hand. Here **you** sit in the seat's chair, by hand, with two sibling
 terminals, so you learn how siblings claim rows, build in worktrees and verify each other before you trust a seat to
 do it. The board and independent verification are most of the value; the seat automates the coordinating you do here.
 Choose **Practice mode (Solo)** in `kit-init` (it starts nothing; the git and context guards stay off), then:
@@ -223,6 +223,8 @@ cd ~/projects/myapp && claude --name Dev2 /orchestration-kit:orient
 | 3. Cross-verify | Dev2 (when Dev1 is done) | "verify Dev1-1 against its row — contract only, don't fix anything" | Dev2 never saw Dev1's reasoning, so it checks the work against the row, not the author's intent. Or run `/orchestration-kit:verify-feature` |
 | | Dev1 (when Dev2 is done) | "verify Dev1-2 against its row — contract only" | The mirror image: each row is checked by the session that did NOT build it |
 | 4. Merge | Dev1 (after PASS) | "/orchestration-kit:reconcile Dev1-1" | Lands the branch on main, re-runs your gate, closes the row. Do the other row the same way, one at a time |
+
+**Why the demo has a mutual pair:** with only two sessions, Dev1 and Dev2 must read each other's row. In team mode the seat avoids that (A reads B, so B does not read A: reciprocity is a bias) by using a third sibling or the verifier subagent for the other row.
 
 Rules that make this safe (the sessions already know them): each session edits in its own git
 worktree, stages explicit paths, never stashes, and verifies the *other* session's rows, never
