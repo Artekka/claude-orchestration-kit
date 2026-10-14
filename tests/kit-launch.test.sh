@@ -27,6 +27,12 @@ out="$(pick 'n\nfresh\n')"; has "new project: kit-init in it" "RUN in $P/fresh: 
 [ -d "$P/fresh/.git" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL new project is not a git repo"; }
 out="$(pick 'n\n../x\nq\n')"; has "new project: refuses a path" "Not a usable folder name" "$out"
 out="$(pick '' nope)"; rc_is "unknown project: exit 1" 1 $?
+# A git worktree (a .git file) is not a project; before_start runs first, with the folder.
+mkdir -p "$P/kit-app-wt"; echo "gitdir: $P/Kit App/.git/worktrees/x" > "$P/kit-app-wt/.git"
+hasnt "worktree not listed" "kit-app-wt" "$(pick 'q\n')"
+printf 'before_start=~/bin/trust.sh --if-mine\n' >> "$S/launcher.conf"
+out="$(pick 'c\n' plain)"; has "before_start runs with the folder" "BEFORE $H/bin/trust.sh --if-mine $P/plain" "$out"
+sed -i '/^before_start=/d' "$S/launcher.conf"
 printf 'workshop=~/ws\nworkshop_label=kit-test\n' >> "$S/launcher.conf"
 out="$(pick 't\n')"; has "workshop listed" "[t] kit-test" "$out"; has "workshop opens in its folder" "RUN in $H/ws: claude" "$out"
 has "workshop runs on the installed kit" "never load this copy into your own session" "$out"

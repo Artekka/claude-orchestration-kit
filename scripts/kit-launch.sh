@@ -14,8 +14,10 @@
 #   projects_dir=~/projects           where projects live (default ~/projects)
 #   workshop=~/kit-test               optional: the test copy of the kit [t] opens
 #   workshop_label=kit-test           optional: the name [t] shows
-# Folders ending in -Test (trial copies), folders starting with _ (e.g. _archive) and the kit's own folder
-# are not listed.
+#   before_start=~/bin/trust.sh       optional: a command run before anything starts in a folder, with the
+#                                     folder as its last argument (e.g. to mark it trusted in Claude Code)
+# Folders ending in -Test (trial copies), folders starting with _ (e.g. _archive), git worktrees (a .git
+# file, not a folder: a sibling's working copy of another project) and the kit's own folder are not listed.
 # Exit 0 done or quit, 1 no such project, 64 usage.
 set -uo pipefail
 
@@ -39,9 +41,17 @@ has_kit() { [ -f "$1/docs/orchestration/ORCHESTRATION.md" ]; }
 
 # run <dir> <command...>: start it in <dir>, in this terminal. KIT_LAUNCH_DRY=1 prints it instead (tests).
 run() {
-  local dir="$1"; shift
-  if [ -n "${KIT_LAUNCH_DRY:-}" ]; then printf 'RUN in %s: %s\n' "$dir" "$*"; return 0; fi
+  local dir="$1" before; shift
+  before="$(conf before_start)"
+  if [ -n "${KIT_LAUNCH_DRY:-}" ]; then
+    [ -z "$before" ] || printf 'BEFORE %s %s\n' "$before" "$dir"
+    printf 'RUN in %s: %s\n' "$dir" "$*"; return 0
+  fi
   cd "$dir" || { echo "cannot enter $dir" >&2; return 1; }
+  if [ -n "$before" ]; then
+    local -a cmd; read -ra cmd <<<"$before"
+    "${cmd[@]}" "$dir" || echo "    (before_start failed: $before)" >&2
+  fi
   exec "$@"
 }
 
@@ -87,6 +97,7 @@ list_projects() {
   [ -d "$PROJECTS" ] || return 0
   while IFS= read -r -d '' d; do
     case "$d" in *-Test) continue ;; esac
+    [ -f "$d/.git" ] && continue
     [ "$(cd "$d" && pwd -P)" = "$(cd "$KIT" && pwd -P)" ] && continue
     PROJ+=("$d")
   done < <(find "$PROJECTS" -mindepth 1 -maxdepth 1 -type d ! -name '.*' ! -name '_*' -print0 | sort -z)
