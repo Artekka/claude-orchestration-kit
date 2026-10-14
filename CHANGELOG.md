@@ -2,6 +2,12 @@
 
 Newest first.
 
+## Unreleased
+
+- **New, status HUD: project dots.** `dotMode: project` colors each session's dot by its project (the main checkout of its directory, so a sibling in its own worktree counts), so one HUD tells several projects' teams apart; the key row then names each project in its color and the sessions title counts projects. The color is the session's own tab color when its launcher set `CLAUDE_TAB_COLOR`, else the color the launcher recorded for the project in `<kitRuntimeDir>/tab-colors`, else the team block's `tab_color:`, else a fixed color from the project's name; a missing file is skipped. Other sessions' rows keep their project and color when read. Default `account`: the look does not change.
+- **New, status HUD: item switches.** `hideItems` turns off any drawn item by id (README: Items), e.g. `history,context-key`. Default: none.
+- **Changed, status HUD: alerts apart from information.** Warnings now sit against the right edge of the chip line (on a row of their own in the pane), most urgent first: Windows commit, past the report mark, high load. The session count moves left, with the other information.
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
