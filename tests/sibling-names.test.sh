@@ -74,6 +74,24 @@ out="$(st --siblings 2 --prefix ZzSib)"
 has "no pool: numbered sibling 1" "LAUNCH ZzSib1" "$out"
 has "no pool: numbered sibling 2" "LAUNCH ZzSib2" "$out"
 
+# 8. Numbered: w1-<name>, w2-<name>... in list order; a running one keeps its number, a new one takes the lowest free.
+out="$(TEAM_NAMES_SHUFFLE=0 st --siblings 2 --names ZzOrion,ZzApollo,ZzMars --numbered w)"
+has "numbered: first" "LAUNCH w1-ZzOrion" "$out"
+has "numbered: second" "LAUNCH w2-ZzApollo" "$out"
+count "numbered: only N" 0 '^LAUNCH .*ZzMars' "$out"
+(exec -a "claude --name w2-ZzCeres" sleep 60) & pids="$pids $!"
+for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -f '^claude --name w2-ZzCeres( |$)' >/dev/null && break; sleep 0.2; done
+out="$(TEAM_NAMES_SHUFFLE=0 st --siblings 3 --names ZzPluto,ZzCeres,ZzJanus --numbered w)"
+has "numbered: running keeps its number" "SKIP   w2-ZzCeres" "$out"
+has "numbered: lowest free number" "LAUNCH w1-ZzPluto" "$out"
+has "numbered: skips the held number" "LAUNCH w3-ZzJanus" "$out"
+count "numbered: no second Ceres" 0 '^LAUNCH .*ZzCeres' "$out"
+printf 'team:\n  seat:             ZzSeat\n  names:            ZzJanus,ZzPluto\n  numbered:         w\n  siblings:         2\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(TEAM_NAMES_SHUFFLE=0 lrun bash "$ST" --dry-run --terminal manual --repo "$R" 2>&1; echo "rc=$?")"
+has "numbered from the team block" "LAUNCH w1-ZzJanus" "$out"
+out="$(st --siblings 1 --names ZzMars --numbered 'w1')"
+has "numbered: bad prefix refused" "rc=64" "$out"
+
 if [ -e "$TMP/REAL-TOOL-CALLED" ]; then fail=$((fail+1)); echo "FAIL a real-tool stand-in was executed: $(cat "$TMP/REAL-TOOL-CALLED")"; else pass=$((pass+1)); fi
 echo "sibling-names: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

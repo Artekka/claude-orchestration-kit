@@ -345,6 +345,7 @@ and it will make the change for you. For example:
 | type `/orchestration-kit:release-review` (only the command starts it) | the release review: the seat freezes features, reviews your decisions with you, locks release tests, has the work attacked and code-reviewed, fixes what is found, and releases. You get an optional checklist to try it yourself |
 | "make the team's tabs green" / "no tab colors" | `tab_color: #27ae60` / `tab_color: none` in the `team:` block (WSL + Windows Terminal) |
 | "give the siblings names from my list" | `names: Mars,Venus,Vulcan` in the `team:` block (a comma list, no spaces): each launch draws from it at random |
+| "number the siblings: w1-Mars, w2-Venus" | add `numbered: w` to the `team:` block, next to `names:` |
 | "deploy on your own when the train is green" / "ask me before deploying" | `deploy_policy: auto-when-green` / `ask` in the Deploy section of `ORCHESTRATION.md` |
 | "ask me questions without blocking" / "go back to blocking questions" | `questions: non-blocking` / `blocking` in `ORCHESTRATION.md` |
 | "cap the team at 6 sessions" | `max_sessions: 6` in the `team:` block |

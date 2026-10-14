@@ -11,10 +11,12 @@
 # Usage:
 #   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX] [--names A,B,C]
 #                         [--mode normal|accept-edits|auto] [--model M] [--effort E]
-#                         [--terminal BACKEND|auto|list] [--repo DIR]
+#                         [--terminal BACKEND|auto|list] [--repo DIR] [--numbered PFX]
 #   --terminal list   print every backend and whether it is available here, then exit
 #   --names A,B,C     name siblings from this pool instead of <prefix>1..N: names already running are
 #                     kept, the rest are drawn at random (TEAM_NAMES_SHUFFLE=0 keeps list order)
+#   --numbered PFX    with a pool: number the siblings, PFX1-<name>, PFX2-<name>... (e.g. w -> w1-Mars, w2-Venus);
+#                     a running one keeps its number, and a new one takes the lowest free number
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
 #   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | a full id). Always
 #                     passed explicitly; default = the team block's `model:`, else opus[1m]. One value
@@ -27,6 +29,7 @@
 #     seat:             Orca
 #     prefix:           Sib
 #     names:            Mars,Venus,Vulcan   (optional: a pool of sibling names, comma list, no spaces)
+#     numbered:         w                   (optional, with names: siblings w1-Mars, w2-Venus...)
 #     siblings:         2
 #     permission_mode:  normal
 #     terminal:         auto
@@ -36,11 +39,11 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib-launch.sh"
 
-usage() { sed -n '11,34p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
+usage() { sed -n '11,37p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
 SEAT_PROMPT="/orchestration-kit:orchestrate"
 SIB_PROMPT="/orchestration-kit:orient"
-DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0; f_names=""
+DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0; f_names=""; f_numbered=""
 # A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
 need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }
 while [ $# -gt 0 ]; do
@@ -50,6 +53,7 @@ while [ $# -gt 0 ]; do
     --seat) shift; f_seat="${1:?--seat needs a name}" ;;
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
     --names) shift; f_names="${1:?--names needs a comma list, e.g. Mars,Venus,Vulcan}" ;;
+    --numbered) shift; f_numbered="${1:?--numbered needs a prefix, e.g. w}" ;;
     --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     # f_model_set / f_effort_set record "given", apart from "empty": `--model=` is a given, invalid value.
@@ -83,14 +87,23 @@ if [ -n "$pool_csv" ]; then
   # A name pool: keep the pool's names that are already running (a re-run fills gaps, as with numbers),
   # then draw the rest at random. The seat's own name is never a sibling.
   IFS=',' read -ra pool <<<"$pool_csv"
-  live=(); idle=()
+  # Numbered siblings (`numbered: w`): w1-<name>, w2-<name>... A running one keeps its number.
+  num="${f_numbered:-${TEAM_NUMBERED:-}}"
+  [[ -z "$num" || "$num" =~ ^[A-Za-z]{1,4}$ ]] || { echo "numbered: '$num' must be 1-4 letters, e.g. w" >&2; exit 64; }
+  live=(); idle=(); seen=" "
   for nm in "${pool[@]}"; do
     launch_valid_name "$nm" || { echo "names: '$nm' is not a valid session name (letters, digits, _ and - only)" >&2; exit 64; }
     [ "$nm" = "$seat" ] && continue
-    case " ${live[*]-} ${idle[*]-} " in *" $nm "*) continue ;; esac
+    case "$seen" in *" $nm "*) continue ;; esac
+    seen="$seen$nm "
     # A pool name another project's session holds is taken, not ours to keep.
     [ -z "$(launch_pids_elsewhere "$nm")" ] || continue
-    if [ -n "$(launch_pids_here "$nm")" ]; then live+=("$nm"); else idle+=("$nm"); fi
+    held=""
+    if [ -n "$num" ]; then
+      for k in 1 2 3 4 5 6 7 8 9; do [ -z "$(launch_pids_here "$num$k-$nm")" ] || { held="$num$k-$nm"; break; }; done
+    fi
+    [ -n "$held" ] || [ -z "$(launch_pids_here "$nm")" ] || held="$nm"
+    if [ -n "$held" ]; then live+=("$held"); else idle+=("$nm"); fi
   done
   if [ "$(( ${#live[@]} + ${#idle[@]} ))" -lt "$n" ]; then
     echo "names: the pool has $(( ${#live[@]} + ${#idle[@]} )) usable names for $n siblings; add names or lower --siblings" >&2; exit 64
@@ -101,8 +114,23 @@ if [ -n "$pool_csv" ]; then
       for ((i = ${#idle[@]} - 1; i > 0; i--)); do j=$((RANDOM % (i + 1))); t="${idle[$i]}"; idle[$i]="${idle[$j]}"; idle[$j]="$t"; done
     fi
   fi
-  for nm in "${live[@]+"${live[@]}"}" "${idle[@]+"${idle[@]}"}"; do
+  for nm in "${live[@]+"${live[@]}"}"; do
     [ "$(( ${#names[@]} - 1 ))" -lt "$n" ] || break
+    names+=("$nm"); prompts+=("$SIB_PROMPT")
+  done
+  k=0
+  for nm in "${idle[@]+"${idle[@]}"}"; do
+    [ "$(( ${#names[@]} - 1 ))" -lt "$n" ] || break
+    if [ -n "$num" ]; then
+      # The lowest number no running sibling holds (and no other project's session holds with this name).
+      while :; do
+        k=$((k + 1))
+        [ "$k" -le 9 ] || { echo "numbered: no free number 1-9 for $nm" >&2; exit 64; }
+        case " ${live[*]-} " in *" $num$k-"*) continue ;; esac
+        [ -z "$(launch_pids_elsewhere "$num$k-$nm")" ] && break
+      done
+      nm="$num$k-$nm"
+    fi
     names+=("$nm"); prompts+=("$SIB_PROMPT")
   done
 else
