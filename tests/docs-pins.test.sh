@@ -23,5 +23,24 @@ pin "tested Claude Code version" $G "Tested on Claude Code 2.1.296."
 for row in "recycle-sibling.sh\` exits 3" "prints \`NO BANNER\`" "Gates never start" "The hooks do nothing" "SendMessage / ListAgents is not available"; do pin "troubleshooting: $row" $G "$row"; done
 pin "kit-init platform check" skills/kit-init/SKILL.md "**Platform check"
 pin "max_sessions in the overlay" $T "max_sessions:     8"
+# Team mode is the default path (ORCA181-3); Solo is the practice mode. The start question's FIRST option must be
+# the team start, and the last must be the practice option; the README must not call Solo the start.
+K=skills/kit-init/SKILL.md; R=README.md
+row="$(grep -F 'Start the team now?' "$ROOT/$K" | head -1)"
+case "$row" in *"| **Seat + 2 siblings (Recommended)** ·"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: first option is not '**Seat + 2 siblings (Recommended)**'";; esac
+last="${row##*"· **"}"   # the text after the LAST option separator: must be the practice option, by position
+case "$last" in "Practice mode (Solo)**"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: the LAST option is not '**Practice mode (Solo)**'";; esac
+pin "practice route keeps the guards off" $K "**Practice mode (Solo)** → both \`off\`"
+for stale in "Solo** (start here)" "recommended first time" "recommended start" "Team** (Advanced)" "Not now" "The way to begin" "Start solo"; do
+  for f in $R $G docs/GLOSSARY.md HOW-IT-WORKS.md docs/how-it-works.html .claude-plugin/plugin.json $K; do
+    grep -qiF -- "$stale" "$ROOT/$f" && { fail=$((fail+1)); echo "FAIL stale default wording '$stale' still in $f"; } || pass=$((pass+1))
+  done
+done
+pin "guide page #pick names Solo as practice" docs/how-it-works.html "<b>Solo (practice):</b> two terminals, no seat"
+pin "guide page flavor table names Solo practice" docs/how-it-works.html "<td>Solo practice (two terminals)</td>"
+pin "HOW-IT-WORKS.md names Solo as practice" HOW-IT-WORKS.md "- **Solo (practice):** two terminals, no seat"
+pin "HOW-IT-WORKS.md flavor table names Solo practice" HOW-IT-WORKS.md "| Solo practice (two terminals) |"
+t="$(grep -n '^| \*\*Team' "$ROOT/$R" | head -1 | cut -d: -f1)"; s="$(grep -n '^| \*\*Solo' "$ROOT/$R" | head -1 | cut -d: -f1)"
+[ -n "$t" ] && [ -n "$s" ] && [ "$t" -lt "$s" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL README mode table: Team row must come before the Solo row"; }
 echo "docs-pins: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
