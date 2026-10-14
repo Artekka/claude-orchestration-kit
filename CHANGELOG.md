@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: your own start word.** `kit-init` asks once per machine for a word (e.g. `go`); typing it in any terminal lists your projects and the installed kit's version, starts a project's team or one Claude chat, or sets the kit up on a project that lacks it. `scripts/kit-word.sh install|remove|show` manages it (one marked block in `~/.bashrc` / `~/.zshrc`); `scripts/kit-launch.sh` is the picker. Optional `before_start=`, `header_cmd=` and `news_cmd=` in `~/.orchestration-kit/launcher.conf`. Tests: `tests/kit-launch.test.sh`.
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
