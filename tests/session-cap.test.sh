@@ -6,7 +6,7 @@
 SUITE=session-cap
 . "$(dirname "$0")/inplace-harness.sh"
 START="$ROOT/scripts/start-team.sh"
-conf() { mkdir -p "$SB/repo/docs/orchestration"; printf 'team:\n  seat:             CapSeat\n  siblings:         1\n%s\n' "$1" > "$SB/repo/docs/orchestration/ORCHESTRATION.md"; }
+conf() { mkdir -p "$SB/repo/docs/orchestration"; printf 'team:\n  seat:             CapSeat\n  prefix:           ZzCapSib\n  siblings:         1\n%s\n' "$1" > "$SB/repo/docs/orchestration/ORCHESTRATION.md"; }
 capfn() {  # <adding> → stderr of launch_cap_warn after parsing the sandbox repo's team block
   KIT_CLAUDE_COUNT="${HOSTN:-5}" bash -c '. "$1"; launch_team_conf "$2"; launch_cap_warn "$3"' _ "$ROOT/scripts/lib-launch.sh" "$SB/repo" "$1" 2>&1
 }
@@ -39,7 +39,7 @@ hasnt "start-team under the cap: no warning" "max_sessions" "$ERR"
 # start-team counts only the names it will ADD: with the seat already running, 5 + 1 sibling = 6 is at the
 # cap of 6 and must not warn, and the plan says SKIP for the running seat. Without it, 5 + 2 = 7 warns.
 sn=$(nameFor SEAT)
-printf 'team:\n  seat:             %s\n  siblings:         1\n  max_sessions:     6\n' "$sn" > "$SB/repo/docs/orchestration/ORCHESTRATION.md"
+printf 'team:\n  seat:             %s\n  prefix:           ZzCapSib\n  siblings:         1\n  max_sessions:     6\n' "$sn" > "$SB/repo/docs/orchestration/ORCHESTRATION.md"
 ( exec -a "claude --name $sn x" sleep 120 ) </dev/null >/dev/null 2>&1 &
 RUNSEAT=$!; disown "$RUNSEAT"; PIDS+=("$RUNSEAT")
 wait_for "running seat stand-in" pgrep -f "^claude --name ${sn}( |\$)"
