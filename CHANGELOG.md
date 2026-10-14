@@ -2,7 +2,7 @@
 
 Newest first.
 
-## Unreleased
+## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
 

@@ -168,6 +168,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.9.0: Team mode (a seat + siblings) is the default start; Solo is now Practice mode, where you play the orchestrator by hand with two sibling terminals to learn the loop.
+
 v0.8.2: the status HUD's WORK/QUIET chip shows only where the quiet-mode script exists, explains itself, and shows a failed press in red.
 v0.8.1: the guide's loop diagram fits phones, and the guide explains `LAUNCH_LIVE_RECHECK` (a refused recycle).
 v0.8.0: release trains (`assemble-train`, `audit-train`) and a `deploy_policy` setting (ask or auto-when-green),
