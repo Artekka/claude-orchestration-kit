@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New, status HUD: session state at a glance.** A busy session's mark turns clockwise (▘ ▝ ▗ ▖, one step per half second; the HUD redraws between refreshes only while some session is busy), and the band's key line explains the marks: `▘ busy  $ shell  ○ idle`. Tests: `tests/layout.test.ts`, `tests/e2e.test.ts`.
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
