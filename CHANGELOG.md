@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New, status HUD: model badges.** Each session row shows its model right after the name: `OPS` (Opus, yellow), `SNT` (Sonnet, blue), `HKU` (Haiku, green), `GEM` (Gemini, purple), else the id's first three letters in gray. It gives way first on a row narrower than 30 columns. Tests: `tests/layout.test.ts`.
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
