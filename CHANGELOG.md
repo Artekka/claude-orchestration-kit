@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: kit update in one step.** `/orchestration-kit:kit-update` (or `scripts/kit-update.sh`) shows the installed and newest versions (`status --fetch`), updates the kit and the status HUD on your yes (`run`), warns that open sessions keep the old version until restarted, and lists projects whose copied session scripts are now older (`projects`); `refresh <project>` replaces them and keeps each old file as `.bak-<date>`. Tests: `tests/kit-update.test.sh`.
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
