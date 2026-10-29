@@ -2,6 +2,12 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: personal team defaults, asked once per machine.** (PRS 2026-10-14)
+- **New: a sibling name pool.** (PRS 2026-10-14)
+- **New: Windows Terminal tab style on WSL.** (PRS 2026-10-14)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
