@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New, lessons 61–151 (`docs/LESSONS.md`, "Guards, gate logs and worktree git").** (PRS 2026-10-29)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
