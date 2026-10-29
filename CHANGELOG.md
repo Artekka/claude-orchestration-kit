@@ -2,6 +2,13 @@
 
 Newest first.
 
+## Unreleased
+
+- **New, status HUD: project dots.** (PRS 2026-10-14)
+- **New, status HUD: item switches.** (PRS 2026-10-14)
+- **New, status HUD: a setup page.** (PRS 2026-10-14)
+- **Changed, status HUD: alerts apart from information.** (PRS 2026-10-14)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
