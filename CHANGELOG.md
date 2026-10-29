@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: your own start word.** (PRS 2026-10-14)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
