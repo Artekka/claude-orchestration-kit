@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **New: permission mode `bypass-available`.** (PRS 2026-10-14)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
