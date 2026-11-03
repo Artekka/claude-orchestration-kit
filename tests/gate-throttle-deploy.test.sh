@@ -269,17 +269,20 @@ if [ "$NPROC" -ge 4 ]; then
 fi
 
 # ── 19. (ORCA322-9 r1) a leave while a sweep is mid-flight does not re-confine what it just restored ──
-# KIT_DEPLOY_SWEEP_DELAY makes every sweep dawdle after reading the tree, so the leave lands INSIDE a sweep. The mask is SAMPLED
-# for 4 s, because the stale sweep re-confines briefly until the monitor heals it.
+# KIT_DEPLOY_SWEEP_DELAY makes every sweep dawdle after reading the tree, so the leave lands INSIDE a sweep. The sweep visits the
+# gate's processes one by one, so the throttle AND its payload are both sampled: whichever the sweep had not reached yet at the
+# leave is the one a sweep without the owner re-check would confine afterwards. The masks are SAMPLED for 4 s, because the stale
+# sweep re-confines only until the monitor heals it. Mutant: drop the owner re-check in dm_sweep.
 if [ "$NPROC" -ge 4 ]; then
-  reset; normal A; before="$(mask "$NS")"
+  reset; normal A; before="$(mask "$NS")"; beforeT="$(mask "$NT")"
   prio KIT_DEPLOY_SWEEP_DELAY=1.5; until_ 10 fileset "$ACTIVE"
-  until_ 45 differs "$NS" "$before" || bad "the first sweep never confined the gate"
-  sleep 0.4   # the next sweep is now asleep inside its delay
+  anyconf() { [ "$(mask "$NS")" != "$before" ] || [ "$(mask "$NT")" != "$beforeT" ]; }
+  until_ 45 anyconf || bad "the first sweep never confined the gate"
+  sleep 0.4   # the next process is now asleep inside the delay
   kill -TERM "$PS"; until_ 10 gone "$ACTIVE" || bad "deploy state was not removed after the leave"
-  seen=""; for _ in $(seq 40); do seen="$seen $(mask "$NS")"; sleep 0.1; done
+  seen=""; for _ in $(seq 40); do seen="$seen $(mask "$NS")/$(mask "$NT")"; sleep 0.1; done
   u="$(tr ' ' '\n' <<<"$seen" | sort -u | grep -v '^$' | tr '\n' ' ')"
-  eq "a leave mid-sweep: the mask never left the original" "$before " "$u"
+  eq "a leave mid-sweep: no process of the gate was re-confined" "$before/$beforeT " "$u"
 fi
 
 # ── 20. (ORCA322-9 r1) INT to the priority throttle restores and drops the state (the EXIT trap), like TERM and HUP in test 7 ──
