@@ -118,7 +118,11 @@ KIT_LOADAVG_FILE="$TMP/loadavg" GATE_MAX_LOAD=4 bg A; sleep 0.6
 has "load: the waiter says why" "holding: load 99.00" "$(cat "$TMP/err")"
 mkdir -p "$TMP/train"; printf '%s\n' "$(cd "$TMP/train" && pwd -P)" > "$KIT_RUNTIME_DIR/gate-priority.txt"
 KIT_LOADAVG_FILE="$TMP/loadavg" GATE_MAX_LOAD=4 bg P "$TMP/train"; waitfor "start P" 5 && ok || bad "load: the priority slot waited on load"
-echo "1.00 1 1 1/1 1" > "$TMP/loadavg"; waitfor "start A" 5 && ok || bad "load: A did not start once load dropped"
+# While the priority gate P runs, deploy mode holds new normal gates by design (tests/gate-throttle-deploy.test.sh), so A can only
+# start once P has finished AND the load has dropped.
+echo "1.00 1 1 1/1 1" > "$TMP/loadavg"; sleep 0.8
+! grep -q "start A" "$LOG" 2>/dev/null && ok || bad "load: A started while the priority gate P (deploy mode) still ran"
+release P; waitfor "end P" 5; waitfor "start A" 5 && ok || bad "load: A did not start once P finished and load dropped"
 release A; release P; waitfor "end A"; waitfor "end P"
 
 # 8. a lock FILE left by a dead holder (e.g. after a reboot) is not a held lock

@@ -32,7 +32,20 @@
 #            effective load is loadavg minus the tasks still in D state a second sample later (GATE_DSTATE_GAP).
 # Workers:   the command gets GATE_WORKERS (a positive integer): CPUs / slots, held to this process's CPU mask, at least 2.
 #            A test runner can read it (jest --maxWorkers, vitest, pytest -n). A GATE_WORKERS you set yourself wins.
-# Not ported (own row): deploy mode, which confines other gates to a CPU subset while a priority gate runs.
+# Deploy mode: while a gate that took the PRIORITY slot runs, (1) no NEW normal gate is admitted (it waits in line, with one
+#            notice), and (2) every OTHER running throttled gate's process tree is confined to the first
+#            GATE_DEPLOY_OTHERS_PCT (default 25) percent of the CPUs, at least 2, so the release gate gets the rest. Each process
+#            gets back EXACTLY the mask it had before. Affinity, not nice: an unprivileged process cannot lower a nice value again,
+#            and a crash would leave gates niced for good. Nothing is ever signaled, stopped or paused. State in
+#            "$RT/deploy-mode/". Restore happens when the priority throttle exits (any signal TERM/INT/HUP included), from its
+#            monitor when it dies without a trap (SIGKILL), and at the top of EVERY throttle start, so a killed release gate
+#            cannot leave anything confined. A pid whose start time changed is never touched. Needs taskset(1)
+#            (KIT_TASKSET_BIN names it); without it deploy mode is an admission hold only, with a note. quiet-mode.sh status
+#            says whether it is on. Seams: KIT_DEPLOY_POLL (monitor period, default 5 s), KIT_DEPLOY_SWEEP_DELAY.
+# Reuse check: `GATE_REUSE_CHECK` or `gate_reuse_check:` in the team block names a command asked BEFORE the throttle takes a
+#            ticket, run as `<that command> <your command and args>`. Exit 0 = the tree already has a green record: its output
+#            passes through and the throttle exits 0 without queueing or running anything. Any other exit = queue as usual. The
+#            throttle has no flag of its own for this: a `--reuse-check` belongs to YOUR gate and, after the command, reaches it.
 # Needs flock(1) (util-linux; macOS: `brew install flock`). Without it, it warns and runs unthrottled.
 set -u
 [ $# -ge 1 ] || { echo "usage: gate-throttle.sh <command> [args...]" >&2; exit 64; }
@@ -63,6 +76,11 @@ if [ -z "$slots" ]; then
 fi
 case "$slots" in ''|*[!0-9]*|0) slots=2 ;; esac
 poll="${GATE_POLL:-5}"
+reuse_cmd="${GATE_REUSE_CHECK:-}"
+if [ -z "$reuse_cmd" ]; then
+  main_wt="$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+  reuse_cmd="$(sed -n 's/^[[:space:]]*gate_reuse_check:[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' "${main_wt:-.}/docs/orchestration/ORCHESTRATION.md" 2>/dev/null | head -n1)"
+fi
 
 # The priority list is re-read on EVERY poll (refresh_prio, top of the wait loop), not once at start: a gate that queued
 # before the seat added its worktree used to sit on the normal slots forever, and a removed path kept the priority slot.
@@ -298,8 +316,154 @@ on_signal() {  # <exit code>
   exit "$1"
 }
 
+TASKSET="${KIT_TASKSET_BIN:-taskset}"
+dm_dir="$RT/deploy-mode"
+dm_active="$dm_dir/active"
+dm_confined="$dm_dir/confined"
+dm_poll="${KIT_DEPLOY_POLL:-5}"
+dm_pct="${GATE_DEPLOY_OTHERS_PCT:-25}"
+dm_owner=0   # 1 in the throttle that entered deploy mode
+dm_mon=""    # pid of that throttle's own monitor helper (never a gate)
+dm_told=0
+dm_field() { sed -n "s/^$1=//p" "$dm_active" 2>/dev/null | head -n 1; }
+# 0 = a live priority gate owns deploy mode (its pid exists and is the same process).
+dm_live() {
+  [ -f "$dm_active" ] || return 1
+  local pid want
+  pid="$(dm_field pid)"; want="$(dm_field lstart)"
+  [ -n "$pid" ] && pid_running "$pid" && [ "$(proc_start "$pid")" = "$want" ]
+}
+# <pid> <lstart>: the recorded original mask of that exact process, or nothing.
+dm_orig_of() {
+  awk -F'|' -v p="$1" -v s="$2" '$1 == p && $2 == s { print $3; exit }' "$dm_confined" 2>/dev/null
+}
+dm_confined_mask() { sed -n 's/^#mask=//p' "$dm_confined" 2>/dev/null | head -n 1; }
+# Give every confined process its mask back. (1) each RECORDED process gets ITS OWN recorded mask (a child with a
+# custom mask keeps it; a process whose start time changed is never touched). (2) A process born after the last
+# sweep inherited the confined mask and is in no record: walk each registered gate's CURRENT tree and give every
+# process still sitting on exactly the confined mask its gate's recorded original.
+dm_restore() {
+  [ -f "$dm_confined" ] || return 0
+  local pid start mask f gpid gstart rootorig cmask cur p
+  cmask="$(dm_confined_mask)"
+  while IFS='|' read -r pid start mask; do
+    case "$pid" in ""|"#"*) continue ;; esac
+    pid_running "$pid" && [ "$(proc_start "$pid")" = "$start" ] || continue
+    "$TASKSET" -a -p "$mask" "$pid" >/dev/null 2>&1
+  done < "$dm_confined"
+  if [ -n "$cmask" ]; then
+    for f in "$rdir"/*; do
+      [ -f "$f" ] || continue
+      gpid="${f##*/}"; gstart="$(sed -n 2p "$f")"
+      pid_running "$gpid" && [ "$(proc_start "$gpid")" = "$gstart" ] || continue
+      rootorig="$(dm_orig_of "$gpid" "$gstart")"
+      [ -n "$rootorig" ] || continue
+      for p in $(tree_of "$gpid"); do
+        [ -n "$(dm_orig_of "$p" "$(proc_start "$p")")" ] && continue   # recorded: handled above
+        cur="$("$TASKSET" -p "$p" 2>/dev/null | sed 's/.*: //')"
+        [ "$cur" = "$cmask" ] && "$TASKSET" -a -p "$rootorig" "$p" >/dev/null 2>&1
+      done
+    done
+  fi
+  rm -f "$dm_confined"
+}
+# A dead owner's state is repaired by whoever notices first: give every confined process its mask back.
+dm_stale_check() {
+  [ -f "$dm_active" ] || { [ -f "$dm_confined" ] && dm_restore; return 0; }
+  dm_live && return 0
+  dm_restore
+  rm -f "$dm_active"
+}
+dm_others_cpulist() {
+  local n k
+  n="$(nproc 2>/dev/null || echo 4)"
+  k=$(( (n * dm_pct + 99) / 100 ))
+  [ "$k" -lt 2 ] && k=2
+  [ "$k" -ge "$n" ] && return 1   # nothing to take away on a 1-2 CPU host
+  echo "0-$((k - 1))"
+}
+# One sweep: confine every other registered gate's tree that is not confined yet.
+# 0 = deploy mode still belongs to <owner> and that process is running.
+dm_owner_ok() {
+  [ "$(sed -n 's/^pid=//p' "$dm_active" 2>/dev/null | head -n 1)" = "$1" ] && pid_running "$1"
+}
+dm_sweep() {  # <owner pid> <cpu list>
+  local owner="$1" cpus="$2" f gpid gstart gprio p pstart cur cmask
+  cmask="$(dm_confined_mask)"
+  for f in "$rdir"/*; do
+    [ -f "$f" ] || continue
+    gpid="${f##*/}"
+    [ "$gpid" = "$owner" ] && continue
+    gstart="$(sed -n 2p "$f")"; gprio="$(sed -n 3p "$f")"
+    if [ ! -d "/proc/$gpid" ] || [ "$(proc_start "$gpid")" != "$gstart" ]; then rm -f "$f"; continue; fi
+    [ "$gprio" = "prio=1" ] && continue   # never confine a priority gate
+    for p in $(tree_of "$gpid"); do
+      # test seam : widens the window between "the tree was read" and "a process is
+      # touched", so the leave-during-sweep race can be provoked on purpose. Unset = no effect.
+      [ -n "${KIT_DEPLOY_SWEEP_DELAY:-}" ] && sleep "$KIT_DEPLOY_SWEEP_DELAY"
+      pstart="$(proc_start "$p")"; [ -n "$pstart" ] || continue
+      [ -n "$(dm_orig_of "$p" "$pstart")" ] && continue
+      cur="$("$TASKSET" -p "$p" 2>/dev/null | sed 's/.*: //')"; [ -n "$cur" ] || continue
+      # Already on the confined mask and in no record = born confined (it inherited the mask). Recording that
+      # mask as its "original" would pin it forever; dm_restore frees it from its gate's recorded mask instead.
+      [ -n "$cmask" ] && [ "$cur" = "$cmask" ] && continue
+      # Re-check the owner right before touching anything: a leave/crash that restored while this sweep was
+      # mid-flight must not be undone by the sweep's stale view.
+      dm_owner_ok "$owner" || return 0
+      echo "$p|$pstart|$cur" >> "$dm_confined"   # this process's OWN mask
+      "$TASKSET" -a -p -c "$cpus" "$p" >/dev/null 2>&1
+    done
+  done
+}
+dm_enter() {  # called by the priority throttle once it holds slot 5
+  command -v "$TASKSET" >/dev/null 2>&1 || { echo "gate-throttle: deploy mode: taskset missing, admission hold only" >&2; }
+  local cpus="" me="$$" mystart
+  cpus="$(dm_others_cpulist)" || cpus=""
+  mystart="$(proc_start $$)"
+  mkdir -p "$dm_dir"
+  # header: the mask the others are confined to (a hex bitmap of CPUs 0..k-1), so a restore can tell an
+  # inherited-confined process from one that merely has a custom mask
+  if [ -n "$cpus" ]; then printf '#mask=%x\n' $(( (1 << (${cpus#0-} + 1)) - 1 )) > "$dm_confined"; else : > "$dm_confined"; fi
+  (
+    exec 9>&- </dev/null >/dev/null 2>&1
+    until [ -f "$dm_active" ]; do sleep 0.1; [ -d "/proc/$me" ] || exit 0; done
+    while :; do
+      if [ "$(proc_start "$me")" != "$mystart" ] || [ "$(sed -n 's/^pid=//p' "$dm_active" 2>/dev/null)" != "$me" ]; then
+        # owner died (no trap ran) or deploy mode ended: give everything back, drop a dead owner's state
+        dm_restore
+        [ -d "/proc/$me" ] || rm -f "$dm_active"
+        exit 0
+      fi
+      [ -n "$cpus" ] && command -v "$TASKSET" >/dev/null 2>&1 && dm_sweep "$me" "$cpus"
+      sleep "$dm_poll"
+    done
+  ) &
+  dm_mon=$!
+  printf 'pid=%s\nlstart=%s\ncwd=%s\nmonitor=%s\n' "$me" "$mystart" "$(pwd -P)" "$dm_mon" > "$dm_dir/.active.$$" \
+    && mv -f "$dm_dir/.active.$$" "$dm_active"
+  dm_owner=1
+  echo "gate-throttle: DEPLOY MODE on: new normal gates wait, running ones are confined to CPUs ${cpus:-none}" >&2
+}
+dm_leave() {
+  [ "$dm_owner" = 1 ] || return 0
+  dm_owner=0
+  # Stop OUR OWN monitor helper first (never a gate), so no sweep is mid-flight while we restore.
+  if [ -n "$dm_mon" ]; then pkill -P "$dm_mon" 2>/dev/null; kill "$dm_mon" 2>/dev/null; wait "$dm_mon" 2>/dev/null; dm_mon=""; fi
+  dm_restore
+  rm -f "$dm_active"
+}
+on_exit() {
+  drop_ticket
+  rm -f "${rdir:?}/$$"
+  dm_leave
+}
+# Reuse check: before any ticket exists, so a hit never queues.
+if [ -n "$reuse_cmd" ]; then
+  if bash -c "$reuse_cmd"' "$@"' gate-throttle-reuse-check "$@"; then exit 0; fi
+fi
+dm_stale_check
 take_ticket
-trap 'drop_ticket; rm -f "${rdir:?}/$$"' EXIT
+trap on_exit EXIT
 trap 'on_signal 143' TERM
 trap 'on_signal 130' INT
 trap 'on_signal 129' HUP
@@ -307,6 +471,18 @@ load_told=0
 while :; do
   cands=""
   refresh_prio
+  # Deploy mode: while a priority gate runs, a normal gate waits in line (its ticket stays), with one notice. A priority gate is
+  # never held. The state is re-checked each pass, so a dead deployer releases the line.
+  dm_stale_check
+  if [ "$prio" != 1 ] && dm_live; then
+    if [ "$dm_told" = 0 ]; then
+      echo "gate-throttle: DEPLOY MODE: a release gate is running ($(dm_field cwd)); waiting for it to finish..." >&2
+      dm_told=1
+    fi
+    sleep "$poll"
+    continue
+  fi
+  dm_told=0
   # The quiet-mode escape also skips the line: the waiters ahead are parked in quiet mode and would hold it forever.
   if am_head || { [ "${GATE_IGNORE_QUIET:-}" = 1 ] && [ -f "$RT/quiet-mode" ]; }; then
     if load_ok; then cands="$(seq 1 "$slots")"; load_told=0
@@ -321,7 +497,9 @@ while :; do
     if "$FLOCK" -n 9; then
       # The run entry goes in BEFORE the ticket is dropped, so there is no gap where a second start from this worktree sees
       # neither one. Line 1: slot, dir, command (tab-separated; what quiet-mode.sh status prints). Line 2: start time.
-      printf '%s\t%s\t%s\n%s\n' "$i" "$(pwd -P)" "$*" "$(proc_start $$)" > "$rdir/$$"
+      # Line 3: prio=1 for a gate in the priority slot or on the priority list (deploy mode never confines those).
+      printf '%s\t%s\t%s\n%s\nprio=%s\n' "$i" "$(pwd -P)" "$*" "$(proc_start $$)" "$([ "$i" = prio ] && echo 1 || echo "$prio")" > "$rdir/$$"
+      [ "$i" = prio ] && dm_enter
       drop_ticket
       echo "gate-throttle: slot $i acquired $(date +%H:%M:%S) in $(pwd -P)" >&2
       workers_decide; export GATE_WORKERS

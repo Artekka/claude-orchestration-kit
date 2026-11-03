@@ -22,6 +22,16 @@ proc_start() {
 
 status() {
   if [ -f "$FLAG" ]; then echo "quiet mode: ON (since $(cat "$FLAG"))"; else echo "quiet mode: OFF"; fi
+  # Deploy mode (a priority gate is running and the others are confined, see gate-throttle.sh): ON only while its owner is the
+  # same live process (pid + start time), so a dead owner's leftover state reads OFF.
+  local da="$RT/deploy-mode/active" dpid dstart deploy="OFF"
+  if [ -f "$da" ]; then
+    dpid="$(sed -n 's/^pid=//p' "$da" | head -n1)"; dstart="$(sed -n 's/^lstart=//p' "$da" | head -n1)"
+    if [ -n "$dpid" ] && kill -0 "$dpid" 2>/dev/null && [ "$(proc_start "$dpid")" = "$dstart" ]; then
+      deploy="ON ($(sed -n 's/^cwd=//p' "$da" | head -n1))"
+    fi
+  fi
+  echo "deploy mode: $deploy"
   local f pid any=0
   echo "--- running (slot, dir, command)"
   for f in "$RT"/running/*; do
