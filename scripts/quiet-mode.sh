@@ -10,6 +10,16 @@ set -u
 RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
 FLAG="$RT/quiet-mode"
 
+# The same start-time function as gate-throttle.sh (see there): the two must agree, or no waiter is listed.
+proc_start() {
+  local s
+  if [ -r "/proc/$1/stat" ]; then
+    s="$(sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | cut -d' ' -f20)"
+    [ -n "$s" ] && { printf '%s' "$s"; return; }
+  fi
+  ps -o lstart= -p "$1" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//'
+}
+
 status() {
   if [ -f "$FLAG" ]; then echo "quiet mode: ON (since $(cat "$FLAG"))"; else echo "quiet mode: OFF"; fi
   local f pid any=0
@@ -17,8 +27,9 @@ status() {
   for f in "$RT"/running/*; do
     [ -f "$f" ] || continue
     pid="${f##*/}"
-    if kill -0 "$pid" 2>/dev/null; then
-      printf '  pid %s  %s\n' "$pid" "$(tr '\t' ' ' < "$f")"; any=1
+    # a run entry is two lines: slot/dir/command, then the holder's start time (pid reuse = not the holder)
+    if kill -0 "$pid" 2>/dev/null && [ "$(proc_start "$pid")" = "$(sed -n 2p "$f")" ]; then
+      printf '  pid %s  %s\n' "$pid" "$(sed -n 1p "$f" | tr '\t' ' ')"; any=1
     else
       rm -f "$f"   # a dead holder's record; its kernel lock is already gone
     fi
@@ -30,7 +41,7 @@ status() {
     pid="${f#*.}"
     # the same liveness rule as gate-throttle.sh: the pid AND the start time recorded in the ticket
     kill -0 "$pid" 2>/dev/null || continue
-    [ "$(ps -o lstart= -p "$pid" 2>/dev/null | tr -s ' ' | sed 's/^ //;s/ $//')" = "$(sed -n 2p "$RT/queue/$f" 2>/dev/null)" ] || continue
+    [ "$(proc_start "$pid")" = "$(sed -n 2p "$RT/queue/$f" 2>/dev/null)" ] || continue
     pos=$((pos + 1)); printf '  #%s pid %s  %s\n' "$pos" "$pid" "$(sed -n 1p "$RT/queue/$f" 2>/dev/null)"
   done
   [ "$pos" -gt 0 ] || echo "  none"

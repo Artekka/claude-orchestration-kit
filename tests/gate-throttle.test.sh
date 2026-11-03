@@ -13,6 +13,9 @@ PIDS=()
 cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null; done; wait 2>/dev/null; rm -rf "$TMP"; }
 trap cleanup EXIT
 export KIT_RUNTIME_DIR="$TMP/rt" GATE_POLL=0.1 GATE_MAX_LOAD=1000000 LOG="$TMP/log"
+# These tests start several throttles from one directory on purpose; the one-slot-per-worktree rule has its own tests (gate-throttle-port).
+export GATE_ALLOW_SECOND_SLOT=1
+export KIT_DSTATE_COUNT_FILE="$TMP/dzero"; echo 0 > "$TMP/dzero"   # no /proc scan (it sleeps a second per poll when a task sits in D state)
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
@@ -72,7 +75,8 @@ GATE_SLOTS=1 timeout 10 bash "$GT" bash -c 'echo reuse-ok >> "$LOG"' 2>/dev/null
 grep -qx reuse-ok "$LOG" && ok || bad "a stale ticket on a reused (live) pid blocked the line"
 [ ! -e "$KIT_RUNTIME_DIR/queue/0000000000.$squat" ] && ok || bad "the stale reused-pid ticket was not deleted"
 # ...and a ticket with the RIGHT start time for that live pid still holds its place
-printf '%s\n%s\n' "$TMP/live" "$(ps -o lstart= -p "$squat" | tr -s ' ' | sed 's/^ //;s/ $//')" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
+pstart() { if [ -r "/proc/$1/stat" ]; then sed 's/^.*) //' "/proc/$1/stat" | cut -d' ' -f20; else ps -o lstart= -p "$1" | tr -s ' ' | sed 's/^ //;s/ $//'; fi; }   # the throttle's start-time form
+printf '%s\n%s\n' "$TMP/live" "$(pstart "$squat")" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
 GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo jumped >> "$LOG"' 2>/dev/null
 ! grep -qx jumped "$LOG" && ok || bad "a live waiter's ticket (right start time) was skipped"
 out="$(bash "$QM" status)"; has "quiet-mode status lists the live waiter with its dir" "pid $squat  $TMP/live" "$out"

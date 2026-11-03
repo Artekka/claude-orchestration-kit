@@ -10,6 +10,16 @@ tmux entry point, ported from a project that has run it daily.
 - **Added: `scripts/tmux/agents.tmux.conf`** — mouse, 200k history, true color, extended keys (Shift+Enter), passthrough, stable window names.
 - **Changed: `sibling-shell.sh`** names its tmux window `<Name>` once when it runs in a tmux pane.
 - **Fixed: bootstrap.sh and the kit-init skill now copy `seat-merge.sh` with its two libs** (`lib-waiting-tickets.sh`, `lib-builder-worktree.sh`), which a new project was missing; `tests/bootstrap.test.sh` pins all three.
+- **Changed: `gate-throttle.sh`**, ported from a project that has run it daily.
+  - An unknown `--option` is refused (exit 2) instead of being queued as a command.
+  - ONE slot per worktree: a second throttle from a worktree that already holds a slot or waits is refused (exit 3), checked under the ticket lock; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape.
+  - The priority list is re-read on every poll, in one canonical path form (symlinks resolved; a trailing `/` means inside the directory); a change is announced once.
+  - A TERM or HUP stops the command's whole process tree (then KILL after `GATE_STOP_GRACE`, default 5 s, for a process that ignored it); the throttle exits 143 / 129.
+  - Load: tasks stuck in uninterruptible sleep (D state) are subtracted from the load average (two samples `KIT_DSTATE_GAP` apart), so a hung driver cannot hold every gate.
+  - Start times come from `/proc/<pid>/stat` (ps `lstart` drifted under load and made live tickets look dead; `ps` stays the fallback without `/proc`); `quiet-mode.sh status` uses the same function. A run entry is now two lines (slot/dir/command, start time).
+  - The command gets `GATE_WORKERS` = CPUs / slots (held to the CPU mask, at least 2) unless you set it.
+  - Not ported (own row): deploy mode and the project gate's `--reuse-check`.
+- **Added: `tests/gate-throttle-port.test.sh`** (55 checks); `tests/gate-throttle.test.sh` sets `GATE_ALLOW_SECOND_SLOT=1` because it starts several throttles from one directory on purpose.
 - **Added: `ctx-fill.py --line`, `--check` and `--host`** — a fill report is measured, then checkable. `--window 1m|200k|<tokens> --line` prints one paste line (`fill N / W · marks P/H · STATUS · measured <stamp> <zone> · session <id8>`); `--check "<line>"` verifies it against the transcript in any account's project dirs: exact equality with one of the last two distinct fills at the claimed time (a mid-turn line cannot see its own turn), the stamp's zone token honored, a 30-minute age limit, exit 0 MATCH / 3 STALE, MISMATCH, NOSESSION, AMBIGUOUS / 2 not a line. `--host <ssh-target>` runs the script on another machine (`KIT_REMOTE_REPO`, else this checkout's path under `$HOME`). Verdict codes come from one `verdict_of()` shared by the report and the line.
 - **Changed: the `tmux-detached` backend** starts its session with the same config when the file ships.
 - **Fixed: one tmux session-name rule.** `launch_tmux_session` (lib-launch.sh) now honors `RECYCLE_TMUX_SESSION`, and `tmux-session.sh` takes its default name from that same function (and honors `REPO_DIR`), so the entry point and every later `start-team`/`recycle-sibling` window land in one session. README "If you use tmux" and a GETTING-STARTED paragraph document the entry point.
