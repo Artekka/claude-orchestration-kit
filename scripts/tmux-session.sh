@@ -8,9 +8,10 @@
 #
 #   (no flags)            create the session if absent (detached, with scripts/tmux/agents.tmux.conf), then attach
 #                         (switch-client when already inside tmux)
-#   --session NAME        the session name; default RECYCLE_TMUX_SESSION, else the main checkout's directory name with every
-#                         character outside [A-Za-z0-9_-] made `_` (the rule of lib-launch.sh launch_tmux_session). No project
-#                         name is baked in.
+#   --session NAME        the session name; default RECYCLE_TMUX_SESSION, else the main checkout's directory name (REPO_DIR
+#                         overrides the checkout) with every character outside [A-Za-z0-9_-] made `_`. The rule is
+#                         lib-launch.sh launch_tmux_session, the one function every tmux window of the kit is named by.
+#                         No project name is baked in.
 #   --seat NAME           also open a window NAME running `sibling-shell.sh NAME --model M [--effort E]` (the respawn
 #                         loop, so recycle-sibling.sh can recycle it in place). The model is always explicit (exit 64).
 #                         --prompt P is the session's first prompt (default /orient). After a reboot:
@@ -44,7 +45,7 @@
 set -euo pipefail
 
 usage() { echo "usage: scripts/tmux-session.sh [--session NAME] [--seat NAME --model M [--effort E] [--prompt P]] [--no-attach]" >&2; }
-session="${RECYCLE_TMUX_SESSION:-}" seat="" model="" effort="" prompt="" attach=1 install=""
+session="" seat="" model="" effort="" prompt="" attach=1 install=""
 install_windows=0 win_bin_dir="" win_frag_dir="" win_distro="" distro_arg=""
 baked=()   # the arguments --install-command writes into the launcher (never --no-attach: the launcher attaches)
 while [ $# -gt 0 ]; do
@@ -78,13 +79,17 @@ if [ "$install_windows" = 0 ] && { [ -n "$win_bin_dir" ] || [ -n "$win_frag_dir"
 fi
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
-# The MAIN checkout (the dir holding the shared .git), the same rule as recycle-sibling.sh.
+# The MAIN checkout (the dir holding the shared .git), the same rule as recycle-sibling.sh. REPO_DIR wins, as it does in
+# lib-launch.sh launch_repo.
 git_common=$(git -C "$script_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
-if [ -n "$git_common" ] && [ "$(basename "$git_common")" = .git ]; then checkout="$(dirname "$git_common")"
+if [ -n "${REPO_DIR:-}" ] && [ -d "$REPO_DIR" ]; then checkout="$REPO_DIR"
+elif [ -n "$git_common" ] && [ "$(basename "$git_common")" = .git ]; then checkout="$(dirname "$git_common")"
 else checkout=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || dirname "$script_dir"); fi
-# The default name follows lib-launch.sh launch_tmux_session (tests/tmux-session.test.sh pins the two together), so the
-# tmux backends of start-team / recycle-sibling add windows to THIS session, never to a second one for the same repo.
-[ -n "$session" ] || session="$(printf '%s' "$(basename "$checkout")" | tr -c 'A-Za-z0-9_-' '_')"
+# The default name comes from lib-launch.sh launch_tmux_session (RECYCLE_TMUX_SESSION, else the checkout's directory name),
+# the function the tmux backends of start-team / recycle-sibling use for every new window, so a repo has ONE session.
+# shellcheck source=lib-launch.sh
+. "$script_dir/lib-launch.sh"
+[ -n "$session" ] || session="$(LAUNCH_REPO="$checkout" launch_tmux_session)"
 [ -n "$session" ] || session=agents
 if [ -n "$install" ]; then
   [[ "$install" =~ ^[A-Za-z][A-Za-z0-9_-]{0,31}$ ]] || { echo "--install-command name must match ^[A-Za-z][A-Za-z0-9_-]{0,31}\$; got '$install'" >&2; exit 64; }

@@ -10,6 +10,7 @@ tmux entry point, ported from a project that has run it daily.
 - **Added: `scripts/tmux/agents.tmux.conf`** — mouse, 200k history, true color, extended keys (Shift+Enter), passthrough, stable window names.
 - **Changed: `sibling-shell.sh`** names its tmux window `<Name>` once when it runs in a tmux pane.
 - **Changed: the `tmux-detached` backend** starts its session with the same config when the file ships.
+- **Fixed: one tmux session-name rule.** `launch_tmux_session` (lib-launch.sh) now honors `RECYCLE_TMUX_SESSION`, and `tmux-session.sh` takes its default name from that same function (and honors `REPO_DIR`), so the entry point and every later `start-team`/`recycle-sibling` window land in one session. README "If you use tmux" and a GETTING-STARTED paragraph document the entry point.
 - **Added: `tests/tmux-session.test.sh`** (76 checks, stub tmux, no real server).
 
 ## 0.9.0 — 2026-10-14
