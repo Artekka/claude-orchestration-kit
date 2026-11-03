@@ -5,6 +5,7 @@
 # Run: bash tests/gate-throttle.test.sh   (needs bash, git, flock, timeout; skips without flock)
 # Every direct call carries a timeout, so a regression that blocks shows as a FAIL, not a hung suite.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle: skipped (no flock)"; exit 0; }
 command -v timeout >/dev/null 2>&1 || { echo "gate-throttle: skipped (no timeout)"; exit 0; }

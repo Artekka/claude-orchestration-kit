@@ -5,6 +5,7 @@
 # fails as surely as an overstated one. Run: bash tests/ctx-fill-line.test.sh
 # Needs python3. HOME is a sandbox with two fake accounts; the clock is CTX_FILL_NOW (epoch seconds), TZ=UTC.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; CF="$ROOT/scripts/ctx-fill.py"
 command -v python3 >/dev/null 2>&1 || { echo "ctx-fill-line: skipped (no python3)"; exit 0; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT

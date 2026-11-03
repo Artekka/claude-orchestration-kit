@@ -5,6 +5,7 @@
 # nothing on a No. No real Claude runs: a stub `claude` on PATH records every call.
 # Run: bash tests/status-hud.test.sh      (needs bash, python3; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HUD="$ROOT/plugins/status-hud"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT

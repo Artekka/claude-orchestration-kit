@@ -4,6 +4,7 @@
 # Safety: every repo is a throwaway under mktemp (a bare "origin", a builder clone, a merge clone); HOME and the runtime dir are
 # temp; git config is isolated; no network. Processes are killed only by exact pid.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SM="$ROOT/scripts/seat-merge.sh"
 pass=0; fail=0; SANDBOXES=(); PIDS=()

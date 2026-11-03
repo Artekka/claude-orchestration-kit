@@ -4,6 +4,7 @@
 # Claude Code version, and the troubleshooting rows for this release's mechanisms.
 # Run: bash tests/docs-pins.test.sh
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pass=0; fail=0
 pin() {  # <label> <file> <fixed string>

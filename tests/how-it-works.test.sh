@@ -12,6 +12,7 @@
 # (HTML); the marker counts must match, and PENDING below lists the paths those sections may name before
 # the reconcile pass. Run: bash tests/how-it-works.test.sh   (needs bash, python3; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }

@@ -5,6 +5,7 @@
 # Safety: tmux is a STUB on PATH / in RECYCLE_TMUX that only appends its argv to a log; `claude` is a stub too;
 # HOME is a temp dir. No real tmux server, Windows tool or session is ever touched.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pass=0; fail=0; SANDBOXES=()
 ok()  { pass=$((pass+1)); }

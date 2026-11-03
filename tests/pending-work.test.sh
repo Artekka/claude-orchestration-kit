@@ -4,6 +4,7 @@
 # Safety: every repo is a throwaway under mktemp (a bare "origin" plus a clone); committer dates are planted so every age is
 # exact against a fixed PENDING_NOW; PENDING_NO_FETCH=1, no network; git config is isolated.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PW="${PENDING_SCRIPT:-$ROOT/scripts/pending-work.sh}"
 pass=0; fail=0; SANDBOXES=()
@@ -200,6 +201,24 @@ G -C "$R" push -q origin main; G -C "$R" fetch -q origin
 pw -- --json; eq "T27 an archive inside the window clears the row" KIT930-1 "$(jid passed_not_on_main)"
 pw PENDING_DAYS=0.01 -- --json; eq "T27 PENDING_DAYS narrows the window" "" "$(jid passed_not_on_main)"
 pw PENDING_STALE_HOURS=6 -- --json; eq "T27 PENDING_STALE_HOURS is honored (no IDLE at 6 h)" "" "$(jid idle)"
+
+# 27b. the CONFIG-FILE path of docs_prefixes and row_id_regex (the env path is covered above); the environment wins over the block
+repo pref2
+cm base.txt base $((NOW - 3*D)); G -C "$R" push -q origin main
+br feat/kit921-1; cm k.txt k $((NOW - 3*H)); G -C "$R" push -q origin feat/kit921-1; co main
+br feat/t-77; cm t.txt t $((NOW - 30*60)); G -C "$R" push -q origin feat/t-77; co main
+cm n.txt n $((NOW - 2*H)) "chore(board): KIT921-1 noted"
+cm docs/orchestration/ORCHESTRATION.md "pending_work:
+  docs_prefixes:  docs( chore(board)
+  row_id_regex:   T-[0-9]+" $((NOW - H)) conf
+cm "$BOARD_PATH" "✅ KIT921-1 READ PASS derived
+✅ T-77 READ PASS derived" $((NOW - H)) tip
+G -C "$R" push -q origin main; G -C "$R" fetch -q origin
+pw -- --json; eq "T27b row_id_regex from the block reads T-77 (and not KIT921-1)" T-77 "$(jid passed_not_on_main)"
+pw PENDING_ROW_REGEX='KIT[0-9]+-[0-9]+' -- --json; eq "T27b the environment wins over the block's row_id_regex (KIT921-1 reads, T-77 does not)" KIT921-1 "$(jid passed_not_on_main)"
+pw PENDING_ROW_REGEX='KIT[0-9]+-[0-9]+|T-[0-9]+' -- --json; eq "T27b docs_prefixes from the block: chore(board) is docs-only, so KIT921-1 is still pending" "KIT921-1
+T-77" "$(jid passed_not_on_main)"
+pw PENDING_ROW_REGEX='KIT[0-9]+-[0-9]+|T-[0-9]+' PENDING_DOCS_PREFIXES='docs(' -- --json; eq "T27b the environment wins over the block's docs_prefixes (chore(board) now ships KIT921-1)" T-77 "$(jid passed_not_on_main)"
 
 # 28. the script carries nothing project-specific and is read-only
 S="$(cat "$PW" 2>/dev/null)"

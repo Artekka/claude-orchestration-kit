@@ -6,6 +6,7 @@
 # The base behavior (slots, order, quiet mode, load, stale locks) stays in tests/gate-throttle.test.sh.
 # Run: bash tests/gate-throttle-port.test.sh   (needs bash, git, flock, timeout; skips without flock)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle-port: skipped (no flock)"; exit 0; }
 command -v timeout >/dev/null 2>&1 || { echo "gate-throttle-port: skipped (no timeout)"; exit 0; }
