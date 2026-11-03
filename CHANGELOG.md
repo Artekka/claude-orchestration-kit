@@ -2,6 +2,16 @@
 
 Newest first.
 
+## Unreleased
+
+tmux entry point, ported from a project that has run it daily.
+
+- **Added: `scripts/tmux-session.sh`** — starts or reaches the tmux session for the team, optionally with the seat as its first window (`--seat Name --model M [--effort E] [--prompt P]`), `--install-command CMD` to write a one-word launcher, `--install-windows` (WSL) to add a Windows `CMD.cmd` and a Windows Terminal profile. Falls back to running the seat in the current terminal when tmux is not installed. The default session name follows `launch_tmux_session`, so `start-team`/`recycle-sibling` add windows to the same session.
+- **Added: `scripts/tmux/agents.tmux.conf`** — mouse, 200k history, true color, extended keys (Shift+Enter), passthrough, stable window names.
+- **Changed: `sibling-shell.sh`** names its tmux window `<Name>` once when it runs in a tmux pane.
+- **Changed: the `tmux-detached` backend** starts its session with the same config when the file ships.
+- **Added: `tests/tmux-session.test.sh`** (76 checks, stub tmux, no real server).
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.

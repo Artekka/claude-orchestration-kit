@@ -789,7 +789,10 @@ launch_open() {
     tmux-detached)
       s="$(launch_tmux_session)"
       if ! tmux has-session -t "=$s" 2>/dev/null; then
-        tmux new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1
+        # The same config scripts/tmux-session.sh loads (mouse, extended keys, stable window names), when it ships.
+        local conf; conf="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tmux/agents.tmux.conf"
+        if [ -f "$conf" ]; then tmux -f "$conf" new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1
+        else tmux new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1; fi
       fi ;;
   esac
   _launch_argv "$name" "$prompt"
