@@ -199,6 +199,7 @@ bash scripts/tmux-session.sh --install-command orca --seat Orca --model 'opus[1m
 
 - **One session per repo.** The name is `RECYCLE_TMUX_SESSION` if set, else the main checkout's directory name with anything outside `[A-Za-z0-9_-]` made `_` (`REPO_DIR` picks another checkout). `start-team.sh` and `recycle-sibling.sh` name their windows by the same function (`launch_tmux_session`), so every new window joins this session.
 - **Recycling stays in place.** The seat's window runs `sibling-shell.sh`, the respawn loop, so `recycle-sibling.sh` replaces the session in the same window.
+- **`--session NAME` names only this script's session.** If you also launch from outside tmux (`start-team.sh`, `recycle-sibling.sh` in another terminal), use RECYCLE_TMUX_SESSION, not --session: only the environment variable reaches those launchers.
 - **`--install-command CMD`** writes `~/.local/bin/CMD`, a launcher that attaches when the session exists and creates it otherwise. A file at that path that the script did not write is refused.
 - **WSL:** `--install-windows` adds a `CMD.cmd` and a Windows Terminal profile fragment, so a reboot costs two words.
 - tmux does not survive a reboot or a WSL VM stop; run the command again, then recycle the sessions.

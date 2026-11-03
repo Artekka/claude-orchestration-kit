@@ -18,6 +18,8 @@
 #                           scripts/tmux-session.sh --seat Orca --model 'opus[1m]' --prompt 'Orient and orchestrate'
 #                         A window already named NAME is left alone.
 #   --no-attach           set everything up and stop (used by tests and over SSH); prints the attach command.
+#                         --session names only THIS script's session: if you also launch from outside tmux, use
+#                         RECYCLE_TMUX_SESSION, not --session, so every launcher agrees on one name.
 #   --install-command CMD writes an executable $HOME/.local/bin/CMD that runs THIS checkout's tmux-session.sh with the
 #                         other arguments given here (extra arguments typed after CMD are appended). Nothing is baked in
 #                         but those arguments. Idempotent: rewriting a launcher this script wrote is fine; any other file

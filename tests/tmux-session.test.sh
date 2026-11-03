@@ -134,6 +134,11 @@ eq "T4b the launcher resolves REPO_DIR to the same name" "other_repo" "$got"
 hasnt "T4b the name rule lives in ONE place (no second tr in tmux-session.sh)" "tr -c" "$(cat "$TS")"
 has "T4b tmux-session.sh asks the launcher for the name" "launch_tmux_session" "$(cat "$TS")"
 
+# 4c. Docs warn that --session names only this script's session (READ LOW): launches from outside tmux need RECYCLE_TMUX_SESSION.
+for f in README.md docs/GETTING-STARTED.md scripts/tmux-session.sh; do
+  has "T4c $f says to use RECYCLE_TMUX_SESSION, not --session" "RECYCLE_TMUX_SESSION, not --session" "$(tr '\n#' '  ' < "$ROOT/$f" | tr -s ' ')"
+done
+
 # 5. No tmux installed: without a seat there is nothing to run (69); with a seat the wrapper runs directly, from the checkout.
 sandbox proj
 run RECYCLE_TMUX=/nonexistent/tmux -- bash "$TS" --session agents
