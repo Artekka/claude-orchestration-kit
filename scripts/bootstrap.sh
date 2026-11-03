@@ -64,10 +64,10 @@ else
 fi
 
 # ── 2b. Session scripts (context measurement + sibling recycling) ────────────
-for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh; do
+for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh; do
   install_if_missing "scripts/$f" "scripts/$f"
 done
-[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh,gate-throttle.sh,quiet-mode.sh}
+[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh,gate-throttle.sh,quiet-mode.sh,seat-merge.sh}
 
 # ── 2c. Institutional-memory docs (status doc + append-only log) ─────────────
 install_if_missing templates/AI_CONTEXT.md docs/AI_CONTEXT.md

@@ -22,7 +22,7 @@ echo "$out" | grep -q 'DONE' && ok || bad "dry-run plan truncated (no DONE line)
 out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
-         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh .claude/agents/verifier.md \
+         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh .claude/agents/verifier.md \
          .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
@@ -43,6 +43,14 @@ bash "$BS" "$P" >/dev/null 2>&1
 [ "$(cat "$P/docs/orchestration/CLAUDE-slimness.md")" = "# my slimness note" ] && ok || bad "a live CLAUDE-slimness.md was overwritten"
 cp "$ROOT/templates/CLAUDE-slimness.md" "$P/docs/orchestration/CLAUDE-slimness.md"
 [ -x "$P/scripts/start-team.sh" ] && ok || bad "start-team.sh not executable"
+[ -x "$P/scripts/seat-merge.sh" ] && ok || bad "seat-merge.sh not executable"
+# seat-merge sources its two libs from its own directory, so all three must travel together (ORCA322-7)
+for lib in lib-waiting-tickets.sh lib-builder-worktree.sh; do
+  grep -q "$lib" "$ROOT/scripts/seat-merge.sh" && ok || bad "seat-merge.sh no longer sources $lib (update this pin)"
+  grep -q "quiet-mode.sh .*$lib" "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install $lib"
+  bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\\[bootstrap\\] CREATE scripts/$lib" && ok || bad "dry-run did not list $lib"
+done
+grep -q 'seat-merge.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install seat-merge.sh"
 [ -d "$P/.git" ] && ok || bad "no git repo"
 ls "$HOME"/.claude/projects/*/memory/MEMORY.md >/dev/null 2>&1 && ok || bad "memory starter index not written"
 [ ! -e "$P/.claude/agents/architect.md" ] && ok || bad "team agents installed without --with-team-agents"
