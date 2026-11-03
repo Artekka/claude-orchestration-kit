@@ -11,6 +11,8 @@ tmux entry point, ported from a project that has run it daily.
 - **Changed: `sibling-shell.sh`** names its tmux window `<Name>` once when it runs in a tmux pane.
 - **Changed: the `tmux-detached` backend** starts its session with the same config when the file ships.
 - **Added: `tests/tmux-session.test.sh`** (76 checks, stub tmux, no real server).
+- **Added: `scripts/seat-merge.sh`** (+ `lib-builder-worktree.sh`, `lib-waiting-tickets.sh`) — the seat's guarded merge, ported from the project where 25 fix rounds hardened it. Project-specific parts are config hooks (`seat_merge:` block or `SEAT_MERGE_*` env): format command, install command, path-selected checks, the board/log paths that may land during a long check. Not ported: the hosted-bundle and page-reader selection (those become `check:` lines).
+- **Added: `tests/seat-merge.test.sh`** (97 checks on throwaway repos).
 
 ## 0.9.0 — 2026-10-14
 
