@@ -297,6 +297,9 @@ if [ "$NPROC" -ge 4 ] && command -v python3 >/dev/null 2>&1; then
   kill -INT "$PT"; wait "$PT" 2>/dev/null
   until_ 10 gone "$ACTIVE" && ok || bad "INT: state left behind"
   until_ 10 equals "$NS" "$before" && ok || bad "INT: mask not restored"
+  # The trap also stops the throttle's own child tree (stop_tree). Without an INT trap the throttle dies at once and the payload
+  # runs on. Mutant: drop the INT trap.
+  until_ 15 gone "/proc/$PS" && ok || bad "INT: the payload (pid $PS) is still running after the INT"
 else echo "gate-throttle-deploy: INT test skipped (< 4 CPUs or no python3)"; fi
 
 echo "gate-throttle-deploy: $pass passed, $fail failed"
