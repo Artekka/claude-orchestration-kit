@@ -233,5 +233,68 @@ has "--reuse-check after the command reaches the command" "gate got: --reuse-che
 out="$(cd "$TMP/work" && timeout 10 bash "$GT" --reuse-check bash -c true 2>&1; echo "rc=$?")"
 has "a LEADING --reuse-check is refused (exit 2)" "rc=2" "$out"; has "and named" "unknown option '--reuse-check'" "$out"
 
+# ── 17. (ORCA322-9 r1) a child born confined that a LATER sweep sees is not pinned ──
+# Test 9 stops the monitor after one sweep. Here the monitor keeps sweeping (0.3 s) while the late child sits on the confined mask:
+# the sweep must skip it (recording the confined mask as its "original" would pin it forever), so the restore frees it from its
+# gate's recorded mask. Mutant: drop the born-confined skip in dm_sweep.
+if [ "$NPROC" -ge 8 ]; then
+  reset
+  (cd "$TMP/work" && exec bash "$GT" bash -c "sleep 120 & echo \$! > '$TMP/early.pid'; while [ ! -f '$TMP/go' ]; do sleep 0.1; done; sleep 120 & echo \$! > '$TMP/late.pid'; wait" 2>>"$TMP/err") & NT=$!; PIDS+=($NT)
+  until_ 10 fileset "$TMP/early.pid"; ea="$(cat "$TMP/early.pid")"; STRAYS+=("$ea"); before="$(mask "$ea")"
+  par="$(sed 's/^.*) //' "/proc/$ea/stat" | cut -d' ' -f2)"
+  prio; until_ 10 fileset "$ACTIVE"; until_ 10 differs "$ea" "$before" || bad "early child never confined"
+  : > "$TMP/go"; until_ 10 fileset "$TMP/late.pid"; la="$(cat "$TMP/late.pid")"; STRAYS+=("$la")
+  [ "$(mask "$la")" = "$(mask "$par")" ] && ok || bad "premise: the late child was not born confined"
+  sleep 1.5   # several sweeps SEE the late child while the deploy runs
+  kill -TERM "$PS"; until_ 10 gone "$ACTIVE"
+  until_ 10 equals "$la" "$before" && ok || bad "a born-confined child that a later sweep saw stayed pinned"
+else echo "gate-throttle-deploy: test 17 skipped (< 8 CPUs)"; fi
+
+# ── 18. (ORCA322-9 r1) restore frees an UNRECORDED confined process even when a record with a WRONG start time names its pid ──
+# A dead deployer's state built by hand (no real deploy runs): the root is registered and recorded, the child sits on the confined
+# mask (3) and its record belongs to a reused pid. Mutant: dm_orig_of matches by pid only (the child would count as "recorded").
+if [ "$NPROC" -ge 4 ]; then
+  reset
+  bash -c "sleep 120 & echo \$! > '$TMP/t.pid'; wait" & root=$!; PIDS+=($root)
+  until_ 10 fileset "$TMP/t.pid"; ch="$(cat "$TMP/t.pid")"; STRAYS+=("$ch")
+  full="$(mask "$root")"; taskset -a -p 3 "$ch" >/dev/null
+  rstart="$(sed 's/^.*) //' "/proc/$root/stat" | cut -d' ' -f20)"
+  mkdir -p "$RT/running" "$RT/deploy-mode"
+  printf '%s\n%s\nprio=0\n' "$TMP/work" "$rstart" > "$RT/running/$root"
+  printf 'pid=999999\nlstart=1\ncwd=%s\nmonitor=999998\n' "$TMP/rel" > "$ACTIVE"
+  printf '#mask=3\n%s|%s|%s\n%s|1|ff\n' "$root" "$rstart" "$full" "$ch" > "$RT/deploy-mode/confined"
+  eq "premise: the child sits on the confined mask" 3 "$(mask "$ch")"
+  (cd "$TMP/work" && timeout 30 bash "$GT" true >/dev/null 2>&1)
+  eq "the wrong-start record does not count as recorded: the child gets its gate's mask" "$full" "$(mask "$ch")"
+fi
+
+# ── 19. (ORCA322-9 r1) a leave while a sweep is mid-flight does not re-confine what it just restored ──
+# KIT_DEPLOY_SWEEP_DELAY makes every sweep dawdle after reading the tree, so the leave lands INSIDE a sweep. The mask is SAMPLED
+# for 4 s, because the stale sweep re-confines briefly until the monitor heals it.
+if [ "$NPROC" -ge 4 ]; then
+  reset; normal A; before="$(mask "$NS")"
+  prio KIT_DEPLOY_SWEEP_DELAY=1.5; until_ 10 fileset "$ACTIVE"
+  until_ 45 differs "$NS" "$before" || bad "the first sweep never confined the gate"
+  sleep 0.4   # the next sweep is now asleep inside its delay
+  kill -TERM "$PS"; until_ 10 gone "$ACTIVE" || bad "deploy state was not removed after the leave"
+  seen=""; for _ in $(seq 40); do seen="$seen $(mask "$NS")"; sleep 0.1; done
+  u="$(tr ' ' '\n' <<<"$seen" | sort -u | grep -v '^$' | tr '\n' ' ')"
+  eq "a leave mid-sweep: the mask never left the original" "$before " "$u"
+fi
+
+# ── 20. (ORCA322-9 r1) INT to the priority throttle restores and drops the state (the EXIT trap), like TERM and HUP in test 7 ──
+# A job started with `&` from a non-interactive shell ignores INT and cannot trap it, so the throttle is started through python3
+# with the default disposition restored (exec keeps it).
+if [ "$NPROC" -ge 4 ] && command -v python3 >/dev/null 2>&1; then
+  reset; normal A; before="$(mask "$NS")"
+  (cd "$TMP/rel" && exec python3 -c 'import os,signal,sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])' \
+    bash "$GT" bash -c "sleep 60 & echo \$! > '$TMP/prio.pid'; wait" 2>>"$TMP/err") & PT=$!; PIDS+=($PT)
+  until_ 10 fileset "$TMP/prio.pid"; PS="$(cat "$TMP/prio.pid" 2>/dev/null)"; STRAYS+=("$PS")
+  until_ 10 fileset "$ACTIVE"; until_ 10 differs "$NS" "$before" || bad "INT: the normal gate was never confined"
+  kill -INT "$PT"; wait "$PT" 2>/dev/null
+  until_ 10 gone "$ACTIVE" && ok || bad "INT: state left behind"
+  until_ 10 equals "$NS" "$before" && ok || bad "INT: mask not restored"
+else echo "gate-throttle-deploy: INT test skipped (< 4 CPUs or no python3)"; fi
+
 echo "gate-throttle-deploy: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
