@@ -22,7 +22,7 @@ echo "$out" | grep -q 'DONE' && ok || bad "dry-run plan truncated (no DONE line)
 out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
-         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh .claude/agents/verifier.md \
+         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh .claude/agents/verifier.md \
          .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
@@ -51,6 +51,11 @@ for lib in lib-waiting-tickets.sh lib-builder-worktree.sh; do
   bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\\[bootstrap\\] CREATE scripts/$lib" && ok || bad "dry-run did not list $lib"
 done
 grep -q 'seat-merge.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install seat-merge.sh"
+# pending-work.sh is one file (its python is inline), installed and made executable by both paths (ORCA322-7)
+[ -x "$P/scripts/pending-work.sh" ] && ok || bad "pending-work.sh not executable"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/pending-work.sh' && ok || bad "dry-run did not list pending-work.sh"
+grep -q 'quiet-mode.sh .*pending-work.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install pending-work.sh"
+grep -q 'chmod +x .*scripts/pending-work.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod pending-work.sh"
 [ -d "$P/.git" ] && ok || bad "no git repo"
 ls "$HOME"/.claude/projects/*/memory/MEMORY.md >/dev/null 2>&1 && ok || bad "memory starter index not written"
 [ ! -e "$P/.claude/agents/architect.md" ] && ok || bad "team agents installed without --with-team-agents"

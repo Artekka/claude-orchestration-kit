@@ -160,6 +160,25 @@ seat_merge:
 
 Keep comments out of the block: a comment line ends it, and a trailing comment becomes part of the value.
 
+## Pending work (`scripts/pending-work.sh`)
+
+The seat's periodic poll for built work that never reached main: `bash scripts/pending-work.sh [--json]` lists, from git and the board text on origin/main, rows that passed their READ but are not merged (PASSED, NOT ON MAIN), stalled branches (IDLE), a reported GREEN-FINAL commit that is on no remote (UNPUSHED GREEN-FINAL) and recent branches cut from a stale main (BEHIND MAIN). Exit 0 = nothing pending, 3 = something listed. It is read-only. Every project-specific part is a hook; the block is read from origin/main, and an environment variable wins:
+
+- `board_path` (`PENDING_BOARD_PATH`): the live board. Default `docs/orchestration/AGENT_BOARD.md`.
+- `archive_path` (`PENDING_ARCHIVE_PATH`): the directory of dated archives (`BOARD_ARCHIVE_<YYYY-MM-DD>*`). Default `docs/orchestration/archive`.
+- `row_id_regex` (`PENDING_ROW_REGEX`): how a row id reads, a Python regex without anchors. Default `[A-Z][A-Z0-9]*\d+-\d+[a-z]?` (a prefix, a number, a dash, a number).
+- `docs_prefixes` (`PENDING_DOCS_PREFIXES`): space-separated commit-subject prefixes that do NOT count as shipping a row. Default `docs( docs:`.
+
+```
+pending_work:
+  board_path:     docs/orchestration/AGENT_BOARD.md
+  archive_path:   docs/orchestration/archive
+  row_id_regex:   [A-Z][A-Z0-9]*\d+-\d+[a-z]?
+  docs_prefixes:  docs( docs:
+```
+
+Keep comments out of the block, as for `seat_merge:`.
+
 ## Docs (institutional memory)
 
 ```
