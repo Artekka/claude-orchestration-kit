@@ -213,5 +213,100 @@ eq "a caller's GATE_WORKERS wins" "3" "$(workers KIT_CPUS=8 KIT_CPUS_ALL=8 GATE_
 eq "a bad GATE_WORKERS is ignored" "4" "$(workers KIT_CPUS=8 KIT_CPUS_ALL=8 GATE_SLOTS=2 GATE_WORKERS=lots)"
 has "the throttle says what it chose and why" "GATE_WORKERS=4" "$(cat "$TMP/err.w")"
 
+# ── 8. r1 (READ of 322-7): stale-fixture tests for the liveness rules, each with a mutant that must turn it red ────────────────
+pstart() { if [ -r "/proc/$1/stat" ]; then sed 's/^.*) //' "/proc/$1/stat" | cut -d' ' -f20; else ps -o lstart= -p "$1" | tr -s ' ' | sed 's/^ //;s/ $//'; fi; }   # the throttle's start-time form
+WRONG="Mon Jan  1 00:00:00 2001"
+# 8a. quiet-mode status: a run entry whose pid is LIVE but belongs to another process (reuse) is not listed, and is removed
+reset; sleep 60 & rq=$!; PIDS+=("$rq"); mkdir -p "$KIT_RUNTIME_DIR/running"
+printf '0\t%s\t%s\n%s\n' "$TMP/reused" "build" "$WRONG" > "$KIT_RUNTIME_DIR/running/$rq"
+out="$(bash "$QM" status)"
+hasnt "quiet-mode status skips a run entry whose pid was reused" "$TMP/reused" "$out"
+[ ! -e "$KIT_RUNTIME_DIR/running/$rq" ] && ok || bad "the reused-pid run entry was not removed"
+printf '0\t%s\t%s\n%s\n' "$TMP/holder" "build" "$(pstart "$rq")" > "$KIT_RUNTIME_DIR/running/$rq"
+out="$(bash "$QM" status)"
+has "quiet-mode status lists a run entry whose start time matches" "pid $rq  0 $TMP/holder build" "$out"
+[ -e "$KIT_RUNTIME_DIR/running/$rq" ] && ok || bad "a live holder's run entry was removed"
+kill "$rq" 2>/dev/null; wait "$rq" 2>/dev/null
+
+# 8b. one slot per worktree: a DEAD ticket from my worktree does not refuse a start (dead pid, and a live pid that was reused)
+export GATE_SLOTS=3
+reset; mkdir -p "$KIT_RUNTIME_DIR/queue"
+true & dp=$!; wait "$dp"
+printf '%s\n%s\n' "$TMP/wt1" "12345" > "$KIT_RUNTIME_DIR/queue/0000000005.$dp"
+out="$(cd "$TMP/wt1" && timeout 10 bash "$GT" bash -c 'echo deadticket >> "$LOG"' 2>&1; echo "rc=$?")"
+has "a ticket of a dead pid from my worktree does not refuse" "rc=0" "$out"
+reset; mkdir -p "$KIT_RUNTIME_DIR/queue"; sleep 60 & sq=$!; PIDS+=("$sq")
+printf '%s\n%s\n' "$TMP/wt1" "$WRONG" > "$KIT_RUNTIME_DIR/queue/0000000005.$sq"
+out="$(cd "$TMP/wt1" && timeout 10 bash "$GT" bash -c 'echo reusedticket >> "$LOG"' 2>&1; echo "rc=$?")"
+has "a ticket whose pid is live but reused does not refuse" "rc=0" "$out"
+printf '%s\n%s\n' "$TMP/wt1" "$(pstart "$sq")" > "$KIT_RUNTIME_DIR/queue/0000000005.$sq"
+out="$(cd "$TMP/wt1" && timeout 10 bash "$GT" bash -c 'echo liveticket >> "$LOG"' 2>&1; echo "rc=$?")"
+has "a ticket with the right start time from my worktree refuses" "rc=3" "$out"
+has "and says the holder is waiting" "waiting" "$out"
+kill "$sq" 2>/dev/null; wait "$sq" 2>/dev/null
+
+# 8c. one slot per worktree: a run entry whose pid is live but reused does not refuse; one with the right start time does
+reset; mkdir -p "$KIT_RUNTIME_DIR/running"; sleep 60 & rq=$!; PIDS+=("$rq")
+printf '0\t%s\t%s\n%s\n' "$TMP/wt1" "build" "$WRONG" > "$KIT_RUNTIME_DIR/running/$rq"
+out="$(cd "$TMP/wt1" && timeout 10 bash "$GT" bash -c 'echo reusedrun >> "$LOG"' 2>&1; echo "rc=$?")"
+has "a run entry whose pid was reused does not refuse" "rc=0" "$out"
+printf '0\t%s\t%s\n%s\n' "$TMP/wt1" "build" "$(pstart "$rq")" > "$KIT_RUNTIME_DIR/running/$rq"
+out="$(cd "$TMP/wt1" && timeout 10 bash "$GT" bash -c 'echo liverun >> "$LOG"' 2>&1; echo "rc=$?")"
+has "a run entry with the right start time from my worktree refuses" "rc=3" "$out"
+has "and says the holder is running" "running" "$out"
+kill "$rq" 2>/dev/null; wait "$rq" 2>/dev/null
+export GATE_SLOTS=1
+
+# 8d. D-state load: only tasks STILL in D a second sample later count; a burst that ends between the samples does not
+reset; mkdir -p "$TMP/proc"; echo "5.00 1 1 1/1 1" > "$TMP/loadavg"
+for n in 101 102 103 104; do mkdir -p "$TMP/proc/$n"; echo "$n (kworker/u8:1 (x) y) D 2 0 0 0" > "$TMP/proc/$n/stat"; done
+( sleep 0.6; for n in 101 102 103 104; do echo "$n (kworker/u8:1 (x) y) S 2 0 0 0" > "$TMP/proc/$n/stat"; done ) & PIDS+=($!)
+eq "tasks in D at the first sample but gone at the second do not lower the load (the line holds)" "124" "$(KIT_DSTATE_COUNT_FILE= KIT_PROC_DIR="$TMP/proc" KIT_DSTATE_GAP=1.5 run_load)"
+for n in 101 102 103 104; do echo "$n (kworker/u8:1 (x) y) D 2 0 0 0" > "$TMP/proc/$n/stat"; done
+eq "tasks still in D at the second sample are subtracted (the line admits)" "0" "$(KIT_DSTATE_COUNT_FILE= KIT_PROC_DIR="$TMP/proc" KIT_DSTATE_GAP=0.3 run_load)"
+
+# 8e. KILL escalation: a pid that died during the grace window and was REUSED by an unrelated process must not be KILLed.
+#     The reuse is forced in a private pid namespace (unshare -Urpf, writing ns_last_pid); skipped where that is not allowed.
+PAYLOAD="$TMP/reuse-payload.sh"
+cat > "$PAYLOAD" <<'EOS'
+#!/usr/bin/env bash
+# TERM kills the child at once; this shell lingers ~1 s in its TERM trap, so the throttle's grace loop keeps running
+d="$(dirname "$LOG")"
+trap 'SECONDS=0; while [ "$SECONDS" -lt 1 ]; do :; done; exit 0' TERM
+sleep 300 & echo $! > "$d/child.pid"
+echo "start R" >> "$LOG"
+wait
+EOS
+NS="$TMP/reuse-ns.sh"
+cat > "$NS" <<'EOS'
+#!/usr/bin/env bash
+# runs INSIDE the pid namespace; prints SURVIVED or KILLED or NOREUSE
+d="$(dirname "$LOG")"; rm -f "$d/child.pid"
+(cd "$d" && GATE_STOP_GRACE=3 exec bash "$GT" bash "$PAYLOAD") 2>>"$d/err" & tp=$!
+i=0; while ! grep -qx "start R" "$LOG" 2>/dev/null || [ ! -s "$d/child.pid" ]; do i=$((i+1)); [ "$i" -gt 200 ] && { echo NOSTART; exit 0; }; sleep 0.05; done
+pc="$(cat "$d/child.pid")"
+kill -TERM "$tp"
+i=0; while kill -0 "$pc" 2>/dev/null; do i=$((i+1)); [ "$i" -gt 100 ] && { echo NOREUSE; exit 0; }; sleep 0.02; done
+inn=""
+for try in 1 2 3 4 5 6 7 8; do
+  echo $((pc - 1)) > /proc/sys/kernel/ns_last_pid 2>/dev/null || { echo NOREUSE; exit 0; }
+  sleep 300 & inn=$!
+  [ "$inn" = "$pc" ] && break
+  kill "$inn" 2>/dev/null; wait "$inn" 2>/dev/null; inn=""
+done
+[ -n "$inn" ] || { echo NOREUSE; exit 0; }
+wait "$tp" 2>/dev/null
+if kill -0 "$inn" 2>/dev/null; then echo SURVIVED; else echo KILLED; fi
+kill "$inn" 2>/dev/null
+EOS
+reset
+if unshare -Urpf --mount-proc bash -c 'echo 0 > /proc/sys/kernel/ns_last_pid' >/dev/null 2>&1; then
+  res="$(GT="$GT" PAYLOAD="$PAYLOAD" LOG="$LOG" unshare -Urpf --mount-proc bash "$NS" 2>/dev/null | tail -1)"
+  eq "an unrelated process that reused a tree member's pid survives the KILL escalation" "SURVIVED" "$res"
+else
+  echo "gate-throttle-port: 8e skipped (no user+pid namespaces)"
+fi
+
+
 echo "gate-throttle-port: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

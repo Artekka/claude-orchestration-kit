@@ -22,7 +22,7 @@ echo "$out" | grep -q 'DONE' && ok || bad "dry-run plan truncated (no DONE line)
 out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
-         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh .claude/agents/verifier.md \
+         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/tmux/agents.tmux.conf .claude/agents/verifier.md \
          .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
@@ -51,6 +51,15 @@ for lib in lib-waiting-tickets.sh lib-builder-worktree.sh; do
   bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\\[bootstrap\\] CREATE scripts/$lib" && ok || bad "dry-run did not list $lib"
 done
 grep -q 'seat-merge.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install seat-merge.sh"
+# tmux-session.sh loads scripts/tmux/agents.tmux.conf from its own directory, so the two travel together (ORCA322-7 r1)
+[ -x "$P/scripts/tmux-session.sh" ] && ok || bad "tmux-session.sh not executable"
+grep -q 'tmux/agents.tmux.conf' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-session.sh no longer loads tmux/agents.tmux.conf (update this pin)"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/tmux-session.sh' && ok || bad "dry-run did not list tmux-session.sh"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/tmux/agents.tmux.conf' && ok || bad "dry-run did not list tmux/agents.tmux.conf"
+cmp -s "$ROOT/scripts/tmux/agents.tmux.conf" "$P/scripts/tmux/agents.tmux.conf" && ok || bad "installed agents.tmux.conf differs from the kit's"
+grep -q 'tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install tmux-session.sh"
+grep -q 'tmux/agents.tmux.conf; do SRC="\$K/scripts/\$f"' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install scripts/tmux/agents.tmux.conf"
+grep -q 'chmod +x .*scripts/tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod tmux-session.sh"
 # pending-work.sh is one file (its python is inline), installed and made executable by both paths (ORCA322-7)
 [ -x "$P/scripts/pending-work.sh" ] && ok || bad "pending-work.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/pending-work.sh' && ok || bad "dry-run did not list pending-work.sh"
