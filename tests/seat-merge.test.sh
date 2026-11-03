@@ -190,5 +190,10 @@ sm SEAT_MERGE_IDLE_MINUTES=0 -- feat "$BSHA" "m"; has "T15 dirty worktree kept w
 sandbox; branch feat src/b.txt new; G -C "$SB/merge" fetch -q; G -C "$SB/merge" worktree add -q "$SB/bw" -b feat origin/feat
 sm -- feat "$BSHA" "m"; has "T15 a file changed in the last 30 min keeps it" "a file changed in the last 30 min" "$OUT"
 
+# 16. the CHECKED merge sha is what is pushed, never HEAD: a commit made in the worktree after the merge must not ride along
+sandbox; branch feat src/b.txt new
+sm SEAT_MERGE_CHECKS="sneaky | * | git commit --allow-empty -qm sneaky" -- feat "$BSHA" "m"
+eq "T16 exit 0" 0 "$RC"; eq "T16 the sneaky commit is not on main" "" "$(git -C "$SB/origin.git" log main --format=%s | grep -x sneaky || true)"; eq "T16 main's tip is the checked merge" "m" "$(git -C "$SB/origin.git" log -1 --format=%s main)"
+
 echo "seat-merge: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
