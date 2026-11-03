@@ -117,6 +117,23 @@ sandbox proj
 run RECYCLE_TMUX_SESSION=from-env -- bash "$TS" --no-attach
 has "T4 RECYCLE_TMUX_SESSION overrides" "new-session|-d|-s|from-env|" "$(log)"
 
+# 4b. ONE name rule (READ MED-1): RECYCLE_TMUX_SESSION and REPO_DIR steer lib-launch's tmux-detached windows too, and this
+#     script takes its default from the SAME function, so a recycle never opens a second session outside the first.
+sandbox proj
+got="$(RECYCLE_TMUX_SESSION=from-env bash -c ". '$ROOT/scripts/lib-launch.sh'; LAUNCH_REPO='$REPO' launch_tmux_session")"
+eq "T4b launch_tmux_session honors RECYCLE_TMUX_SESSION" "from-env" "$got"
+got="$(env -u RECYCLE_TMUX_SESSION bash -c ". '$ROOT/scripts/lib-launch.sh'; LAUNCH_REPO='$REPO' launch_tmux_session")"
+eq "T4b without it, the repo's directory name" "proj" "$got"
+run RECYCLE_TMUX_SESSION=from-env -- bash "$TS" --no-attach
+has "T4b tmux-session.sh and the launcher name the same session" "new-session|-d|-s|from-env|" "$(log)"
+OTHER="$SB/other.repo"; mkdir -p "$OTHER"
+run REPO_DIR="$OTHER" -- bash "$TS" --no-attach
+has "T4b REPO_DIR names the session, as it does for the launcher" "new-session|-d|-s|other_repo|" "$(log)"
+got="$(REPO_DIR="$OTHER" bash -c ". '$ROOT/scripts/lib-launch.sh'; LAUNCH_REPO=\"\$(launch_repo)\" launch_tmux_session")"
+eq "T4b the launcher resolves REPO_DIR to the same name" "other_repo" "$got"
+hasnt "T4b the name rule lives in ONE place (no second tr in tmux-session.sh)" "tr -c" "$(cat "$TS")"
+has "T4b tmux-session.sh asks the launcher for the name" "launch_tmux_session" "$(cat "$TS")"
+
 # 5. No tmux installed: without a seat there is nothing to run (69); with a seat the wrapper runs directly, from the checkout.
 sandbox proj
 run RECYCLE_TMUX=/nonexistent/tmux -- bash "$TS" --session agents
