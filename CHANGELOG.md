@@ -12,7 +12,8 @@ tmux entry point, ported from a project that has run it daily.
 - **Changed: the `tmux-detached` backend** starts its session with the same config when the file ships.
 - **Added: `tests/tmux-session.test.sh`** (76 checks, stub tmux, no real server).
 - **Added: `scripts/seat-merge.sh`** (+ `lib-builder-worktree.sh`, `lib-waiting-tickets.sh`) — the seat's guarded merge, ported from the project where 25 fix rounds hardened it. Project-specific parts are config hooks (`seat_merge:` block or `SEAT_MERGE_*` env): format command, install command, path-selected checks, the board/log paths that may land during a long check. Not ported: the hosted-bundle and page-reader selection (those become `check:` lines).
-- **Added: `tests/seat-merge.test.sh`** (100 checks on throwaway repos).
+- **Added: `tests/seat-merge.test.sh`** (131 checks on throwaway repos).
+- **Added: a `seat_merge:` section in `templates/ORCHESTRATION.md`** documenting every hook (`format_cmd`, `install_cmd`, `check`, `allowed_paths`, `yield_max_s`, `yield_poll_s`, `idle_minutes`, `SEAT_MERGE_RUNTIME_DIR`) with a recommended `check:` line whose globs are `*`; a test parses the block as written. seat-merge.sh states that config is read BEFORE the merge, and its runtime dir now follows `KIT_RUNTIME_DIR` like `gate-throttle.sh`.
 
 ## 0.9.0 — 2026-10-14
 

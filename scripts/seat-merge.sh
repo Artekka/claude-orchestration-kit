@@ -23,6 +23,9 @@
 # last line says so and how to reset it).
 #
 # CONFIG (a hook is optional; the environment variable wins over the config file):
+#   When: the config is read BEFORE the merge, from the ORCHESTRATION.md this worktree has checked out (not from the merged
+#     tree). A branch that edits the seat_merge: block therefore cannot gate, or ungate, its own merge; the change applies to
+#     the next run, once the worktree has caught up (after a green run it sits on the merged commit, so it has).
 #   File: an unindented `seat_merge:` line in docs/orchestration/ORCHESTRATION.md, then indented `key: value` lines:
 #     format_cmd:   the format check, run on the merged tree. Default: `pnpm format:check` (or `npm run format:check`
 #                   without a pnpm-lock.yaml) when package.json has a "format:check" script, else none (a note says so).
@@ -41,8 +44,9 @@
 #                   new origin/main and pushed without re-running the checks (at most 3 times). Env SEAT_MERGE_ALLOWED_PATHS.
 #     yield_max_s / yield_poll_s: see YIELD below (defaults 3600 / 5). Env SEAT_MERGE_YIELD_MAX_S / SEAT_MERGE_YIELD_POLL_S.
 #     idle_minutes: a builder worktree with a file changed this recently is kept (default 30). Env SEAT_MERGE_IDLE_MINUTES.
-# Env only: SEAT_MERGE_REPO (the directory to run in; a test seam), SEAT_MERGE_RUNTIME_DIR (default
-#   $HOME/.orchestration-kit/runtime; the lock and the tickets live there, never inside the worktree),
+# Env only: SEAT_MERGE_REPO (the directory to run in; a test seam), SEAT_MERGE_RUNTIME_DIR (default KIT_RUNTIME_DIR, the
+#   runtime dir gate-throttle.sh and quiet-mode.sh share, else $HOME/.orchestration-kit/runtime; the lock and the tickets
+#   live there, never inside the worktree),
 #   SEAT_MERGE_ALLOW_SHARED_CHECKOUT=1 (skip the linked-worktree check; for tests that use plain clones).
 #
 # YIELD: before it takes its lock the script waits while a LIVE pusher holds a ticket, <runtime>/seat-merge/<tool>-<pid>.waiting
@@ -98,7 +102,7 @@ fi
 # file, taken BEFORE git is touched. The file lives in the runtime dir (never /tmp, never inside the worktree), keyed by the
 # worktree's absolute path. The kernel holds the flock, not the file, so a lock left by a dead run (or by a reboot) never
 # blocks. The holder writes its pid into the file for the refusal message.
-RT="${SEAT_MERGE_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
+RT="${SEAT_MERGE_RUNTIME_DIR:-${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}}"
 # Never in the shared checkout. A failed run leaves the worktree detached on an UNPUSHED merge, which under the one shared
 # checkout would sit under every sibling's `git status`. A linked worktree has its own git dir; the main working tree's git
 # dir IS the common dir.

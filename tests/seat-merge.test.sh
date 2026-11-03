@@ -195,5 +195,51 @@ sandbox; branch feat src/b.txt new
 sm SEAT_MERGE_CHECKS="sneaky | * | git commit --allow-empty -qm sneaky" -- feat "$BSHA" "m"
 eq "T16 exit 0" 0 "$RC"; eq "T16 the sneaky commit is not on main" "" "$(git -C "$SB/origin.git" log main --format=%s | grep -x sneaky || true)"; eq "T16 main's tip is the checked merge" "m" "$(git -C "$SB/origin.git" log -1 --format=%s main)"
 
+# 17. a rejected push with NO race (origin/main did not move) is a plain refusal, not a retry loop (READ LOW-1: mutant S14,
+#     deleting that guard, used to survive because only the race paths were tested).
+sandbox; branch feat src/b.txt new
+printf '#!/bin/sh\nexit 1\n' > "$SB/origin.git/hooks/pre-receive"; chmod +x "$SB/origin.git/hooks/pre-receive"
+sm SEAT_MERGE_CHECKS="count | * | echo ran >> $SB/checkruns" -- feat "$BSHA" "m"
+eq "T17 exit 1" 1 "$RC"; has "T17 says the push failed" "push failed" "$ERR"; has "T17 says origin/main did not move" "did not move" "$ERR"
+hasnt "T17 no retry" "retry" "$OUT"; eq "T17 the checks ran once" 1 "$(wc -l < "$SB/checkruns")"
+has "T17 nothing forced, the reset hint is the last line" "git checkout --detach origin/main" "$(tail -n1 "$SB/err")"
+
+# 18. the runtime dir follows KIT_RUNTIME_DIR like gate-throttle.sh and quiet-mode.sh (READ LOW-3); SEAT_MERGE_RUNTIME_DIR wins
+sandbox; branch feat src/b.txt new
+sm SEAT_MERGE_RUNTIME_DIR= KIT_RUNTIME_DIR="$SB/kitrt" -- feat "$BSHA" "m"
+eq "T18 exit 0" 0 "$RC"; eq "T18 the lock lives under KIT_RUNTIME_DIR" 1 "$(ls "$SB/kitrt/seat-merge"/*.lock 2>/dev/null | wc -l | tr -d ' ')"
+eq "T18 and not under HOME" no "$([ -d "$SB/home/.orchestration-kit" ] && echo yes || echo no)"
+sandbox; branch feat src/b.txt new
+sm KIT_RUNTIME_DIR="$SB/kitrt" -- feat "$BSHA" "m"
+eq "T18 SEAT_MERGE_RUNTIME_DIR beats KIT_RUNTIME_DIR" 0 "$(ls "$SB/kitrt/seat-merge" 2>/dev/null | wc -l | tr -d ' ')"
+
+# 19. config is read from THIS worktree's checkout BEFORE the merge (READ LOW-2): a branch that adds a red check does not
+#     gate its own merge; the next run, from the merged tree, does. The header says so.
+sandbox
+extra_seed() { :; }
+branch feat docs/orchestration/ORCHESTRATION.md "$(printf 'seat_merge:\n  check: boom | * | false')"
+sm SEAT_MERGE_CHECKS= -- feat "$BSHA" "m"
+eq "T19 the branch's own new check does not gate its merge" 0 "$RC"
+branch feat2 src/c.txt new; G -C "$SB/merge" checkout -q --detach origin/main
+sm SEAT_MERGE_CHECKS= -- feat2 "$BSHA" "m2"
+eq "T19 from the merged tree the new check applies and is red" 1 "$RC"; has "T19 names the check" "boom" "$ERR"
+has "T19 the header says the config is read before the merge" "read BEFORE the merge" "$(sed -n 1,60p "$SM")"
+
+# 20. templates/ORCHESTRATION.md documents the seat_merge: block: every hook, a recommended `*` check, and the block parses
+T="$ROOT/templates/ORCHESTRATION.md"
+tb="$(awk '/^seat_merge:[[:space:]]*$/{on=1;print;next} on&&/^[[:space:]]+[a-z_]+:/{print;next} on{exit}' "$T")"
+for k in format_cmd install_cmd check allowed_paths yield_max_s yield_poll_s idle_minutes; do
+  has "T20 template seat_merge: block carries $k" "  $k:" "$tb"
+done
+has "T20 the recommended check runs on every merge (globs *)" "| * |" "$tb"
+for k in format_cmd install_cmd allowed_paths yield_max_s yield_poll_s idle_minutes SEAT_MERGE_RUNTIME_DIR; do
+  has "T20 the template prose explains $k" "$k" "$(cat "$T")"
+done
+sandbox; branch feat src/b.txt new
+mkdir -p "$SB/merge/docs/orchestration"
+sed -E 's/<[^>]*>/true/g' "$T" > "$SB/merge/docs/orchestration/ORCHESTRATION.md"
+sm SEAT_MERGE_FORMAT_CMD= SEAT_MERGE_CHECKS= SEAT_MERGE_ALLOWED_PATHS= -- feat "$BSHA" "m"
+eq "T20 the template's block runs as written (placeholders filled)" 0 "$RC"; has "T20 its * check ran" "check '" "$OUT"
+
 echo "seat-merge: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

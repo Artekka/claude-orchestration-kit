@@ -134,6 +134,32 @@ it the evidence a verdict rests on. Quote the path in reports so the next reader
 prefer it) or `non-blocking` (for a human who steps away: text + a push notification, work that does not
 depend on the answer keeps moving).
 
+## Merge (`scripts/seat-merge.sh`)
+
+The seat merges a READ-passed branch with `bash scripts/seat-merge.sh <branch> <READ-sha> "<message>"`, from its own linked merge worktree. It merges `origin/<branch>` onto a fresh `origin/main`, runs the checks below on the MERGED tree, and pushes the checked sha only when they are all green. These keys are optional; an environment variable (`SEAT_MERGE_<KEY>`, upper case) beats the file. The block is read BEFORE the merge, from this worktree's checked-out copy of this file, so a branch that edits it takes effect on the next run.
+
+- `format_cmd`: the format check. Default: your `format:check` package script, when `package.json` has one; else none (a note says so).
+- `install_cmd`: runs once before the checks, only when at least one check applies, so a stale install cannot give a false green.
+- `check`: repeatable, `name | globs | command`. `globs` are matched against the paths the merge changes (`docs/*` a directory, `*` every merge). A red check is rerun once alone; red twice refuses. **Recommended: one `check:` line with globs `*` that runs your fast guards, so no merge reaches main without them**; add narrower lines for the slower suites a path should trigger.
+- `allowed_paths`: path prefixes (default `docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md`). When the push loses a race to commits that touch only these, the same merge is redone and pushed without re-running the checks (at most 3 times). Any other path refuses.
+- `yield_max_s` / `yield_poll_s`: the merge waits (at most `yield_max_s`, default 3600, polling every `yield_poll_s`, default 5) while another session holds a "waiting pusher" ticket, so a retrying push is not starved.
+- `idle_minutes`: the builder's worktree is removed after a merge only if nothing in it changed this recently (default 30).
+- `SEAT_MERGE_RUNTIME_DIR` (env only): where the lock and tickets live; defaults to `KIT_RUNTIME_DIR`, else `~/.orchestration-kit/runtime`.
+
+```
+seat_merge:
+  format_cmd:     <your format check, e.g. npm run format:check>
+  install_cmd:    <your install, e.g. npm ci>
+  check:          guards | * | <your fast guard command, e.g. npm run test:guards>
+  check:          full | src/* tests/* | <your slower suite for source changes>
+  allowed_paths:  docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md
+  yield_max_s:    3600
+  yield_poll_s:   5
+  idle_minutes:   30
+```
+
+Keep comments out of the block: a comment line ends it, and a trailing comment becomes part of the value.
+
 ## Docs (institutional memory)
 
 ```
