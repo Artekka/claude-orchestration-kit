@@ -211,6 +211,18 @@ routinely present on the origin setup and complement the kit, but the kit never 
 or requires them: `superpowers` (TDD/debugging discipline), `code-review`, a token/context
 hygiene plugin. If a skill here references one, treat it as optional.
 
+## Security
+
+Report a vulnerability privately, never in a public issue: see [SECURITY.md](SECURITY.md) for the
+supported versions, the private reporting channel and what to expect. CI scans every push and pull
+request for secrets, and `tests/leak-guard.test.sh` keeps personal paths and keys out of the repo.
+
+## Contributing
+
+Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, `bash tests/run.sh`, the
+branch and PR flow, commit messages and the optional pre-push secret scan. Everyone follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Contributors
 
 - Miles Brown (@MilesBrown34)
