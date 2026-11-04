@@ -8,6 +8,7 @@ Newest first.
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
 - **New: memory-aware gate slots.** (PRS 2026-10-16)
 - **New, status HUD: model badges.** (PRS 2026-10-14)
+- **New, status HUD: session state at a glance.** (PRS 2026-10-14)
 
 ## 0.9.0 — 2026-10-14
 
