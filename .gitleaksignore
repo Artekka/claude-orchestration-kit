@@ -1,0 +1,3 @@
+# Findings in old commits, already gone from the tree; history is not rewritten. Format: commit:file:rule:line.
+9ba4fcea11cd8f67baaaa102201fb84a3c16593f:tests/how-it-works.test.sh:home-path:46
+4223658e066179ecb8534286fa30d9781cafb0d8:templates/memory-starter/feedback_link_not_relative_path_for_deliverables.md:home-path:15

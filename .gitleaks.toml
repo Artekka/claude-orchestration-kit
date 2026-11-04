@@ -1,0 +1,47 @@
+# gitleaks config for this repo. CI runs it on each push and pull request diff; the opt-in pre-push hook
+# (.github/hooks/install-pre-push.sh) runs it on the commits you push. Tested with gitleaks 8.30.1.
+# tests/leak-guard.test.sh checks the same personal-detail classes on the working tree.
+title = "orchestration-kit"
+
+# Every built-in gitleaks rule (cloud keys, GitHub, Anthropic, OpenAI and other tokens, private keys, ...).
+[extend]
+useDefault = true
+
+# A real user's home directory. The placeholders the docs and tests use are allowed. The secret is the user
+# name alone: the default global allowlist drops any secret that itself looks like /home/... or /Users/...
+[[rules]]
+id = "home-path"
+description = "A /home/<user> or /Users/<user> path names a real machine user"
+regex = '''(?:^|[^A-Za-z0-9_}/.\-])/(?:home|Users)/([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
+secretGroup = 1
+keywords = ["/home/", "/users/"]
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = ['''^(?:u|x|you|user|username|me|name|example|runner)$''']
+
+# A personal email address. Noreply forms and the reserved example.* domains are allowed.
+[[rules]]
+id = "email"
+description = "An email address other than a noreply form"
+regex = '''([A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,})'''
+secretGroup = 1
+keywords = ["@"]
+[[rules.allowlists]]
+regexTarget = "secret"
+regexes = [
+  '''@users\.noreply\.github\.com$''',
+  '''^noreply@anthropic\.com$''',
+  '''^noreply@github\.com$''',
+  '''^git@github\.com$''',
+  '''@example\.(?:com|org|net)$''',
+]
+
+# The status HUD's e2e test feeds a fake "Authorization: SECRET-TOKEN" curl line to prove the HUD never
+# writes it out. All three must match (rule, file, placeholder), so a real token there still fails.
+[[allowlists]]
+description = "status-hud redaction fixture"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''^plugins/status-hud/tests/e2e\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''Authorization: SECRET-TOKEN"''']
