@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests for scripts/gate-throttle.sh and scripts/quiet-mode.sh: exit code, slot limit, first-come order,
 # dead tickets, quiet mode, the priority slot, load admission, stale locks, gate_slots from the team block,
-# and the no-flock fallback. Every run uses a private runtime dir and a fast poll.
+# the no-flock fallback, and --log (commit and dirty count first, read when the slot is taken; exit code
+# last). Every run uses a private runtime dir and a fast poll.
 # Run: bash tests/gate-throttle.test.sh   (needs bash, git, flock, timeout; skips without flock)
 # Every direct call carries a timeout, so a regression that blocks shows as a FAIL, not a hung suite.
 set -u
@@ -154,6 +155,36 @@ env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" off >/dev/null
 # 10. no flock: warns and runs unthrottled
 out="$(KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" bash -c 'echo ran' 2>&1)"
 has "no flock: still runs the command" "ran" "$out"; has "no flock: says it is unthrottled" "UNTHROTTLED" "$out"
+
+# 11. --log: commit and dirty count first, the command's output, exit code last; the slot line stays on stderr
+reset; export GATE_SLOTS=1
+L="$TMP/repo-log"; git init -q -b main "$L"
+git -C "$L" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m one
+: > "$L/untracked"
+err="$(cd "$L" && timeout 20 bash "$GT" --log "$TMP/gate.log" bash -c 'echo to-out; echo to-err >&2; exit 7' 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 7 ] && ok || bad "--log: exit code not passed through (got $rc)"
+[ "$(sed -n 1p "$TMP/gate.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && ok || bad "--log: line 1 is not the commit: $(sed -n 1p "$TMP/gate.log")"
+sed -n 2p "$TMP/gate.log" | grep -Eq '^started [0-9]{2}:[0-9]{2}:[0-9]{2} dirty=1$' && ok || bad "--log: line 2 is not 'started HH:MM:SS dirty=1': $(sed -n 2p "$TMP/gate.log")"
+has "--log: stdout in the log" "to-out" "$(cat "$TMP/gate.log")"; has "--log: stderr in the log" "to-err" "$(cat "$TMP/gate.log")"
+[ "$(tail -n 1 "$TMP/gate.log")" = "exit 7" ] && ok || bad "--log: last line is not 'exit 7': $(tail -n 1 "$TMP/gate.log")"
+has "--log: the slot line stays on stderr" "slot 1 acquired" "$err"; hasnt "--log: the slot line is not in the log" "acquired" "$(cat "$TMP/gate.log")"
+
+# 11b. --log reads the commit when the slot is taken, not while waiting: a commit made in the queue is the one logged
+reset; export GATE_SLOTS=1
+bg A; waitfor "start A" || bad "--log queue: A never started"
+(cd "$L" && exec bash "$GT" --log "$TMP/queued.log" bash -c 'echo queued-ran >> "$LOG"' 2>>"$TMP/err") & PIDS+=($!); qpid=$!
+sleep 0.4; ! grep -q queued-ran "$LOG" && ok || bad "--log queue: the logged run did not wait for the slot"
+git -C "$L" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m two
+release A; wait "$qpid"
+[ "$(sed -n 1p "$TMP/queued.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && ok || bad "--log queue: logged $(sed -n 1p "$TMP/queued.log"), want the commit made while it waited"
+
+# 11c. --log usage and an unwritable log; no flock still writes the log
+timeout 20 bash "$GT" --log 2>/dev/null; [ $? -eq 64 ] && ok || bad "--log with no file: want exit 64"
+timeout 20 bash "$GT" --log "$TMP/x.log" 2>/dev/null; [ $? -eq 64 ] && ok || bad "--log with no command: want exit 64"
+timeout 20 bash "$GT" --log "$TMP/no/such/dir/x.log" true 2>/dev/null; [ $? -eq 73 ] && ok || bad "--log to an unwritable path: want exit 73"
+(cd "$L" && KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" --log "$TMP/noflock.log" bash -c 'echo nf-ran' 2>/dev/null)
+[ "$(sed -n 1p "$TMP/noflock.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && [ "$(tail -n 1 "$TMP/noflock.log")" = "exit 0" ] && ok \
+  || bad "no flock: --log did not write SHA first and exit last: $(cat "$TMP/noflock.log")"
 
 echo "gate-throttle: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

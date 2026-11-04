@@ -5,6 +5,7 @@ Newest first.
 ## Unreleased
 
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
+- **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
 
 ## 0.9.0 — 2026-10-14
 

@@ -3,7 +3,12 @@
 # N host-wide slots is free, so several sessions on one machine do not run N full gates at once and flake
 # on load. Usage, from inside YOUR worktree:
 #   bash scripts/gate-throttle.sh <command> [args...]        e.g. bash scripts/gate-throttle.sh npm test
+#   bash scripts/gate-throttle.sh --log <file> <command> [args...]
 # Exit code = the command's exit code.
+# --log:     once the slot is held, the command's output (stdout and stderr) goes to <file>, which opens
+#            with "SHA <full commit>" and "started <HH:MM:SS> dirty=<changed paths>" read at that moment
+#            (not while waiting: a commit made in the queue would make the log name the wrong code) and
+#            ends with "exit <code>". The slot line stays on stderr.
 #
 # Slots:     `gate_slots:` in the team block of docs/orchestration/ORCHESTRATION.md (default 2);
 #            GATE_SLOTS overrides it.
@@ -23,12 +28,30 @@
 #            not by the file: the holder died with the machine, so the next command simply takes it.
 # Needs flock(1) (util-linux; macOS: `brew install flock`). Without it, it warns and runs unthrottled.
 set -u
-[ $# -ge 1 ] || { echo "usage: gate-throttle.sh <command> [args...]" >&2; exit 64; }
+log=""
+if [ "${1:-}" = --log ]; then
+  [ $# -ge 3 ] && [ -n "$2" ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
+  log="$2"; shift 2
+  : > "$log" || { echo "gate-throttle: cannot write the log $log" >&2; exit 73; }
+fi
+[ $# -ge 1 ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
+# The command, logged when --log was given: commit and dirty count first, read now, exit code last.
+run() {
+  [ -z "$log" ] && { "$@"; return $?; }
+  local rc
+  {
+    echo "SHA $(git rev-parse HEAD 2>/dev/null || echo none)"
+    echo "started $(date +%H:%M:%S) dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    "$@"; rc=$?
+    echo "exit $rc"
+    return $rc
+  } > "$log" 2>&1
+}
 RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
   echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2
-  "$@"; exit $?
+  run "$@"; exit $?
 fi
 locks_dir="$RT/locks"; qdir="$RT/queue"; rdir="$RT/running"
 mkdir -p "$locks_dir" "$qdir" "$rdir" || exit 1
@@ -128,7 +151,7 @@ while :; do
       echo "gate-throttle: slot $i acquired $(date +%H:%M:%S) in $(pwd -P)" >&2
       # 9>&-: the command does not inherit the lock fd, so a daemon it leaves behind (a dev server, a
       # watcher) cannot keep the slot after it returns. This shell's own fd 9 holds the lock until exit.
-      "$@" 9>&-; rc=$?
+      run "$@" 9>&-; rc=$?
       exit $rc
     fi
     exec 9>&-
