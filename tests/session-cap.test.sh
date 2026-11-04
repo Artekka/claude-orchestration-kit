@@ -26,6 +26,12 @@ real="$(bash -c '. "$1"; pgrep -x claude | wc -l' _ "$ROOT/scripts/lib-launch.sh
 got="$(bash -c '. "$1"; TEAM_MAX=1; launch_cap_warn 0' _ "$ROOT/scripts/lib-launch.sh" 2>&1)"
 if [ "$real" -gt 1 ]; then has "real counter: counts named claude processes" "$real Claude sessions" "$got"; else eq "real counter: no named claude here, no warning at cap 1" "" "$got"; fi
 kill -KILL "$DEC" 2>/dev/null
+# no claude running at all: pgrep exits 1, and under the launchers' `set -euo pipefail` that must not end the
+# script (it once did, silently, right after the `terminal` line); the count is 0 and the warning still works
+mkdir -p "$SB/nopgrep"; printf '#!/bin/sh\nexit 1\n' > "$SB/nopgrep/pgrep"; chmod +x "$SB/nopgrep/pgrep"
+got="$(PATH="$SB/nopgrep:$PATH" bash -c 'set -euo pipefail; . "$1"; TEAM_MAX=1; launch_cap_warn 2; echo SURVIVED' _ "$ROOT/scripts/lib-launch.sh" 2>&1)"
+has "no claude running (pgrep exits 1): set -e caller survives" "SURVIVED" "$got"
+has "no claude running: counts 0 and still warns" "0 Claude sessions already run" "$got"
 
 # start-team dry run: warns, still plans the launches (a warning, never a refusal)
 run_in_sb FAKE_TERM_MODE=forbid KIT_CLAUDE_COUNT=5 -- bash "$START" --repo "$SB/repo" --terminal linux-xterm --dry-run

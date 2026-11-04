@@ -2,6 +2,10 @@
 
 Newest first.
 
+## Unreleased
+
+- **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
+
 ## 0.9.0 — 2026-10-14
 
 Team mode is now the default; Solo is a practice mode.
