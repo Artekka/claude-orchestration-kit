@@ -189,6 +189,18 @@ v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off s
 context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
 example session. Full history: [`CHANGELOG.md`](CHANGELOG.md).
 
+## Disk cleanup
+
+A team that builds, tests and deploys all day fills a disk: worktrees nobody removed, Docker build layers from every deploy, test containers left running. One project lost 170 GB this way. The kit now carries three small guards. Each is plain bash, and each can be dry-run.
+
+| Script | What it removes or refuses | What it always keeps |
+|---|---|---|
+| `scripts/retro-worktrees.sh --prefix <branch-prefix> [--dry-run]` (the `/retro` skill runs it as Step 4b) | worktrees of YOUR session whose branch is already on `origin/main` | an unmerged branch; a tree with uncommitted or untracked files, an unusual ignored file, a commit `origin/main` lacks, a file changed in the last 30 minutes, or a process running inside it; the worktree it runs in; every branch ref, so no commit is lost. It never uses `--force`, and an empty prefix is refused. |
+| `scripts/docker-cache-cap.sh [--dry-run]` | the OLDEST Docker build-cache layers, down to `KIT_BUILD_CACHE_KEEP` (default `40GB`) | the most recently used layers; images and containers (it prunes the build cache only). Call it after a deploy that passed its health check, never before. A failure only warns. |
+| `scripts/gate-disk-guard.sh` (`gate-throttle.sh` runs it before it queues) | nothing: it REFUSES to start a gate when free space is under the minimum | the disk as it was. The minimum is `KIT_GATE_MIN_FREE_GB`, or `gate_min_free_gb:` in the team block, default 20 GB; `0` turns it off; `KIT_GATE_DISK_PATH` picks the disk (default `/`). |
+
+Try them without changing anything: `bash scripts/retro-worktrees.sh --prefix s5e307/ --dry-run` prints `would remove N, kept M` with the reason for every tree it keeps, and `bash scripts/docker-cache-cap.sh --dry-run` prints the command it would run. `bootstrap.sh` and the `kit-init` skill copy all three scripts (and the worktree safety check that `retro-worktrees.sh` and `seat-merge.sh` share).
+
 ## If you use tmux
 
 `scripts/tmux-session.sh` is the one entry point. It creates (or reaches) the tmux session that holds the team, opens the seat in its own window, and attaches:

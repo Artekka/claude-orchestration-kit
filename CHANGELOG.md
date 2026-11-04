@@ -4,6 +4,16 @@ Newest first.
 
 ## Unreleased
 
+### Disk cleanup
+
+A kit user's SSD filled (170 GB of old Docker layers, worktrees and leftovers), so the guards the originating project runs daily are in the kit (plain bash, each with a dry run; see the README section "Disk cleanup").
+
+- **Added: `scripts/retro-worktrees.sh --prefix <branch-prefix> [--dry-run]`** — removes the retiring session's worktrees whose branch is already on `origin/main`. Keeps an unmerged branch, any tree with uncommitted or untracked files, a commit `origin/main` lacks, a file changed in the last 30 minutes or a process inside it, and the worktree it runs in; never `--force`; branch refs stay. An empty prefix is refused. The `retro` skill runs it as Step 4b and reports its counts.
+- **Added: `scripts/docker-cache-cap.sh [--dry-run]`** — trims the Docker build cache to `KIT_BUILD_CACHE_KEEP` (default `40GB`), keeping the most recently used layers. Call it after a deploy passed its health check. A failure only warns; no docker is a note.
+- **Added: `scripts/gate-disk-guard.sh`**, run by `gate-throttle.sh` before it queues: it refuses (exit 1) when free space is under `KIT_GATE_MIN_FREE_GB` / `gate_min_free_gb:` (default 20 GB, `0` = off, `KIT_GATE_DISK_PATH` picks the disk). An unreadable `df` never blocks.
+- **Changed: `bootstrap.sh` and the `kit-init` skill copy the three scripts.**
+- **Added: `tests/disk-cleanup.test.sh`** (fake `df` and `docker`; throwaway repos).
+
 tmux entry point, ported from a project that has run it daily.
 
 - **Added: `scripts/tmux-session.sh`** — starts or reaches the tmux session for the team, optionally with the seat as its first window (`--seat Name --model M [--effort E] [--prompt P]`), `--install-command CMD` to write a one-word launcher, `--install-windows` (WSL) to add a Windows `CMD.cmd` and a Windows Terminal profile. Falls back to running the seat in the current terminal when tmux is not installed. The default session name follows `launch_tmux_session`, so `start-team`/`recycle-sibling` add windows to the same session.

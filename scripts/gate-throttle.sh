@@ -58,6 +58,10 @@ case "$1" in
     exit 2
     ;;
 esac
+# Low disk: refuse before any ticket exists (scripts/gate-disk-guard.sh; KIT_GATE_MIN_FREE_GB or `gate_min_free_gb:` sets the
+# minimum, default 20 GB, 0 = off). A project that did not copy the guard script simply has no check.
+_guard="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/gate-disk-guard.sh"
+if [ -f "$_guard" ]; then bash "$_guard" || exit 1; fi
 RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
