@@ -20,6 +20,10 @@
 #            took freed slots). A dead waiter's ticket is skipped and deleted.
 # Load:      the head of the line takes a normal slot only while the 1-minute load average is below
 #            GATE_MAX_LOAD (default 0.9 x CPU count). Unreadable load = admit.
+# Memory:    a normal slot beyond the first is admitted only while the system's available memory
+#            (MemAvailable in /proc/meminfo, the "available" column of `free -m`) is at least
+#            GATE_MIN_FREE_MB (default 3072). Below that, one normal slot at a time. Unreadable = admit.
+#            KIT_MEMINFO_FILE points at a stand-in for /proc/meminfo (tests).
 # Quiet mode: while "$RT/quiet-mode" exists (scripts/quiet-mode.sh on), no NEW command starts; running
 #            ones finish. GATE_IGNORE_QUIET=1 is the seat's escape for a hotfix gate; while quiet
 #            mode is on it also skips the line, because the waiters ahead of it are parked.
@@ -129,14 +133,45 @@ load_ok() {
   awk -v l="$l" -v m="$max_load" 'BEGIN { exit !(l < m) }'
 }
 
+min_free_mb="${GATE_MIN_FREE_MB:-3072}"
+case "$min_free_mb" in ''|*[!0-9]*) min_free_mb=3072 ;; esac
+mem_avail_mb() {  # available memory in MB; empty when unreadable
+  local f="${KIT_MEMINFO_FILE:-/proc/meminfo}"
+  [ -r "$f" ] || return 0
+  awk '/^MemAvailable:/ { printf "%d", $2 / 1024 }' "$f" 2>/dev/null
+}
+mem_ok() {  # 0 = a normal slot beyond the first may start
+  local m; m="$(mem_avail_mb)"
+  [ -z "$m" ] && return 0
+  [ "$m" -ge "$min_free_mb" ]
+}
+running_normal() {  # how many normal-slot commands are running now (live pid, numeric slot)
+  local f n=0 pid
+  for f in "$rdir"/*; do
+    [ -e "$f" ] || continue
+    pid="${f##*/}"
+    case "$(cut -f1 "$f" 2>/dev/null)" in ''|*[!0-9]*) continue ;; esac
+    alive "$pid" && n=$((n + 1))
+  done
+  echo "$n"
+}
+
 take_ticket
 trap 'drop_ticket; rm -f "$rdir/$$"' EXIT
 load_told=0
+mem_told=0
 while :; do
   cands=""
   # The quiet-mode escape also skips the line: the waiters ahead are parked in quiet mode and would hold it forever.
   if am_head || { [ "${GATE_IGNORE_QUIET:-}" = 1 ] && [ -f "$RT/quiet-mode" ]; }; then
-    if load_ok; then cands="$(seq 1 "$slots")"; load_told=0
+    if load_ok; then
+      cands="$(seq 1 "$slots")"; load_told=0
+      if [ "$slots" -gt 1 ] && ! mem_ok && [ "$(running_normal)" -ge 1 ]; then
+        cands=""
+        if [ "$mem_told" = 0 ]; then
+          echo "gate-throttle: next in line, holding: $(mem_avail_mb) MB available < $min_free_mb MB (GATE_MIN_FREE_MB); one slot until memory frees" >&2; mem_told=1
+        fi
+      else mem_told=0; fi
     elif [ "$load_told" = 0 ]; then
       echo "gate-throttle: next in line, holding: load $(load_now) >= $max_load (GATE_MAX_LOAD)" >&2; load_told=1
     fi

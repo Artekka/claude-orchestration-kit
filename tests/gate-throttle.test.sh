@@ -185,6 +185,23 @@ timeout 20 bash "$GT" --log "$TMP/no/such/dir/x.log" true 2>/dev/null; [ $? -eq 
 (cd "$L" && KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" --log "$TMP/noflock.log" bash -c 'echo nf-ran' 2>/dev/null)
 [ "$(sed -n 1p "$TMP/noflock.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && [ "$(tail -n 1 "$TMP/noflock.log")" = "exit 0" ] && ok \
   || bad "no flock: --log did not write SHA first and exit last: $(cat "$TMP/noflock.log")"
+# 12. memory admission: the second normal slot only while MemAvailable >= GATE_MIN_FREE_MB (default 3072);
+#     below it one normal slot at a time. KIT_MEMINFO_FILE fakes /proc/meminfo; unreadable = admit.
+meminfo() { printf 'MemTotal:       16000000 kB\nMemFree:          100000 kB\nMemAvailable:   %d kB\n' "$(( $1 * 1024 ))" > "$TMP/meminfo"; }
+two_run() {  # <label> <expect: together|alone> — A holds, B queued; do they run together?
+  bg A; waitfor "start A" || bad "$1: A never started"
+  bg B; sleep 0.6
+  if [ "$2" = together ]; then [ "$(order)" = "A B " ] && ok || bad "$1: want A and B together, got '$(order)'"
+  else [ "$(order)" = "A " ] && ok || bad "$1: want only A, got '$(order)'"; fi
+}
+reset; export GATE_SLOTS=2 KIT_MEMINFO_FILE="$TMP/meminfo"; unset GATE_MIN_FREE_MB
+meminfo 1000; two_run "low memory (1000 MB)" alone
+release A; waitfor "start B" || bad "low memory: B never started after A released"; release B; waitfor "end B"
+reset; meminfo 8000; two_run "ample memory (8000 MB)" together
+reset; meminfo 3072; two_run "exactly the floor (3072 MB)" together
+reset; rm -f "$TMP/meminfo"; two_run "unreadable meminfo" together
+reset; meminfo 1000; GATE_MIN_FREE_MB=500 two_run "knob GATE_MIN_FREE_MB=500 with 1000 MB" together
+reset; unset KIT_MEMINFO_FILE
 
 echo "gate-throttle: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

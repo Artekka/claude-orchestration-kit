@@ -6,6 +6,7 @@ Newest first.
 
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
+- **New: memory-aware gate slots.** (PRS 2026-10-16)
 
 ## 0.9.0 — 2026-10-14
 
