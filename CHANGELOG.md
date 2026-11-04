@@ -9,6 +9,7 @@ Newest first.
 - **New: memory-aware gate slots.** (PRS 2026-10-16)
 - **New, status HUD: model badges.** (PRS 2026-10-14)
 - **New, status HUD: session state at a glance.** (PRS 2026-10-14)
+- Thanks to @MilesBrown34 for #3, #4, #10, #11 and #12.
 
 ## 0.9.0 — 2026-10-14
 

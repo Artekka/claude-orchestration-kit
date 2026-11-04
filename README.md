@@ -210,3 +210,7 @@ The workflow assumes nothing beyond stock Claude Code. These user-level plugins 
 routinely present on the origin setup and complement the kit, but the kit never installs
 or requires them: `superpowers` (TDD/debugging discipline), `code-review`, a token/context
 hygiene plugin. If a skill here references one, treat it as optional.
+
+## Contributors
+
+- Miles Brown (@MilesBrown34)
