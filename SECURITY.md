@@ -17,9 +17,9 @@ A fix ships as a new patch release and a CHANGELOG entry.
 
 **Do not open a public issue for a vulnerability.** Report it privately through GitHub:
 
-1. Open this repository's **Security** tab.
-2. Choose **Report a vulnerability**
-   (https://github.com/Artekka/claude-orchestration-kit/security/advisories/new).
+1. Open this repository's **Security** tab
+   (https://github.com/Artekka/claude-orchestration-kit/security).
+2. Choose **Report a vulnerability**.
 3. Say what is affected, how to reproduce it, and what an attacker gains.
 
 Private vulnerability reporting must be switched on by the repository owner. If the button is missing,
