@@ -16,21 +16,23 @@ bad() { fail=$((fail + 1)); echo "FAIL $*"; }
 
 # ---- the classes: label TAB extended regex (grep -E) ------------------------------------------------
 CLASSES="$(cat <<'EOF'
-home-path	(^|[^A-Za-z0-9_}/.-])/(home|Users)/[A-Za-z0-9_][A-Za-z0-9._-]*
+home-path	((^|[^A-Za-z0-9_}/.-])/(home|Users)|/mnt/[A-Za-z]/([Uu]sers|home)|file://(localhost)?/(home|Users)|\.\./(home|Users)|\b[A-Za-z]:[\\/]+[Uu]sers)[\\/]+[A-Za-z0-9_][A-Za-z0-9._-]*
 email	[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}
 aws-key	\b(AKIA|ASIA)[0-9A-Z]{16}\b
-github-token	\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}\b
+github-token	\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}
 github-token	\bgithub_pat_[A-Za-z0-9_]{22,}
 anthropic-key	\bsk-ant-[A-Za-z0-9_-]{20,}
 openai-key	\bsk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}
 private-key	-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY( BLOCK)?-----
 EOF
 )"
-# home-path starts at a boundary, so a sandbox path like "$SB/home/x" is not a user's home; a user name
-# starts with a letter, digit or _, so "/home/.config" is not one either.
+# home-path: a bare /home/<name> or /Users/<name> starts at a boundary, so a sandbox path like "$SB/home/x" is not a user's
+# home. Paths that reach a home through a "/" are listed one by one instead: WSL's /mnt/<drive>/Users/<name>, file:// URLs,
+# ../home/<name>, and Windows <drive>:\Users\<name> (either slash). A user name starts with a letter, digit or _, so
+# "/home/.config" is not one. The allow-list is checked against the user name alone, whatever the form.
 # Matches that are fine. Each is checked against the matched text alone, never the whole line, so an
 # allowed path on a line cannot hide a real one beside it.
-ALLOW_HOME='^/(home|Users)/(u|x|you|user|username|me|name|example|runner)$'
+ALLOW_HOME='^(u|x|you|user|username|me|name|example|runner|Public|Default)$'
 ALLOW_EMAIL='(@users\.noreply\.github\.com|^noreply@anthropic\.com|^noreply@github\.com|^git@github\.com|@example\.(com|org|net))$'
 # The openai shape also catches every Anthropic key; report those once, as anthropic-key.
 ALLOW_OPENAI='^sk-ant-'
@@ -50,8 +52,12 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
     # -I skips binary files; -o prints each match on its own line; -H keeps file:line: with one file
     (cd "$dir" && grep -HonIE -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
       local m="${hit#*:}"; m="${m#*:}"
-      [ "$label" = home-path ] && m="/${m#*/}"   # drop the boundary character
-      if [ -n "$allow" ] && printf '%s\n' "$m" | grep -qE -- "$allow"; then continue; fi
+      local subject="$m"
+      if [ "$label" = home-path ]; then
+        [[ "$m" =~ ^[A-Za-z0-9/.~-] ]] || m="${m:1}"   # drop the boundary character of the bare form
+        subject="${m##*[\\/]}"                       # the user name: the allow-list is about who, not the form
+      fi
+      if [ -n "$allow" ] && printf '%s\n' "$subject" | grep -qE -- "$allow"; then continue; fi
       echo "$label ${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1): $m"
     done
   done <<< "$CLASSES"
@@ -73,10 +79,20 @@ A=A; Z=0123456789ABCDEF; L=abcdefghijklmnopqrstuvwxyz0123456789
 plant home-path      "cd /ho""me/jdoe/projects"
 plant home-path      "open /Us""ers/jdoe/Library"
 plant home-path      "a placeholder /home/u beside a real path /ho""me/jdoe"
+plant home-path      "WSL: /mnt/c/Us""ers/jdoe/Documents"
+plant home-path      "WSL lower case: /mnt/d/us""ers/jdoe"
+plant home-path      "open file:///ho""me/jdoe/index.html"
+plant home-path      "mac: file:///Us""ers/jdoe/x"
+plant home-path      "cd ~/../ho""me/jdoe"
+plant home-path      'C:\Us''ers\jdoe\AppData'
+plant home-path      'json: "C:\\\\Us''ers\\\\jdoe"'
+plant home-path      "C:/Us""ers/jdoe/x"
+plant home-path      "PATH=/usr/bin:/ho""me/jdoe/bin"
 plant email          "mail jane.doe""@""gmail.com"
 plant aws-key        "key=${A}KIA${Z}"
 plant aws-key        "key=${A}SIA${Z}"
 plant github-token   "token=gh""p_${L}"
+plant github-token   "token=gh""p_${L}XYZ"   # a longer tail than 36
 plant github-token   "token=github""_pat_${L}_${L}"
 plant anthropic-key  "ANTHROPIC_API_KEY=sk-""ant-api03-${L}"
 plant openai-key     "OPENAI_API_KEY=sk-""proj-${L}"
@@ -85,6 +101,8 @@ plant private-key    "-----BEGIN ""PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""OPENSSH PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""RSA PRIVATE KEY-----"
 clean home-path      "HOME=/home/u and /home/user/x and /Users/you/x and /home/<user> and /home/\$USER"
+clean home-path      'sandbox: "$SB/home/x" "${SB}/home/jdoe" /tmp/sb/home/jdoe "$SB/home/.claude-acct2"'
+clean home-path      'placeholders: /mnt/c/Users/you C:\Users\Public C:\Users\%USERNAME% file:///home/user/x ../home/u'
 clean email          "Co-Authored-By: Claude <noreply""@anthropic.com> and 12345+someone""@users.noreply.github.com"
 clean email          "t""@example.com, git""@github.com:owner/repo.git, plugin@marketplace-name"
 clean anthropic-key  "an Anthropic key starts with sk-ant- and the docs never show one"

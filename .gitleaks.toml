@@ -7,17 +7,19 @@ title = "orchestration-kit"
 [extend]
 useDefault = true
 
-# A real user's home directory. The placeholders the docs and tests use are allowed. The secret is the user
+# A real user's home directory, in the same forms as tests/leak-guard.test.sh: a bare /home/<name> or /Users/<name> (after a
+# boundary, so a sandbox "$SB/home/x" is not one), WSL /mnt/<drive>/Users/<name>, file:// URLs, ../home/<name>, and Windows
+# <drive>:\Users\<name> with either slash. The placeholders the docs and tests use are allowed. The secret is the user
 # name alone: the default global allowlist drops any secret that itself looks like /home/... or /Users/...
 [[rules]]
 id = "home-path"
 description = "A /home/<user> or /Users/<user> path names a real machine user"
-regex = '''(?:^|[^A-Za-z0-9_}/.\-])/(?:home|Users)/([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
+regex = '''(?:(?:^|[^A-Za-z0-9_}/.\-])/(?:home|Users)|/mnt/[A-Za-z]/(?:[Uu]sers|home)|file://(?:localhost)?/(?:home|Users)|\.\./(?:home|Users)|\b[A-Za-z]:[\\/]+[Uu]sers)[\\/]+([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
 secretGroup = 1
-keywords = ["/home/", "/users/"]
+keywords = ["home", "users"]
 [[rules.allowlists]]
 regexTarget = "secret"
-regexes = ['''^(?:u|x|you|user|username|me|name|example|runner)$''']
+regexes = ['''^(?:u|x|you|user|username|me|name|example|runner|Public|Default)$''']
 
 # A personal email address. Noreply forms and the reserved example.* domains are allowed.
 [[rules]]
