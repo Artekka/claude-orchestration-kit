@@ -7,23 +7,24 @@ title = "orchestration-kit"
 [extend]
 useDefault = true
 
-# A real user's home directory: the same INVERTED rule as tests/leak-guard.test.sh (its part 3 feeds this regex the same
-# cases, so the two cannot drift). Any home or users directory after one or more separators (/ or \, or URL-encoded %2F /
-# %5C), in any case, followed by a user name. The only safe prefixes are the test sandboxes: a shell variable right before
-# it ($SB, ${SB}) and a /tmp/... path whose segments are not "..". The secret is the user name alone (group 2): the default
-# global allowlist drops any secret that itself looks like /home/... or /Users/...
+# A real user's home directory: the same rule as tests/leak-guard.test.sh (its part 3 feeds this regex the same cases, so the
+# two cannot drift). home or users counts only as the FIRST directory of an absolute path: at a line start or after
+# whitespace, a quote, =, :, ( or , or right after a known root (/mnt/<x>, /var, /tmp, /var/tmp, a drive, a UNC \\host\share,
+# file://, ~, .. segments, a $VAR). Separators are / or \ or %2F / %5C, any case. Safe: only the test sandboxes ($SB, $TMPDIR,
+# one mktemp-style /tmp segment). The secret is the user name alone: the default global allowlist drops any secret that
+# itself looks like /home/... or /Users/...
 [[rules]]
 id = "home-path"
 description = "A home or users directory path names a real machine user"
-regex = '''(?i)(\$\{[^}\s]*\}|\$[A-Za-z_][A-Za-z0-9_]*|/tmp(?:/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?(?:[\\/]|%2F|%5C)+(?:home|users)(?:[\\/]|%2F|%5C)+([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
-secretGroup = 2
+regex = '''(?im)(?:^|[\s"'`=:(,])(?:/mnt/[^\\/\s]+|/var|/(?:var/)?tmp(?:[\\/][^\\/\s]+)*|[A-Za-z]:|[\\/]{2,}[^\\/\s]+[\\/]+[^\\/\s]+|file:(?://|%2F%2F)[^\\/\s%]*|~|\.\.|\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*))?(?:[\\/]+\.\.)*(?:[\\/]|%2F|%5C)+(?:home|users)(?:[\\/]|%2F|%5C)+([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
+secretGroup = 1
 keywords = ["home", "users"]
 [[rules.allowlists]]
 regexTarget = "secret"
-regexes = ['''(?i)^(?:u|x|you|user|username|me|name|example|runner|Public|Default)$''']
+regexes = ['''(?i)^(?:u|x|you|user|username|me|name|example|runner|public|default|shared|home|users)$''']
 [[rules.allowlists]]
 regexTarget = "match"
-regexes = ['''(?i)^(?:\$|/tmp)''']
+regexes = ['''(?i)^[\s"'`=:(,]?(?:\$(?:\{(?:SB|TMPDIR)\}|(?:SB|TMPDIR))|/tmp/[A-Za-z0-9_-]*\.[A-Za-z0-9]{6,})(?:[\\/]|%2F|%5C)+(?:home|users)(?:[\\/]|%2F|%5C)+[A-Za-z0-9_][A-Za-z0-9._-]*$''']
 
 # A personal email address. Noreply forms and the reserved example.* domains are allowed.
 [[rules]]

@@ -16,7 +16,7 @@ bad() { fail=$((fail + 1)); echo "FAIL $*"; }
 
 # ---- the classes: label TAB extended regex (grep -E) ------------------------------------------------
 CLASSES="$(cat <<'EOF'
-home-path	(\$\{[^}[:space:]]*\}|\$[A-Za-z_][A-Za-z0-9_]*|/tmp(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?([\\/]|%2[Ff]|%5[Cc])+(home|users)([\\/]|%2[Ff]|%5[Cc])+[A-Za-z0-9_][A-Za-z0-9._-]*
+home-path	(^|[[:space:]"'`=:(,])(/mnt/[^\\/[:space:]]+|/var|/(var/)?tmp([\\/][^\\/[:space:]]+)*|[A-Za-z]:|[\\/]{2,}[^\\/[:space:]]+[\\/]+[^\\/[:space:]]+|file:(//|%2[Ff]%2[Ff])[^\\/[:space:]%]*|~|\.\.|\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*))?([\\/]+\.\.)*([\\/]|%2[Ff]|%5[Cc])+(home|users)([\\/]|%2[Ff]|%5[Cc])+[A-Za-z0-9_][A-Za-z0-9._-]*
 email	[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}
 aws-key	\b(AKIA|ASIA)[0-9A-Z]{16}\b
 github-token	\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}
@@ -26,16 +26,17 @@ openai-key	\bsk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}
 private-key	-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY( BLOCK)?-----
 EOF
 )"
-# home-path is INVERTED: any home or users directory after one or more separators (/ or \, or URL-encoded %2F / %5C), in
-# any case, followed by a user name, is a leak (/home/x, //home/x, /var/home/x, C:\USERS\x, \\wsl$\Ubuntu\home\x,
-# file:%2F%2F%2Fhome%2Fx, ..\home\x, ...). Listing leak forms one by one kept missing some (READ r0, r1). Only two SAFE
-# prefixes are listed, both test sandboxes: a shell variable right before the separator ($SB, ${SB}) and a /tmp/... path
-# (its segments cannot be "..", so /tmp/../home/x still fails). A user name starts with a letter, digit or _, so
-# "/home/.config" is not one. The allow-list is checked against the user name alone. .gitleaks.toml holds the same rule;
-# part 3 below feeds it the same cases, so the two cannot drift.
+# home-path (READ r0-r2): home or users counts only as the FIRST directory of an absolute path. That is, at the start of a
+# line or after whitespace, a quote, =, :, ( or , (so src/pages/Home/x and GET /api/users/1 are not homes), or right after a
+# known root: /mnt/<x>, /var, /tmp or /var/tmp (any segments), a drive C:, a UNC \\host\share, file:// or file:%2F%2F, ~,
+# .. segments, or a $VAR / ${VAR}. Separators are / or \ (repeated, JSON-escaped) or URL-encoded %2F / %5C, in any case.
+# SAFE_HOME lists the only safe prefixes, the test sandboxes this repo uses: $SB, ${SB}, $TMPDIR, ${TMPDIR}, and ONE
+# mktemp-style /tmp segment (name.XXXXXX). Any .. in between is never safe. .gitleaks.toml holds the same rule; part 3
+# feeds it the same cases, so the two cannot drift.
 # Matches that are fine. Each is checked against the matched text alone, never the whole line, so an
 # allowed path on a line cannot hide a real one beside it.
-ALLOW_HOME='^(u|x|you|user|username|me|name|example|runner|Public|Default)$'
+ALLOW_HOME='^(u|x|you|user|username|me|name|example|runner|public|default|shared|home|users)$'
+SAFE_HOME='^[[:space:]"'"'"'`=:(,]?(\$(\{(SB|TMPDIR)\}|(SB|TMPDIR))|/tmp/[A-Za-z0-9_-]*\.[A-Za-z0-9]{6,})([\\/]|%2[Ff]|%5[Cc])+(home|users)([\\/]|%2[Ff]|%5[Cc])+[A-Za-z0-9_][A-Za-z0-9._-]*$'
 ALLOW_EMAIL='(@users\.noreply\.github\.com|^noreply@anthropic\.com|^noreply@github\.com|^git@github\.com|@example\.(com|org|net))$'
 # The openai shape also catches every Anthropic key; report those once, as anthropic-key.
 ALLOW_OPENAI='^sk-ant-'
@@ -58,7 +59,8 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
       local m="${hit#*:}"; m="${m#*:}"
       local subject="$m" icase=""
       if [ "$label" = home-path ]; then
-        case "$m" in '$'*|/[Tt][Mm][Pp]*) continue ;; esac   # a safe prefix: a sandbox, not a home
+        printf '%s\n' "$m" | grep -qiE -- "$SAFE_HOME" && continue   # a test sandbox, not a home
+        case "$m" in [[:space:]\"\'\`=:\(,]*) m="${m:1}" ;; esac   # drop the boundary character from the report
         subject="$(printf '%s' "$m" | sed -E 's/.*([\\/]|%2[Ff]|%5[Cc])//')"   # the user name: the allow-list is about who
         icase=i
       fi
@@ -89,6 +91,7 @@ HOME_RED=(
   "WSL lower case: /mnt/d/us""ers/jdoe"
   "open file:///ho""me/jdoe/index.html"
   "mac: file:///Us""ers/jdoe/x"
+  "host: file://localhost/ho""me/jdoe/x"
   "cd ~/../ho""me/jdoe"
   'C:\Us''ers\jdoe\AppData'
   'json: "C:\\Us''ers\\jdoe"'
@@ -112,11 +115,22 @@ HOME_RED=(
   "\$HOME/../ho""me/jdoe"
   "/tmp/../ho""me/jdoe"
   "\$SB beside /ho""me/jdoe"
+  "\${REMOTE}/ho""me/jdoe/x"
+  "\$SRC/ho""me/jdoe/x"
+  "\$X/Us""ers/jdoe"
+  "\$SB/../ho""me/jdoe"
+  "/tmp/rootfs/ho""me/jdoe"
+  "/var/tmp/ho""me/jdoe"
+  "/TMP/x/ho""me/jdoe"
+  "(see /ho""me/jdoe)"
+  "a,/ho""me/jdoe"
 )
 HOME_CLEAN=(
   "HOME=/home/u and /home/user/x and /Users/you/x and /home/<user> and /home/\$USER"
-  'sandbox: "$SB/home/jdoe" "${SB}/home/jdoe" /tmp/sb/home/jdoe "$SB/home/.claude-acct2" $X/Users/jdoe'
-  'placeholders: /mnt/c/Users/you C:\Users\Public C:\Users\%USERNAME% file:///home/user/x ../home/u /HOME/U %2Fhome%2Fu'
+  'sandbox: "$SB/home/jdoe" "${SB}/home/jdoe" "$TMPDIR/home/jdoe" ${TMPDIR}/Users/jdoe /tmp/leak-guard.Ab12Cd/home/jdoe "$SB/home/.claude-acct2"'
+  'placeholders: /mnt/c/Users/you C:\Users\Public C:\Users\%USERNAME% file:///home/user/x ../home/u /HOME/U %2Fhome%2Fu /Users/Shared'
+  'code: src/pages/Home/Dashboard.tsx routes/users/list.ts GET /api/users/123 https://example.com/home/welcome Settings/Home/Profile'
+  'prose: the /home/users page'
 )
 for c in "${HOME_RED[@]}"; do plant home-path "$c"; done
 for c in "${HOME_CLEAN[@]}"; do clean home-path "$c"; done
