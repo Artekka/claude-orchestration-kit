@@ -50,6 +50,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/gitleaks"
           tar -xzf "$RUNNER_TEMP/$tgz" -C "$RUNNER_TEMP/gitleaks" gitleaks
           echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+      # With gitleaks on PATH, the leak guard also runs its parity case through the real binary, so the guard and
+      # .gitleaks.toml are checked against each other on every push (the test job has no gitleaks and skips that case).
+      - name: Leak guard, with the gitleaks parity case
+        shell: bash
+        run: bash tests/leak-guard.test.sh
       - name: Scan the new commits
         shell: bash
         env:

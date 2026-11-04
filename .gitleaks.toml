@@ -7,19 +7,23 @@ title = "orchestration-kit"
 [extend]
 useDefault = true
 
-# A real user's home directory, in the same forms as tests/leak-guard.test.sh: a bare /home/<name> or /Users/<name> (after a
-# boundary, so a sandbox "$SB/home/x" is not one), WSL /mnt/<drive>/Users/<name>, file:// URLs, ../home/<name>, and Windows
-# <drive>:\Users\<name> with either slash. The placeholders the docs and tests use are allowed. The secret is the user
-# name alone: the default global allowlist drops any secret that itself looks like /home/... or /Users/...
+# A real user's home directory: the same INVERTED rule as tests/leak-guard.test.sh (its part 3 feeds this regex the same
+# cases, so the two cannot drift). Any home or users directory after one or more separators (/ or \, or URL-encoded %2F /
+# %5C), in any case, followed by a user name. The only safe prefixes are the test sandboxes: a shell variable right before
+# it ($SB, ${SB}) and a /tmp/... path whose segments are not "..". The secret is the user name alone (group 2): the default
+# global allowlist drops any secret that itself looks like /home/... or /Users/...
 [[rules]]
 id = "home-path"
-description = "A /home/<user> or /Users/<user> path names a real machine user"
-regex = '''(?:(?:^|[^A-Za-z0-9_}/.\-])/(?:home|Users)|/mnt/[A-Za-z]/(?:[Uu]sers|home)|file://(?:localhost)?/(?:home|Users)|\.\./(?:home|Users)|\b[A-Za-z]:[\\/]+[Uu]sers)[\\/]+([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
-secretGroup = 1
+description = "A home or users directory path names a real machine user"
+regex = '''(?i)(\$\{[^}\s]*\}|\$[A-Za-z_][A-Za-z0-9_]*|/tmp(?:/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?(?:[\\/]|%2F|%5C)+(?:home|users)(?:[\\/]|%2F|%5C)+([A-Za-z0-9_][A-Za-z0-9._\-]*)'''
+secretGroup = 2
 keywords = ["home", "users"]
 [[rules.allowlists]]
 regexTarget = "secret"
-regexes = ['''^(?:u|x|you|user|username|me|name|example|runner|Public|Default)$''']
+regexes = ['''(?i)^(?:u|x|you|user|username|me|name|example|runner|Public|Default)$''']
+[[rules.allowlists]]
+regexTarget = "match"
+regexes = ['''(?i)^(?:\$|/tmp)''']
 
 # A personal email address. Noreply forms and the reserved example.* domains are allowed.
 [[rules]]

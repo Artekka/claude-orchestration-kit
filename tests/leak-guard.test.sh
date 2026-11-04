@@ -16,7 +16,7 @@ bad() { fail=$((fail + 1)); echo "FAIL $*"; }
 
 # ---- the classes: label TAB extended regex (grep -E) ------------------------------------------------
 CLASSES="$(cat <<'EOF'
-home-path	((^|[^A-Za-z0-9_}/.-])/(home|Users)|/mnt/[A-Za-z]/([Uu]sers|home)|file://(localhost)?/(home|Users)|\.\./(home|Users)|\b[A-Za-z]:[\\/]+[Uu]sers)[\\/]+[A-Za-z0-9_][A-Za-z0-9._-]*
+home-path	(\$\{[^}[:space:]]*\}|\$[A-Za-z_][A-Za-z0-9_]*|/tmp(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*)?([\\/]|%2[Ff]|%5[Cc])+(home|users)([\\/]|%2[Ff]|%5[Cc])+[A-Za-z0-9_][A-Za-z0-9._-]*
 email	[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}
 aws-key	\b(AKIA|ASIA)[0-9A-Z]{16}\b
 github-token	\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}
@@ -26,10 +26,13 @@ openai-key	\bsk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}
 private-key	-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY( BLOCK)?-----
 EOF
 )"
-# home-path: a bare /home/<name> or /Users/<name> starts at a boundary, so a sandbox path like "$SB/home/x" is not a user's
-# home. Paths that reach a home through a "/" are listed one by one instead: WSL's /mnt/<drive>/Users/<name>, file:// URLs,
-# ../home/<name>, and Windows <drive>:\Users\<name> (either slash). A user name starts with a letter, digit or _, so
-# "/home/.config" is not one. The allow-list is checked against the user name alone, whatever the form.
+# home-path is INVERTED: any home or users directory after one or more separators (/ or \, or URL-encoded %2F / %5C), in
+# any case, followed by a user name, is a leak (/home/x, //home/x, /var/home/x, C:\USERS\x, \\wsl$\Ubuntu\home\x,
+# file:%2F%2F%2Fhome%2Fx, ..\home\x, ...). Listing leak forms one by one kept missing some (READ r0, r1). Only two SAFE
+# prefixes are listed, both test sandboxes: a shell variable right before the separator ($SB, ${SB}) and a /tmp/... path
+# (its segments cannot be "..", so /tmp/../home/x still fails). A user name starts with a letter, digit or _, so
+# "/home/.config" is not one. The allow-list is checked against the user name alone. .gitleaks.toml holds the same rule;
+# part 3 below feeds it the same cases, so the two cannot drift.
 # Matches that are fine. Each is checked against the matched text alone, never the whole line, so an
 # allowed path on a line cannot hide a real one beside it.
 ALLOW_HOME='^(u|x|you|user|username|me|name|example|runner|Public|Default)$'
@@ -50,14 +53,16 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
   while IFS=$'\t' read -r label re; do
     case "$label" in home-path) allow="$ALLOW_HOME" ;; email) allow="$ALLOW_EMAIL" ;; openai-key) allow="$ALLOW_OPENAI" ;; *) allow='' ;; esac
     # -I skips binary files; -o prints each match on its own line; -H keeps file:line: with one file
-    (cd "$dir" && grep -HonIE -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
+    local gi=""; [ "$label" = home-path ] && gi=i   # a home path in any case (C:\USERS, /HOME)
+    (cd "$dir" && grep -HonIE$gi -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
       local m="${hit#*:}"; m="${m#*:}"
-      local subject="$m"
+      local subject="$m" icase=""
       if [ "$label" = home-path ]; then
-        [[ "$m" =~ ^[A-Za-z0-9/.~-] ]] || m="${m:1}"   # drop the boundary character of the bare form
-        subject="${m##*[\\/]}"                       # the user name: the allow-list is about who, not the form
+        case "$m" in '$'*|/[Tt][Mm][Pp]*) continue ;; esac   # a safe prefix: a sandbox, not a home
+        subject="$(printf '%s' "$m" | sed -E 's/.*([\\/]|%2[Ff]|%5[Cc])//')"   # the user name: the allow-list is about who
+        icase=i
       fi
-      if [ -n "$allow" ] && printf '%s\n' "$subject" | grep -qE -- "$allow"; then continue; fi
+      if [ -n "$allow" ] && printf '%s\n' "$subject" | grep -q${icase}E -- "$allow"; then continue; fi
       echo "$label ${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1): $m"
     done
   done <<< "$CLASSES"
@@ -76,18 +81,45 @@ clean() {  # <label> <file content>: the scanner must report nothing
   [ -z "$out" ] && ok || bad "allowed form flagged ($1): $out"
 }
 A=A; Z=0123456789ABCDEF; L=abcdefghijklmnopqrstuvwxyz0123456789
-plant home-path      "cd /ho""me/jdoe/projects"
-plant home-path      "open /Us""ers/jdoe/Library"
-plant home-path      "a placeholder /home/u beside a real path /ho""me/jdoe"
-plant home-path      "WSL: /mnt/c/Us""ers/jdoe/Documents"
-plant home-path      "WSL lower case: /mnt/d/us""ers/jdoe"
-plant home-path      "open file:///ho""me/jdoe/index.html"
-plant home-path      "mac: file:///Us""ers/jdoe/x"
-plant home-path      "cd ~/../ho""me/jdoe"
-plant home-path      'C:\Us''ers\jdoe\AppData'
-plant home-path      'json: "C:\\\\Us''ers\\\\jdoe"'
-plant home-path      "C:/Us""ers/jdoe/x"
-plant home-path      "PATH=/usr/bin:/ho""me/jdoe/bin"
+HOME_RED=(
+  "cd /ho""me/jdoe/projects"
+  "open /Us""ers/jdoe/Library"
+  "a placeholder /home/u beside a real path /ho""me/jdoe"
+  "WSL: /mnt/c/Us""ers/jdoe/Documents"
+  "WSL lower case: /mnt/d/us""ers/jdoe"
+  "open file:///ho""me/jdoe/index.html"
+  "mac: file:///Us""ers/jdoe/x"
+  "cd ~/../ho""me/jdoe"
+  'C:\Us''ers\jdoe\AppData'
+  'json: "C:\\Us''ers\\jdoe"'
+  "C:/Us""ers/jdoe/x"
+  "PATH=/usr/bin:/ho""me/jdoe/bin"
+  "//ho""me/jdoe"
+  "//Us""ers/jdoe"
+  "/us""ers/jdoe"
+  "/HO""ME/jdoe"
+  'C:\US''ERS\jdoe'
+  '\\wsl$\Ubuntu\ho''me\jdoe'
+  '\\wsl.localhost\Ubuntu\ho''me\jdoe'
+  'json: "\\\\wsl$\\Ubuntu\\ho''me\\jdoe"'
+  "%2Fho""me%2Fjdoe"
+  "file:%2F%2F%2Fho""me%2Fjdoe"
+  "%5CUs""ers%5Cjdoe"
+  "%2fho""me%2fjdoe"
+  "/var/ho""me/jdoe"
+  "/mnt/wsl/ho""me/jdoe"
+  '..\ho''me\jdoe'
+  "\$HOME/../ho""me/jdoe"
+  "/tmp/../ho""me/jdoe"
+  "\$SB beside /ho""me/jdoe"
+)
+HOME_CLEAN=(
+  "HOME=/home/u and /home/user/x and /Users/you/x and /home/<user> and /home/\$USER"
+  'sandbox: "$SB/home/jdoe" "${SB}/home/jdoe" /tmp/sb/home/jdoe "$SB/home/.claude-acct2" $X/Users/jdoe'
+  'placeholders: /mnt/c/Users/you C:\Users\Public C:\Users\%USERNAME% file:///home/user/x ../home/u /HOME/U %2Fhome%2Fu'
+)
+for c in "${HOME_RED[@]}"; do plant home-path "$c"; done
+for c in "${HOME_CLEAN[@]}"; do clean home-path "$c"; done
 plant email          "mail jane.doe""@""gmail.com"
 plant aws-key        "key=${A}KIA${Z}"
 plant aws-key        "key=${A}SIA${Z}"
@@ -100,9 +132,6 @@ plant openai-key     "OPENAI_API_KEY=sk-""${L}"
 plant private-key    "-----BEGIN ""PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""OPENSSH PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""RSA PRIVATE KEY-----"
-clean home-path      "HOME=/home/u and /home/user/x and /Users/you/x and /home/<user> and /home/\$USER"
-clean home-path      'sandbox: "$SB/home/x" "${SB}/home/jdoe" /tmp/sb/home/jdoe "$SB/home/.claude-acct2"'
-clean home-path      'placeholders: /mnt/c/Users/you C:\Users\Public C:\Users\%USERNAME% file:///home/user/x ../home/u'
 clean email          "Co-Authored-By: Claude <noreply""@anthropic.com> and 12345+someone""@users.noreply.github.com"
 clean email          "t""@example.com, git""@github.com:owner/repo.git, plugin@marketplace-name"
 clean anthropic-key  "an Anthropic key starts with sk-ant- and the docs never show one"
@@ -115,6 +144,52 @@ printf 'ignored.txt\n' > "$SB/g/.gitignore"; printf '%s\n' "/ho""me/jdoe" > "$SB
 out="$(leak_scan "$SB/g")"
 case "$out" in *"new.txt:1:"*) ok ;; *) bad "untracked file not scanned (got: ${out:-nothing})" ;; esac
 case "$out" in *"ignored.txt"*) bad "ignored file scanned: $out" ;; *) ok ;; esac
+
+# ---- (3) parity: .gitleaks.toml's home-path rule flags exactly the same cases -----------------------------
+# The rule's regex and allowlists are read from the toml and applied with Python's re (the same syntax subset as gitleaks'
+# RE2 here), so CI's gitleaks scan cannot drift from this guard. With a real gitleaks on PATH (CI's gitleaks job), each case
+# also goes through the binary itself, default rules and global allowlist included.
+CASES="$SB/home-cases.txt"; : > "$CASES"
+for c in "${HOME_RED[@]}"; do printf 'R\t%s\n' "$c" >> "$CASES"; done
+for c in "${HOME_CLEAN[@]}"; do printf 'C\t%s\n' "$c" >> "$CASES"; done
+if [ ! -f "$ROOT/.gitleaks.toml" ]; then
+  echo "SKIP gitleaks parity: no .gitleaks.toml in this repo (a copy of this guard elsewhere, e.g. the pre-push hook's sandbox)"
+elif command -v python3 >/dev/null 2>&1 && python3 -c 'import tomllib' 2>/dev/null; then
+  drift="$(python3 -I - "$ROOT/.gitleaks.toml" "$CASES" <<'EOF'
+import re, sys, tomllib
+cfg = tomllib.load(open(sys.argv[1], "rb"))
+rule = next(r for r in cfg.get("rules", []) if r["id"] == "home-path")
+rx, grp = re.compile(rule["regex"]), rule.get("secretGroup", 0)
+allows = [(a.get("regexTarget", "secret"), [re.compile(x) for x in a.get("regexes", [])]) for a in rule.get("allowlists", [])]
+def allowed(m):
+    target = {"secret": m.group(grp), "match": m.group(0)}
+    return any(any(x.search(target.get(t, m.group(grp))) for x in xs) for t, xs in allows)
+for line in open(sys.argv[2], encoding="utf-8"):
+    want, text = line.rstrip("\n").split("\t", 1)
+    got = "R" if any(not allowed(m) for m in rx.finditer(text)) else "C"
+    if got != want:
+        print(f"want {'flagged' if want == 'R' else 'clean'}, gitleaks rule says {'flagged' if got == 'R' else 'clean'}: {text}")
+EOF
+)"
+  [ -z "$drift" ] && ok || bad "the .gitleaks.toml home-path rule drifted from this guard:"$'\n'"$drift"
+else
+  echo "SKIP gitleaks parity (regex): python3 with tomllib (3.11+) is not available"
+fi
+if [ -f "$ROOT/.gitleaks.toml" ] && command -v gitleaks >/dev/null 2>&1; then
+  rm -rf "$SB/gl"; mkdir -p "$SB/gl"; i=0
+  while IFS=$'\t' read -r want text; do i=$((i + 1)); printf '%s\n' "$text" > "$SB/gl/$want-$i.txt"; done < "$CASES"
+  gitleaks dir "$SB/gl" -c "$ROOT/.gitleaks.toml" --no-banner --report-format csv --report-path "$SB/gl.csv" >/dev/null 2>&1
+  [ -s "$SB/gl.csv" ] || bad "gitleaks wrote no report (it failed to run with .gitleaks.toml)"
+  flagged="$(awk -F, 'NR > 1 && $1 == "home-path" { print $3 }' "$SB/gl.csv" | sed 's#.*/##' | sort -u)"
+  miss=""
+  for f in "$SB"/gl/*.txt; do
+    b="${f##*/}"; hit=C; grep -qxF "$b" <<<"$flagged" && hit=R
+    [ "$hit" = "${b%%-*}" ] || miss="$miss"$'\n'"  gitleaks says $hit, want ${b%%-*}: $(cat "$f")"
+  done
+  [ -z "$miss" ] && ok || bad "real gitleaks disagrees with this guard:$miss"
+elif [ -f "$ROOT/.gitleaks.toml" ]; then
+  echo "SKIP gitleaks parity (binary): gitleaks is not on PATH (CI's gitleaks job runs this case)"
+fi
 
 # ---- (2) the repo itself is clean -------------------------------------------------------------------
 found="$(leak_scan "$ROOT")"
