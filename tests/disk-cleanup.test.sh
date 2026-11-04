@@ -85,6 +85,13 @@ sandbox; tree s5e307/a 1; ta="$TREE"; tree s5e307/b 1; tb="$TREE"; echo d > "$tb
 out="$(rw --prefix s5e307/)"; has "several trees: the clean ones go, the dirty one stays" "retro-worktrees: removed 2, kept 1" "$out"
 [ ! -d "$ta" ] && [ -d "$tb" ] && [ ! -d "$tc" ] && ok || bad "wrong set removed"
 
+# never --force: a git shim on PATH records every `worktree remove` and passes everything through to the real git
+sandbox; tree s5e307/a 1; REAL_GIT="$(command -v git)"; mkdir -p "$SB/shim"
+printf '#!/usr/bin/env bash\n[ "${1:-}" = worktree ] && [ "${2:-}" = remove ] && echo "$*" >> "%s/git.calls"\nexec "%s" "$@"\n' "$SB" "$REAL_GIT" > "$SB/shim/git"; chmod +x "$SB/shim/git"
+out="$(cd "$SB/work" && PATH="$SB/shim:$PATH" bash "$RW" --prefix s5e307/ 2>&1; echo "rc=$?")"
+has "the shim saw the removal" "removed" "$out"; has "git worktree remove was called" "worktree remove" "$(cat "$SB/git.calls" 2>/dev/null)"
+case "$(cat "$SB/git.calls" 2>/dev/null)" in *--force*|*" -f"*) bad "retro-worktrees must never pass --force to git worktree remove" ;; *) ok ;; esac
+
 # ── B. docker-cache-cap.sh (a FAKE docker records its argv) ───────────────────────────────────────────────────────────────────
 FD="$TMP/fakedocker"; CALLS="$TMP/docker.calls"
 printf '#!/usr/bin/env bash\necho "$*" >> "%s"\n[ -n "${FAKE_DOCKER_FAIL:-}" ] && exit 1\nexit 0\n' "$CALLS" > "$FD"; chmod +x "$FD"
