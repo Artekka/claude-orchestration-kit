@@ -11,8 +11,8 @@ You need a Unix shell with `bash`, `git`, `awk`, `python3`, `pgrep`, `flock` and
 Linux or WSL has them). The tests are developed on Linux and WSL; on macOS some cases skip.
 
 ```bash
-git clone https://github.com/Artekka/claude-orchestration-kit.git
-cd claude-orchestration-kit
+git clone https://github.com/Artekka/orcastration-kit.git
+cd orcastration-kit
 bash tests/run.sh
 ```
 

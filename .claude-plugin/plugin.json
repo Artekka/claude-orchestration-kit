@@ -6,6 +6,8 @@
   "author": {
     "name": "Artekka"
   },
+  "homepage": "https://github.com/Artekka/orcastration-kit",
+  "repository": "https://github.com/Artekka/orcastration-kit",
   "license": "MIT",
   "keywords": [
     "orchestration",

@@ -18,7 +18,7 @@ A fix ships as a new patch release and a CHANGELOG entry.
 **Do not open a public issue for a vulnerability.** Report it privately through GitHub:
 
 1. Open this repository's **Security** tab
-   (https://github.com/Artekka/claude-orchestration-kit/security).
+   (https://github.com/Artekka/orcastration-kit/security).
 2. Choose **Report a vulnerability**.
 3. Say what is affected, how to reproduce it, and what an attacker gains.
 

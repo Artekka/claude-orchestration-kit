@@ -69,7 +69,7 @@ In a terminal (on Windows: a WSL terminal), **from inside the repo you want to u
 
 ```bash
 cd ~/projects/myapp
-claude plugin marketplace add Artekka/claude-orchestration-kit
+claude plugin marketplace add Artekka/orcastration-kit
 claude plugin install orchestration-kit@artekka-kits --scope project
 ```
 

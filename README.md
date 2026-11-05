@@ -10,7 +10,7 @@ project: three concurrent sessions, ~15 workstreams, one evening, zero collision
 ```bash
 # 1. Install into your repo (normal shell, not inside Claude; on Windows run `wsl` first)
 cd ~/projects/myapp
-claude plugin marketplace add Artekka/claude-orchestration-kit
+claude plugin marketplace add Artekka/orcastration-kit
 claude plugin install orchestration-kit@artekka-kits --scope project
 
 # 2. Set up the repo and start the team — inside Claude; tell it your test command,
@@ -117,7 +117,7 @@ Per repo (recommended — the kit is active only in the repos you install it int
 Run from inside the repo:
 
 ```bash
-claude plugin marketplace add Artekka/claude-orchestration-kit   # or a local path
+claude plugin marketplace add Artekka/orcastration-kit   # or a local path
 claude plugin install orchestration-kit@artekka-kits --scope project   # or --scope local
 ```
 
@@ -135,7 +135,7 @@ automatically) — add to the project's `.claude/settings.json`:
 {
   "extraKnownMarketplaces": {
     "artekka-kits": {
-      "source": { "source": "github", "repo": "Artekka/claude-orchestration-kit" }
+      "source": { "source": "github", "repo": "Artekka/orcastration-kit" }
     }
   },
   "enabledPlugins": { "orchestration-kit@artekka-kits": true }
